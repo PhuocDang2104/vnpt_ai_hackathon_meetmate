@@ -1,0 +1,46 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import get_settings
+from app.api.v1.endpoints import (
+    auth,
+    users,
+    meetings,
+    documents,
+    in_meeting,
+    pre_meeting,
+    post_meeting,
+    rag,
+    agents,
+    chat_http,
+    health,
+)
+from app.api.v1.websocket import in_meeting_ws
+
+settings = get_settings()
+
+app = FastAPI(title=settings.project_name)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
+
+app.include_router(health.router, prefix=f"{settings.api_v1_prefix}/health", tags=['health'])
+app.include_router(auth.router, prefix=f"{settings.api_v1_prefix}/auth", tags=['auth'])
+app.include_router(users.router, prefix=f"{settings.api_v1_prefix}/users", tags=['users'])
+app.include_router(meetings.router, prefix=f"{settings.api_v1_prefix}/meetings", tags=['meetings'])
+app.include_router(documents.router, prefix=f"{settings.api_v1_prefix}/documents", tags=['documents'])
+app.include_router(pre_meeting.router, prefix=f"{settings.api_v1_prefix}/pre-meeting", tags=['pre-meeting'])
+app.include_router(in_meeting.router, prefix=f"{settings.api_v1_prefix}/in-meeting", tags=['in-meeting'])
+app.include_router(post_meeting.router, prefix=f"{settings.api_v1_prefix}/post-meeting", tags=['post-meeting'])
+app.include_router(rag.router, prefix=f"{settings.api_v1_prefix}/rag", tags=['rag'])
+app.include_router(agents.router, prefix=f"{settings.api_v1_prefix}/agents", tags=['agents'])
+app.include_router(chat_http.router, prefix=f"{settings.api_v1_prefix}/chat", tags=['chat'])
+app.include_router(in_meeting_ws.router, prefix=f"{settings.api_v1_prefix}/ws", tags=['ws'])
+
+
+@app.get('/')
+def root():
+    return {"message": "MeetMate backend scaffold running"}

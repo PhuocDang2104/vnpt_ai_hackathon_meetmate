@@ -1,0 +1,1 @@
+IN_MEETING_PROMPT = "Summarize live transcript into bullets with Action/Decision/Risk tags."

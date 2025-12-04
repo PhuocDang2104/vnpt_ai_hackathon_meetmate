@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  postgres:
+    build: ./postgres
+    container_name: vnpt_meetmate_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: meetmate
+      POSTGRES_PASSWORD: meetmate
+      POSTGRES_DB: meetmate
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgres_data:

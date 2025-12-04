@@ -1,0 +1,43 @@
+import { createHashRouter } from 'react-router-dom'
+import AppShell from '../layout/AppShell'
+import Dashboard from '../routes/Dashboard'
+import Calendar from '../routes/Calendar'
+import Meetings from '../routes/Meetings'
+import MeetingPre from '../routes/Meetings/MeetingPre'
+import MeetingIn from '../routes/Meetings/MeetingIn'
+import MeetingPost from '../routes/Meetings/MeetingPost'
+import LiveMeeting from '../routes/LiveMeeting'
+import KnowledgeHub from '../routes/KnowledgeHub'
+import Tasks from '../routes/Tasks'
+import Settings from '../routes/Settings'
+import MeetingLayout from '../layout/MeetingLayout'
+
+const router = createHashRouter([
+  {
+    path: '/',
+    element: <AppShell />,
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: 'calendar', element: <Calendar /> },
+      {
+        path: 'meetings',
+        element: <Meetings />, // list page
+      },
+      {
+        path: 'meetings/:meetingId',
+        element: <MeetingLayout />, // detail shell
+        children: [
+          { path: 'pre', element: <MeetingPre /> },
+          { path: 'in', element: <MeetingIn /> },
+          { path: 'post', element: <MeetingPost /> },
+        ],
+      },
+      { path: 'live', element: <LiveMeeting /> },
+      { path: 'knowledge', element: <KnowledgeHub /> },
+      { path: 'tasks', element: <Tasks /> },
+      { path: 'settings', element: <Settings /> },
+    ],
+  },
+])
+
+export default router
