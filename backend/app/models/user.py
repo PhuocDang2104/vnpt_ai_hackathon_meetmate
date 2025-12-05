@@ -1,13 +1,54 @@
 import uuid
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from app.db.base import Base
+from sqlalchemy.orm import relationship
+from app.models.base import Base, TimestampMixin, UUIDMixin
 
 
-class User(Base):
-    __tablename__ = 'users'
+class Organization(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = 'organization'
+    
+    name = Column(String, nullable=False)
+    
+    # Relationships
+    users = relationship("UserAccount", back_populates="organization")
+    projects = relationship("Project", back_populates="organization")
+    departments = relationship("Department", back_populates="organization")
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String, unique=True, index=True, nullable=False)
-    full_name = Column(String, nullable=True)
-    role = Column(String, default='pmo')
+
+class Department(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = 'department'
+    
+    organization_id = Column(UUID(as_uuid=True), ForeignKey('organization.id'))
+    name = Column(String, nullable=False)
+    
+    organization = relationship("Organization", back_populates="departments")
+    users = relationship("UserAccount", back_populates="department")
+
+
+class Project(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = 'project'
+    
+    organization_id = Column(UUID(as_uuid=True), ForeignKey('organization.id'))
+    name = Column(String, nullable=False)
+    code = Column(String)
+    
+    organization = relationship("Organization", back_populates="projects")
+    meetings = relationship("Meeting", back_populates="project")
+
+
+class UserAccount(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = 'user_account'
+    
+    email = Column(String, unique=True, nullable=False, index=True)
+    display_name = Column(String)
+    role = Column(String, default='user')  # user / chair / PMO / admin
+    organization_id = Column(UUID(as_uuid=True), ForeignKey('organization.id'))
+    department_id = Column(UUID(as_uuid=True), ForeignKey('department.id'))
+    avatar_url = Column(String)
+    
+    # Relationships
+    organization = relationship("Organization", back_populates="users")
+    department = relationship("Department", back_populates="users")
+    organized_meetings = relationship("Meeting", back_populates="organizer")
+    participations = relationship("MeetingParticipant", back_populates="user")
