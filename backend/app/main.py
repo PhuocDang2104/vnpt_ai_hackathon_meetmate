@@ -18,10 +18,24 @@ from app.api.v1.websocket import in_meeting_ws
 
 settings = get_settings()
 
-app = FastAPI(title=settings.project_name)
+# Parse CORS origins from settings
+def get_cors_origins():
+    origins = settings.cors_origins
+    if origins == '*':
+        return ['*']
+    return [o.strip() for o in origins.split(',') if o.strip()]
+
+app = FastAPI(
+    title=settings.project_name,
+    description="MeetMate - AI-powered Meeting Assistant",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
