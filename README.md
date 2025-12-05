@@ -1,9 +1,54 @@
 # 🌐 MeetMate (VNPT AI Hackathon) – AI Meeting Co-Host for LPBank PMO
 
 <p align="center">
-  <b>Electron desktop + FastAPI backend + LangGraph agents (Pre | In | Post) with RAG over pgvector.</b><br>
+  <b>Electron desktop + FastAPI backend + Gemini AI + RAG over pgvector.</b><br>
   <i>Built for Head of PMO / Program Directors: dependable minutes, action tracking, knowledge recall, and auditability.</i>
 </p>
+
+---
+
+## 🚀 Quick Start (Updated 05/12/2024)
+
+### 1. Start Database
+```bash
+cd infra
+docker compose up -d
+```
+
+### 2. Start Backend
+```bash
+cd backend
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+
+# Set Gemini API key
+export GEMINI_API_KEY="your_gemini_api_key"
+
+# Run
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+### 3. Start Frontend
+```bash
+cd electron
+npm install
+npm run dev
+```
+
+### 4. Test AI Chat
+```bash
+# Check AI status
+curl http://localhost:8000/api/v1/chat/status
+
+# Chat with AI
+curl -X POST http://localhost:8000/api/v1/chat/message \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Xin chào!"}'
+```
+
+### 📖 Full Changelog
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for detailed updates.
+
+---
 
 <p align="center">
   <img src="https://img.shields.io/badge/Desktop-Electron%20%7C%20Vite%20%7C%20React-blue" alt="Electron badge">

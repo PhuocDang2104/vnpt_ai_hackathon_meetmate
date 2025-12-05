@@ -11,6 +11,7 @@ import KnowledgeHub from '../routes/KnowledgeHub'
 import Tasks from '../routes/Tasks'
 import Settings from '../routes/Settings'
 import MeetingLayout from '../layout/MeetingLayout'
+import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 
 const router = createHashRouter([
   {
@@ -24,8 +25,12 @@ const router = createHashRouter([
         element: <Meetings />, // list page
       },
       {
+        path: 'meetings/:meetingId/detail',
+        element: <MeetingDetail />, // new detail page with tabs
+      },
+      {
         path: 'meetings/:meetingId',
-        element: <MeetingLayout />, // detail shell
+        element: <MeetingLayout />, // legacy detail shell
         children: [
           { path: 'pre', element: <MeetingPre /> },
           { path: 'in', element: <MeetingIn /> },
@@ -33,6 +38,7 @@ const router = createHashRouter([
         ],
       },
       { path: 'live', element: <LiveMeeting /> },
+      { path: 'live/:meetingId', element: <LiveMeeting /> },
       { path: 'knowledge', element: <KnowledgeHub /> },
       { path: 'tasks', element: <Tasks /> },
       { path: 'settings', element: <Settings /> },

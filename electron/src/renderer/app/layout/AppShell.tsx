@@ -8,9 +8,9 @@ const AppShell = () => {
       <Sidebar />
       <div className="app-shell__main">
         <Topbar />
-        <div className="app-shell__content">
+        <main className="app-shell__content">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   )
