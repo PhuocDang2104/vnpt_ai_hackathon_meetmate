@@ -359,14 +359,18 @@ vnpt_ai_hackathon/
 ```
 
 ##  Quickstart (dev)
-### 1) Database (Postgres + pgvector)
+### 1) Database + Backend via Docker (recommended)
 ```powershell
 cd infra
-docker compose up -d          # starts Postgres, auto-runs init/seed SQL
+copy env\.env.local.example env\.env.local   # optional: set GEMINI_API_KEY, overrides default DB creds if you change them
+$env:GEMINI_API_KEY="your_key"               # optional: pass through to backend container
+docker compose up -d --build                 # starts Postgres + FastAPI backend
 ```
-- Init scripts run automatically: `infra/postgres/init/01_init_extensions.sql`, `02_schema_minimal.sql`, `03_seed_mock.sql`.
+- DB exposed on host `localhost:5433`, backend on `http://localhost:8000`.
+- Init SQL runs automatically on first boot: `infra/postgres/init/01_init_extensions.sql`, `02_schema.sql`, `03_seed_mock.sql`.
+- Code is volume-mounted for hot reload; backend command already uses `--reload`.
 
-### 2) Backend (FastAPI)
+### 2) Backend (local venv, optional instead of Docker)
 ```powershell
 cd backend
 python -m venv .venv
@@ -374,7 +378,6 @@ python -m venv .venv
 pip install -r ..\requirements.txt
 copy ..\infra\env\.env.development.example .env
 $env:PYTHONPATH="."
-python -m app.db.init_db                  # optional quick schema (if you skip alembic initially)
 uvicorn app.main:app --reload --port 8000
 ```
 

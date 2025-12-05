@@ -1,33 +1,36 @@
-try:
-    from langgraph.graph import StateGraph, END
-except ImportError:  # Fallback stub
-    class StateGraph:  # type: ignore
-        def __init__(self, *_args, **_kwargs):
-            self.nodes = []
-            self.edges = []
-
-        def add_node(self, name, fn):
-            self.nodes.append((name, fn))
-
-        def add_edge(self, *_args, **_kwargs):
-            self.edges.append((_args, _kwargs))
-
-        def compile(self):
-            return self
-
-        def invoke(self, state):
-            return state
-
-    END = 'END'
+from app.llm.graphs.state import MeetingState, StateGraph, END
 
 
-def build_pre_meeting_graph():
-    graph = StateGraph(dict)
+def build_pre_meeting_subgraph():
+    graph = StateGraph(MeetingState)
 
-    def agenda_node(state: dict):
-        state['agenda'] = ['Review BRD', 'Risks', 'Timeline']
+    def prepare_context(state: MeetingState) -> MeetingState:
+        state.setdefault("stage", "pre")
+        state.setdefault("rag_docs", [])
+        state.setdefault("citations", [])
+        debug = state.setdefault("debug_info", {})
+        debug["pre_context_ready"] = True
         return state
 
-    graph.add_node('agenda', agenda_node)
-    graph.add_edge('agenda', END)
+    def agenda_stub(state: MeetingState) -> MeetingState:
+        state.setdefault("rag_docs", [])
+        agenda = [
+            {"order": 1, "title": "Khai mạc & điểm danh", "duration_minutes": 5, "presenter": "Chair"},
+            {"order": 2, "title": "Báo cáo tiến độ", "duration_minutes": 15, "presenter": "PM"},
+            {"order": 3, "title": "Rủi ro & blockers", "duration_minutes": 20, "presenter": "PMO"},
+            {"order": 4, "title": "Quyết định & Action Items", "duration_minutes": 10, "presenter": "Leads"},
+            {"order": 5, "title": "Kết luận", "duration_minutes": 5, "presenter": "Chair"},
+        ]
+        state["debug_info"]["agenda_suggestion"] = agenda
+        return state
+
+    graph.add_node("prepare_context", prepare_context)
+    graph.add_node("agenda", agenda_stub)
+    graph.set_entry_point("prepare_context")
+    graph.add_edge("prepare_context", "agenda")
+    graph.add_edge("agenda", END)
     return graph.compile()
+
+
+# Backward-compatible alias
+build_pre_meeting_graph = build_pre_meeting_subgraph

@@ -5,8 +5,14 @@ from alembic import context
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config
+
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    try:
+        fileConfig(config.config_file_name)
+    except KeyError:
+        # alembic.ini không define logging đầy đủ (formatters/handlers/loggers)
+        # → bỏ qua logging, vẫn chạy migration bình thường
+        pass
 
 from app.db.base import Base  # noqa: E402
 from app import models  # noqa: E402,F401

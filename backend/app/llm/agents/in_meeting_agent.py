@@ -1,7 +1,7 @@
 from app.llm.agents.base_agent import BaseAgent
-from app.llm.graphs.in_meeting_graph import build_in_meeting_graph
+from app.llm.graphs.router import build_router_graph
 
 
 class InMeetingAgent(BaseAgent):
     def __init__(self) -> None:
-        super().__init__(build_in_meeting_graph())
+        super().__init__(build_router_graph(default_stage="in"), stage="in")

@@ -18,5 +18,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: vnpt_meetmate_backend
+    restart: unless-stopped
+    environment:
+      ENV: development
+      DATABASE_URL: postgresql+psycopg2://meetmate:meetmate@postgres:5432/meetmate
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PYTHONPATH: /app/backend
+    volumes:
+      - ../backend:/app/backend
+      - ../infra/env:/app/infra/env:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 volumes:
   postgres_data:

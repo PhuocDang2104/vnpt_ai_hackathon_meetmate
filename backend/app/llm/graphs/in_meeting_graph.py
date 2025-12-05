@@ -1,39 +1,73 @@
-try:
-    from langgraph.graph import StateGraph, END
-except ImportError:  # Fallback stub
-    class StateGraph:  # type: ignore
-        def __init__(self, *_args, **_kwargs):
-            self.nodes = []
-            self.edges = []
+from app.llm.graphs.state import (
+    MeetingState,
+    StateGraph,
+    END,
+    ActionItem,
+    Decision,
+    Risk,
+)
 
-        def add_node(self, name, fn):
-            self.nodes.append((name, fn))
 
-        def add_edge(self, *_args, **_kwargs):
-            self.edges.append((_args, _kwargs))
+def build_in_meeting_subgraph():
+    graph = StateGraph(MeetingState)
 
-        def compile(self):
-            return self
+    def ingest_node(state: MeetingState) -> MeetingState:
+        state.setdefault("stage", "in")
+        state.setdefault("transcript_window", "")
+        state.setdefault("actions", [])
+        state.setdefault("decisions", [])
+        state.setdefault("risks", [])
+        return state
 
-        def invoke(self, state):
+    def recap_node(state: MeetingState) -> MeetingState:
+        window = state.get("transcript_window") or ""
+        recap = window[:120] + ("..." if len(window) > 120 else "")
+        state.setdefault("debug_info", {})
+        state["debug_info"]["recap"] = recap or "No transcript received"
+        return state
+
+    def adr_node(state: MeetingState) -> MeetingState:
+        actions = state.setdefault("actions", [])
+        decisions = state.setdefault("decisions", [])
+        risks = state.setdefault("risks", [])
+
+        actions.append(ActionItem(task="Close CR-2024-015", owner="Tech Lead", due_date=None, priority="high"))
+        decisions.append(Decision(title="Proceed with API throttling", rationale="Protect core banking latency"))
+        risks.append(Risk(desc="Performance hit on LOS integration", severity="medium", mitigation="Add load test suite"))
+        return state
+
+    def qa_node(state: MeetingState) -> MeetingState:
+        question = state.get("last_user_question")
+        if not question:
             return state
-
-    END = 'END'
-
-
-def build_in_meeting_graph():
-    graph = StateGraph(dict)
-
-    def recap_node(state: dict):
-        state['recap'] = 'live recap stub'
+        state.setdefault("debug_info", {})
+        state["debug_info"]["qa_answer"] = f"(stub) Answer for: {question}"
         return state
 
-    def action_node(state: dict):
-        state.setdefault('actions', []).append('Action: close CR-2024-015')
-        return state
+    graph.add_node("ingest", ingest_node)
+    graph.add_node("recap", recap_node)
+    graph.add_node("qa", qa_node)
+    graph.add_node("adr", adr_node)
 
-    graph.add_node('recap', recap_node)
-    graph.add_node('action', action_node)
-    graph.add_edge('recap', 'action')
-    graph.add_edge('action', END)
+    graph.set_entry_point("ingest")
+    graph.add_edge("ingest", "recap")
+
+    def route_after_recap(state: MeetingState):
+        return "qa" if state.get("last_user_question") else "adr"
+
+    graph.add_conditional_edges(
+        "recap",
+        route_after_recap,
+        {
+            "qa": "qa",
+            "adr": "adr",
+        },
+    )
+
+    graph.add_edge("qa", "adr")
+    graph.add_edge("adr", END)
     return graph.compile()
+
+
+# Backward-compatible alias
+build_in_meeting_graph = build_in_meeting_subgraph
