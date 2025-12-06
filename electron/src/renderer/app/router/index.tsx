@@ -12,8 +12,14 @@ import Tasks from '../routes/Tasks'
 import Settings from '../routes/Settings'
 import MeetingLayout from '../layout/MeetingLayout'
 import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
+import { Login, Register } from '../routes/Auth'
 
 const router = createHashRouter([
+  // Auth routes (no shell)
+  { path: '/login', element: <Login /> },
+  { path: '/register', element: <Register /> },
+  
+  // App routes (with shell)
   {
     path: '/',
     element: <AppShell />,
