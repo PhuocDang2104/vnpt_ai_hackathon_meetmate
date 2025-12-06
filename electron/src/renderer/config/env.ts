@@ -8,9 +8,10 @@
 // - Production (Render): 'https://meetmate-api.onrender.com'
 // - Thay bằng URL thực tế của bạn
 
-export const API_URL = 'https://meetmate-api.onrender.com';
+export const API_URL = 'https://vnpt-ai-hackathon-meetmate.onrender.com';
 
 // Bật/tắt kết nối API (false = dùng mock data)
+// Set false để demo với mock data khi backend chưa sẵn sàng
 export const USE_API = true;
 
 // Debug mode

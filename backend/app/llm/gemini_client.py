@@ -21,11 +21,17 @@ def get_gemini_client():
 def is_gemini_available() -> bool:
     """Check if Gemini API is configured and working"""
     if not settings.gemini_api_key or settings.gemini_api_key == '':
+        print("[Gemini] No API key configured")
         return False
     try:
         genai.configure(api_key=settings.gemini_api_key)
+        # Try a simple test call
+        model = genai.GenerativeModel(settings.gemini_model)
+        response = model.generate_content("test", generation_config=genai.types.GenerationConfig(max_output_tokens=10))
+        print(f"[Gemini] API working with model: {settings.gemini_model}")
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[Gemini] API error: {e}")
         return False
 
 
@@ -98,7 +104,9 @@ Bạn có kiến thức về:
             return assistant_message
             
         except Exception as e:
-            print(f"Gemini API error: {e}")
+            import traceback
+            print(f"[Gemini] Chat error: {e}")
+            print(f"[Gemini] Traceback: {traceback.format_exc()}")
             return self._mock_response(message)
     
     def _mock_response(self, message: str) -> str:

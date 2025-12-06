@@ -49,10 +49,48 @@ def get_or_create_session(session_id: Optional[str], meeting_id: Optional[str]) 
 @router.get('/status')
 def get_ai_status():
     """Check if AI is available"""
+    from app.core.config import get_settings
+    settings = get_settings()
+    
     return {
         'gemini_available': is_gemini_available(),
-        'status': 'ready' if is_gemini_available() else 'mock_mode'
+        'status': 'ready' if is_gemini_available() else 'mock_mode',
+        'model': settings.gemini_model,
+        'api_key_set': bool(settings.gemini_api_key and len(settings.gemini_api_key) > 10),
+        'api_key_preview': settings.gemini_api_key[:8] + '...' if settings.gemini_api_key else None
     }
+
+
+@router.get('/test')
+async def test_gemini():
+    """Test Gemini API directly"""
+    from app.core.config import get_settings
+    import google.generativeai as genai
+    
+    settings = get_settings()
+    
+    if not settings.gemini_api_key:
+        return {'error': 'No API key configured', 'key': None}
+    
+    try:
+        genai.configure(api_key=settings.gemini_api_key)
+        model = genai.GenerativeModel(settings.gemini_model)
+        response = model.generate_content(
+            "Say hello in Vietnamese",
+            generation_config=genai.types.GenerationConfig(max_output_tokens=50)
+        )
+        return {
+            'success': True,
+            'response': response.text,
+            'model': settings.gemini_model
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'model': settings.gemini_model,
+            'api_key_preview': settings.gemini_api_key[:8] + '...' if settings.gemini_api_key else None
+        }
 
 
 @router.post('/message', response_model=ChatResponse)
