@@ -3,9 +3,23 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+venv/
+env/
+*.venv/
 .env
 .env.*
+.env.local
 .python-version
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Backend virtual environment
+backend/venv/
+backend/.venv/
+backend/*.egg-info/
 
 # Node / Electron / Vite
 node_modules/
@@ -30,5 +44,32 @@ coverage.xml
 # Alembic
 alembic.ini.bak
 
+# Docker
+*.tar
+docker-compose.override.yml
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+
+# Secrets
+*.pem
+*.key
+secrets/
+
 # Misc
 *.log
+*.tmp
+*.temp
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local scripts output
+scripts/*.log
