@@ -13,30 +13,33 @@ import Settings from '../routes/Settings'
 import MeetingLayout from '../layout/MeetingLayout'
 import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 import { Login, Register } from '../routes/Auth'
+import Landing from '../routes/Landing'
 
 const router = createHashRouter([
-  // Auth routes (no shell)
+  // Public routes
+  { path: '/', element: <Landing /> },
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   
-  // App routes (with shell)
+  // App routes (with shell) - Protected
   {
-    path: '/',
+    path: '/app',
     element: <AppShell />,
     children: [
       { index: true, element: <Dashboard /> },
+      { path: 'dashboard', element: <Dashboard /> },
       { path: 'calendar', element: <Calendar /> },
       {
         path: 'meetings',
-        element: <Meetings />, // list page
+        element: <Meetings />,
       },
       {
         path: 'meetings/:meetingId/detail',
-        element: <MeetingDetail />, // new detail page with tabs
+        element: <MeetingDetail />,
       },
       {
         path: 'meetings/:meetingId',
-        element: <MeetingLayout />, // legacy detail shell
+        element: <MeetingLayout />,
         children: [
           { path: 'pre', element: <MeetingPre /> },
           { path: 'in', element: <MeetingIn /> },

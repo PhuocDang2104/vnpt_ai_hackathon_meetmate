@@ -22,7 +22,7 @@ export const Login: React.FC = () => {
       await login({ email, password });
       const user = await getCurrentUser();
       storeUser(user);
-      navigate('/');
+      navigate('/app');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -34,7 +34,9 @@ export const Login: React.FC = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="auth-logo">MeetMate</h1>
+          <Link to="/" className="auth-logo-link">
+            <h1 className="auth-logo">MeetMate</h1>
+          </Link>
           <p className="auth-subtitle">AI-Powered Meeting Assistant</p>
         </div>
 
@@ -127,6 +129,10 @@ export const Login: React.FC = () => {
         .auth-header {
           text-align: center;
           margin-bottom: var(--space-xl);
+        }
+
+        .auth-logo-link {
+          text-decoration: none;
         }
 
         .auth-logo {
