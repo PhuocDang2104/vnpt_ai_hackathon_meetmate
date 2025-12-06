@@ -134,7 +134,7 @@ INSERT INTO meeting_participant (meeting_id, user_id, role) VALUES
 ON CONFLICT DO NOTHING;
 
 -- 7. ACTION ITEMS
-INSERT INTO action_item (id, meeting_id, owner_id, description, deadline, priority, status, source_text) VALUES
+INSERT INTO action_item (id, meeting_id, owner_user_id, description, deadline, priority, status, source_text) VALUES
     ('e0000001-0000-0000-0000-000000000001',
      'c0000001-0000-0000-0000-000000000001',
      'b0000006-0000-0000-0000-000000000006',
@@ -164,7 +164,7 @@ INSERT INTO action_item (id, meeting_id, owner_id, description, deadline, priori
 ON CONFLICT (id) DO NOTHING;
 
 -- 8. DECISIONS
-INSERT INTO decision_item (id, meeting_id, description, rationale, confirmed_by_id, status) VALUES
+INSERT INTO decision_item (id, meeting_id, description, rationale, confirmed_by, status) VALUES
     ('f0000001-0000-0000-0000-000000000001',
      'c0000001-0000-0000-0000-000000000001',
      'Approve điều chuyển 2 senior developers từ team Mobile sang team Core Banking trong 4 tuần',
@@ -181,7 +181,7 @@ INSERT INTO decision_item (id, meeting_id, description, rationale, confirmed_by_
 ON CONFLICT (id) DO NOTHING;
 
 -- 9. RISKS
-INSERT INTO risk_item (id, meeting_id, description, severity, mitigation, status, owner_id) VALUES
+INSERT INTO risk_item (id, meeting_id, description, severity, mitigation, status, owner_user_id) VALUES
     ('aa000001-0000-0000-0000-000000000001',
      'c0000001-0000-0000-0000-000000000001',
      'Go-live Core Banking có thể delay 2 tuần nếu không có đủ resources',
