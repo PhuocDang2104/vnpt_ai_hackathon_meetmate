@@ -3,7 +3,9 @@
 // HTTP client for backend communication
 // ============================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL } from '../config/env';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || API_URL;
 const API_PREFIX = '/api/v1';
 
 export class ApiError extends Error {

@@ -20,9 +20,7 @@ import { Modal } from '../../../components/ui/Modal'
 import { CreateMeetingForm } from '../../../features/meetings/components/CreateMeetingForm'
 import { meetingsApi } from '../../../lib/api/meetings'
 import type { Meeting, MeetingPhase } from '../../../shared/dto/meeting'
-
-// Toggle this to use API or mock data
-const USE_API = true
+import { USE_API } from '../../../config/env'
 
 const Meetings = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
