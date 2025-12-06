@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     
     # AI Model settings
     # Valid models: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-exp
-    gemini_model: str = 'gemini-1.5-flash'
+    gemini_model: str = 'gemini-2.5-flash-lite'
     ai_temperature: float = 0.7
     ai_max_tokens: int = 2048
     
