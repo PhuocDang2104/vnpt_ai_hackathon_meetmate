@@ -46,6 +46,23 @@ export const aiApi = {
   getRAGHistory: async (meetingId: string): Promise<RAGHistory> => {
     return api.get<RAGHistory>(`/rag/history/${meetingId}`);
   },
+
+  // Chat
+  sendMessage: async (message: string, meetingId?: string): Promise<{ message: string; confidence: number }> => {
+    return api.post('/chat/message', {
+      message,
+      meeting_id: meetingId,
+      include_context: true,
+    });
+  },
+
+  // Summary
+  generateSummary: async (meetingId: string, transcript: string): Promise<{ summary: string }> => {
+    return api.post('/chat/generate/summary', {
+      meeting_id: meetingId,
+      transcript,
+    });
+  },
 };
 
 export default aiApi;
