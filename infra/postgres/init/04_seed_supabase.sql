@@ -270,5 +270,26 @@ INSERT INTO transcript_chunk (id, meeting_id, chunk_index, start_time, end_time,
      'Em cần 2 người có experience với batch processing và Oracle optimization. Nếu có người từ team Mobile qua support 3-4 tuần là đủ.')
 ON CONFLICT (id) DO NOTHING;
 
+-- ============================================
+-- ADD PASSWORD_HASH COLUMN AND SET DEMO PASSWORDS
+-- ============================================
+
+-- Add password_hash column if not exists
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'user_account' AND column_name = 'password_hash'
+    ) THEN
+        ALTER TABLE user_account ADD COLUMN password_hash TEXT;
+    END IF;
+END $$;
+
+-- Set demo password for all users: "demo123"
+-- bcrypt hash for "demo123"
+UPDATE user_account 
+SET password_hash = '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiLXCJJH7pWe'
+WHERE password_hash IS NULL;
+
 -- Done!
 SELECT 'Seed completed successfully!' as status;

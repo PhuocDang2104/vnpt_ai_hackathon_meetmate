@@ -21,35 +21,68 @@ from app.core.security import (
 
 def get_user_by_email(db: Session, email: str) -> Optional[dict]:
     """Get user by email with password hash"""
-    query = text("""
-        SELECT 
-            u.id::text, u.email, u.display_name, u.role,
-            u.password_hash, u.department_id::text, u.avatar_url,
-            u.organization_id::text, u.created_at,
-            d.name as department_name
-        FROM user_account u
-        LEFT JOIN department d ON u.department_id = d.id
-        WHERE u.email = :email
-    """)
-    
-    result = db.execute(query, {'email': email})
-    row = result.fetchone()
-    
-    if not row:
-        return None
-    
-    return {
-        'id': row[0],
-        'email': row[1],
-        'display_name': row[2],
-        'role': row[3] or 'user',
-        'password_hash': row[4],
-        'department_id': row[5],
-        'avatar_url': row[6],
-        'organization_id': row[7],
-        'created_at': row[8],
-        'department_name': row[9]
-    }
+    # First try with password_hash column
+    try:
+        query = text("""
+            SELECT 
+                u.id::text, u.email, u.display_name, u.role,
+                u.password_hash, u.department_id::text, u.avatar_url,
+                u.organization_id::text, u.created_at,
+                d.name as department_name
+            FROM user_account u
+            LEFT JOIN department d ON u.department_id = d.id
+            WHERE u.email = :email
+        """)
+        
+        result = db.execute(query, {'email': email})
+        row = result.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            'id': row[0],
+            'email': row[1],
+            'display_name': row[2],
+            'role': row[3] or 'user',
+            'password_hash': row[4],
+            'department_id': row[5],
+            'avatar_url': row[6],
+            'organization_id': row[7],
+            'created_at': row[8],
+            'department_name': row[9]
+        }
+    except Exception:
+        # Fallback: password_hash column might not exist
+        query = text("""
+            SELECT 
+                u.id::text, u.email, u.display_name, u.role,
+                u.department_id::text, u.avatar_url,
+                u.organization_id::text, u.created_at,
+                d.name as department_name
+            FROM user_account u
+            LEFT JOIN department d ON u.department_id = d.id
+            WHERE u.email = :email
+        """)
+        
+        result = db.execute(query, {'email': email})
+        row = result.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            'id': row[0],
+            'email': row[1],
+            'display_name': row[2],
+            'role': row[3] or 'user',
+            'password_hash': None,  # No password hash column
+            'department_id': row[4],
+            'avatar_url': row[5],
+            'organization_id': row[6],
+            'created_at': row[7],
+            'department_name': row[8]
+        }
 
 
 def get_user_by_id(db: Session, user_id: str) -> Optional[CurrentUser]:
