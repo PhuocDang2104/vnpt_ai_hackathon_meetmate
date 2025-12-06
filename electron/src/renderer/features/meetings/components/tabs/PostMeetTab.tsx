@@ -262,13 +262,13 @@ const DistributionSection = ({ meeting }: { meeting: MeetingWithParticipants }) 
       </div>
       <div className="card__body">
         <div className="distribution-list">
-          {participants.slice(0, 5).map((p: any) => (
-            <div key={p.id} className="distribution-item">
+          {participants.slice(0, 5).map((p: any, idx: number) => (
+            <div key={p.user_id || p.email || idx} className="distribution-item">
               <div className="distribution-avatar">
-                {p.display_name?.charAt(0) || '?'}
+                {(p.display_name || p.email || '?').charAt(0)}
               </div>
               <div className="distribution-info">
-                <div className="distribution-name">{p.display_name || p.email}</div>
+                <div className="distribution-name">{p.display_name || p.email || 'Thành viên'}</div>
                 <div className="distribution-email">{p.email}</div>
               </div>
               <span className="badge badge--success">
