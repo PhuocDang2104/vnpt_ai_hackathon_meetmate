@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ''
     gemini_api_key: str = ''
     
-    # AI Model settings - Gemini 2.5 Flash Live
-    gemini_model: str = 'gemini-2.5-flash-preview-05-20'
+    # AI Model settings
+    # Valid models: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-exp
+    gemini_model: str = 'gemini-1.5-flash'
     ai_temperature: float = 0.7
     ai_max_tokens: int = 2048
     
