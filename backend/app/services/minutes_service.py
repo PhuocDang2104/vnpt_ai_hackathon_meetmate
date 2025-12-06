@@ -1,0 +1,447 @@
+"""
+Meeting Minutes Service
+"""
+from datetime import datetime
+from typing import Optional, List
+from uuid import uuid4
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from app.schemas.minutes import (
+    MeetingMinutesCreate, MeetingMinutesUpdate,
+    MeetingMinutesResponse, MeetingMinutesList,
+    DistributionLogCreate, DistributionLogResponse, DistributionLogList,
+    GenerateMinutesRequest
+)
+from app.services import transcript_service, action_item_service
+
+
+def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
+    """List all minutes versions for a meeting"""
+    query = text("""
+        SELECT 
+            id::text, meeting_id::text, version, minutes_text,
+            minutes_html, minutes_markdown, minutes_doc_url,
+            executive_summary, generated_at, edited_by::text,
+            edited_at, status, approved_by::text, approved_at
+        FROM meeting_minutes
+        WHERE meeting_id = :meeting_id
+        ORDER BY version DESC
+    """)
+    
+    result = db.execute(query, {'meeting_id': meeting_id})
+    rows = result.fetchall()
+    
+    minutes_list = []
+    for row in rows:
+        minutes_list.append(MeetingMinutesResponse(
+            id=row[0],
+            meeting_id=row[1],
+            version=row[2],
+            minutes_text=row[3],
+            minutes_html=row[4],
+            minutes_markdown=row[5],
+            minutes_doc_url=row[6],
+            executive_summary=row[7],
+            generated_at=row[8],
+            edited_by=row[9],
+            edited_at=row[10],
+            status=row[11],
+            approved_by=row[12],
+            approved_at=row[13]
+        ))
+    
+    return MeetingMinutesList(minutes=minutes_list, total=len(minutes_list))
+
+
+def get_latest_minutes(db: Session, meeting_id: str) -> Optional[MeetingMinutesResponse]:
+    """Get the latest minutes for a meeting"""
+    query = text("""
+        SELECT 
+            id::text, meeting_id::text, version, minutes_text,
+            minutes_html, minutes_markdown, minutes_doc_url,
+            executive_summary, generated_at, edited_by::text,
+            edited_at, status, approved_by::text, approved_at
+        FROM meeting_minutes
+        WHERE meeting_id = :meeting_id
+        ORDER BY version DESC
+        LIMIT 1
+    """)
+    
+    result = db.execute(query, {'meeting_id': meeting_id})
+    row = result.fetchone()
+    
+    if not row:
+        return None
+    
+    return MeetingMinutesResponse(
+        id=row[0],
+        meeting_id=row[1],
+        version=row[2],
+        minutes_text=row[3],
+        minutes_html=row[4],
+        minutes_markdown=row[5],
+        minutes_doc_url=row[6],
+        executive_summary=row[7],
+        generated_at=row[8],
+        edited_by=row[9],
+        edited_at=row[10],
+        status=row[11],
+        approved_by=row[12],
+        approved_at=row[13]
+    )
+
+
+def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesResponse:
+    """Create new meeting minutes"""
+    minutes_id = str(uuid4())
+    now = datetime.utcnow()
+    
+    # Get next version number
+    version_query = text("""
+        SELECT COALESCE(MAX(version), 0) + 1
+        FROM meeting_minutes
+        WHERE meeting_id = :meeting_id
+    """)
+    version_result = db.execute(version_query, {'meeting_id': data.meeting_id})
+    version = version_result.fetchone()[0]
+    
+    query = text("""
+        INSERT INTO meeting_minutes (
+            id, meeting_id, version, minutes_text, minutes_html,
+            minutes_markdown, executive_summary, status, generated_at
+        )
+        VALUES (
+            :id, :meeting_id, :version, :minutes_text, :minutes_html,
+            :minutes_markdown, :executive_summary, :status, :generated_at
+        )
+        RETURNING id::text
+    """)
+    
+    db.execute(query, {
+        'id': minutes_id,
+        'meeting_id': data.meeting_id,
+        'version': version,
+        'minutes_text': data.minutes_text,
+        'minutes_html': data.minutes_html,
+        'minutes_markdown': data.minutes_markdown,
+        'executive_summary': data.executive_summary,
+        'status': data.status,
+        'generated_at': now
+    })
+    db.commit()
+    
+    return MeetingMinutesResponse(
+        id=minutes_id,
+        meeting_id=data.meeting_id,
+        version=version,
+        minutes_text=data.minutes_text,
+        minutes_html=data.minutes_html,
+        minutes_markdown=data.minutes_markdown,
+        executive_summary=data.executive_summary,
+        status=data.status,
+        generated_at=now
+    )
+
+
+def update_minutes(
+    db: Session, 
+    minutes_id: str, 
+    data: MeetingMinutesUpdate,
+    edited_by: Optional[str] = None
+) -> Optional[MeetingMinutesResponse]:
+    """Update meeting minutes"""
+    updates = ["edited_at = :edited_at"]
+    params = {'minutes_id': minutes_id, 'edited_at': datetime.utcnow()}
+    
+    if edited_by:
+        updates.append("edited_by = :edited_by")
+        params['edited_by'] = edited_by
+    
+    if data.minutes_text is not None:
+        updates.append("minutes_text = :minutes_text")
+        params['minutes_text'] = data.minutes_text
+    if data.minutes_html is not None:
+        updates.append("minutes_html = :minutes_html")
+        params['minutes_html'] = data.minutes_html
+    if data.minutes_markdown is not None:
+        updates.append("minutes_markdown = :minutes_markdown")
+        params['minutes_markdown'] = data.minutes_markdown
+    if data.executive_summary is not None:
+        updates.append("executive_summary = :executive_summary")
+        params['executive_summary'] = data.executive_summary
+    if data.status is not None:
+        updates.append("status = :status")
+        params['status'] = data.status
+    
+    query = text(f"""
+        UPDATE meeting_minutes
+        SET {', '.join(updates)}
+        WHERE id = :minutes_id
+        RETURNING id::text, meeting_id::text
+    """)
+    
+    result = db.execute(query, params)
+    db.commit()
+    row = result.fetchone()
+    
+    if not row:
+        return None
+    
+    return get_latest_minutes(db, row[1])
+
+
+def approve_minutes(
+    db: Session, 
+    minutes_id: str, 
+    approved_by: str
+) -> Optional[MeetingMinutesResponse]:
+    """Approve meeting minutes"""
+    now = datetime.utcnow()
+    
+    query = text("""
+        UPDATE meeting_minutes
+        SET status = 'approved', approved_by = :approved_by, approved_at = :approved_at
+        WHERE id = :minutes_id
+        RETURNING id::text, meeting_id::text
+    """)
+    
+    result = db.execute(query, {
+        'minutes_id': minutes_id,
+        'approved_by': approved_by,
+        'approved_at': now
+    })
+    db.commit()
+    row = result.fetchone()
+    
+    if not row:
+        return None
+    
+    return get_latest_minutes(db, row[1])
+
+
+# ============================================
+# AI-Powered Minutes Generation
+# ============================================
+
+async def generate_minutes_with_ai(
+    db: Session, 
+    request: GenerateMinutesRequest
+) -> MeetingMinutesResponse:
+    """Generate meeting minutes using AI"""
+    from app.llm.gemini_client import MeetingAIAssistant
+    
+    meeting_id = request.meeting_id
+    
+    # Get meeting info
+    meeting_query = text("""
+        SELECT title, meeting_type, description, start_time, end_time
+        FROM meeting WHERE id = :meeting_id
+    """)
+    meeting_result = db.execute(meeting_query, {'meeting_id': meeting_id})
+    meeting_row = meeting_result.fetchone()
+    
+    if not meeting_row:
+        raise ValueError(f"Meeting {meeting_id} not found")
+    
+    meeting_title = meeting_row[0]
+    meeting_type = meeting_row[1]
+    meeting_desc = meeting_row[2]
+    start_time = meeting_row[3]
+    end_time = meeting_row[4]
+    
+    # Get transcript
+    transcript = ""
+    if request.include_transcript:
+        transcript = transcript_service.get_full_transcript(db, meeting_id)
+    
+    # Get action items
+    actions = []
+    if request.include_actions:
+        action_list = action_item_service.list_action_items(db, meeting_id)
+        actions = [item.description for item in action_list.items]
+    
+    # Get decisions
+    decisions = []
+    if request.include_decisions:
+        decision_list = action_item_service.list_decision_items(db, meeting_id)
+        decisions = [item.description for item in decision_list.items]
+    
+    # Get risks
+    risks = []
+    if request.include_risks:
+        risk_list = action_item_service.list_risk_items(db, meeting_id)
+        risks = [f"{item.description} (Severity: {item.severity})" for item in risk_list.items]
+    
+    # Use AI to generate summary
+    assistant = MeetingAIAssistant(meeting_id, {
+        'title': meeting_title,
+        'type': meeting_type,
+        'description': meeting_desc
+    })
+    
+    summary_result = await assistant.generate_summary(transcript or "No transcript available")
+    
+    # Format minutes
+    minutes_content = format_minutes(
+        meeting_title=meeting_title,
+        meeting_type=meeting_type,
+        start_time=start_time,
+        end_time=end_time,
+        summary=summary_result.get('summary', ''),
+        key_points=summary_result.get('key_points', []),
+        actions=actions,
+        decisions=decisions,
+        risks=risks,
+        format_type=request.format
+    )
+    
+    # Create minutes record
+    minutes_data = MeetingMinutesCreate(
+        meeting_id=meeting_id,
+        minutes_text=minutes_content if request.format == 'text' else None,
+        minutes_markdown=minutes_content if request.format == 'markdown' else None,
+        minutes_html=minutes_content if request.format == 'html' else None,
+        executive_summary=summary_result.get('summary', ''),
+        status='draft'
+    )
+    
+    return create_minutes(db, minutes_data)
+
+
+def format_minutes(
+    meeting_title: str,
+    meeting_type: str,
+    start_time,
+    end_time,
+    summary: str,
+    key_points: List[str],
+    actions: List[str],
+    decisions: List[str],
+    risks: List[str],
+    format_type: str = 'markdown'
+) -> str:
+    """Format meeting minutes"""
+    
+    lines = []
+    
+    # Header
+    lines.append(f"# Biên bản cuộc họp: {meeting_title}")
+    lines.append("")
+    lines.append(f"**Loại cuộc họp:** {meeting_type}")
+    if start_time:
+        lines.append(f"**Thời gian:** {start_time.strftime('%d/%m/%Y %H:%M') if start_time else 'N/A'} - {end_time.strftime('%H:%M') if end_time else 'N/A'}")
+    lines.append("")
+    
+    # Executive Summary
+    lines.append("## Tóm tắt điều hành")
+    lines.append(summary)
+    lines.append("")
+    
+    # Key Points
+    if key_points:
+        lines.append("## Điểm chính")
+        for point in key_points:
+            lines.append(f"- {point}")
+        lines.append("")
+    
+    # Decisions
+    if decisions:
+        lines.append("## Các quyết định")
+        for i, decision in enumerate(decisions, 1):
+            lines.append(f"{i}. {decision}")
+        lines.append("")
+    
+    # Action Items
+    if actions:
+        lines.append("## Action Items")
+        for i, action in enumerate(actions, 1):
+            lines.append(f"{i}. {action}")
+        lines.append("")
+    
+    # Risks
+    if risks:
+        lines.append("## Rủi ro đã nhận diện")
+        for risk in risks:
+            lines.append(f"- {risk}")
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
+# ============================================
+# Distribution
+# ============================================
+
+def list_distribution_logs(db: Session, meeting_id: str) -> DistributionLogList:
+    """List distribution logs for a meeting"""
+    query = text("""
+        SELECT 
+            id::text, minutes_id::text, meeting_id::text,
+            user_id::text, channel, recipient_email,
+            sent_at, status, error_message
+        FROM minutes_distribution_log
+        WHERE meeting_id = :meeting_id
+        ORDER BY sent_at DESC
+    """)
+    
+    result = db.execute(query, {'meeting_id': meeting_id})
+    rows = result.fetchall()
+    
+    logs = []
+    for row in rows:
+        logs.append(DistributionLogResponse(
+            id=row[0],
+            minutes_id=row[1],
+            meeting_id=row[2],
+            user_id=row[3],
+            channel=row[4],
+            recipient_email=row[5],
+            sent_at=row[6],
+            status=row[7],
+            error_message=row[8]
+        ))
+    
+    return DistributionLogList(logs=logs, total=len(logs))
+
+
+def create_distribution_log(db: Session, data: DistributionLogCreate) -> DistributionLogResponse:
+    """Create a distribution log entry"""
+    log_id = str(uuid4())
+    now = datetime.utcnow()
+    
+    query = text("""
+        INSERT INTO minutes_distribution_log (
+            id, minutes_id, meeting_id, user_id, channel,
+            recipient_email, sent_at, status
+        )
+        VALUES (
+            :id, :minutes_id, :meeting_id, :user_id, :channel,
+            :recipient_email, :sent_at, :status
+        )
+        RETURNING id::text
+    """)
+    
+    db.execute(query, {
+        'id': log_id,
+        'minutes_id': data.minutes_id,
+        'meeting_id': data.meeting_id,
+        'user_id': data.user_id,
+        'channel': data.channel,
+        'recipient_email': data.recipient_email,
+        'sent_at': now,
+        'status': data.status
+    })
+    db.commit()
+    
+    return DistributionLogResponse(
+        id=log_id,
+        minutes_id=data.minutes_id,
+        meeting_id=data.meeting_id,
+        user_id=data.user_id,
+        channel=data.channel,
+        recipient_email=data.recipient_email,
+        sent_at=now,
+        status=data.status
+    )
+

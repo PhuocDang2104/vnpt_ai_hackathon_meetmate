@@ -13,6 +13,10 @@ from app.api.v1.endpoints import (
     agents,
     chat_http,
     health,
+    action_items,
+    transcripts,
+    participants,
+    minutes,
 )
 from app.api.v1.websocket import in_meeting_ws
 
@@ -52,6 +56,10 @@ app.include_router(post_meeting.router, prefix=f"{settings.api_v1_prefix}/post-m
 app.include_router(rag.router, prefix=f"{settings.api_v1_prefix}/rag", tags=['rag'])
 app.include_router(agents.router, prefix=f"{settings.api_v1_prefix}/agents", tags=['agents'])
 app.include_router(chat_http.router, prefix=f"{settings.api_v1_prefix}/chat", tags=['chat'])
+app.include_router(action_items.router, prefix=f"{settings.api_v1_prefix}/items", tags=['items'])
+app.include_router(transcripts.router, prefix=f"{settings.api_v1_prefix}/transcripts", tags=['transcripts'])
+app.include_router(participants.router, prefix=f"{settings.api_v1_prefix}/participants", tags=['participants'])
+app.include_router(minutes.router, prefix=f"{settings.api_v1_prefix}/minutes", tags=['minutes'])
 app.include_router(in_meeting_ws.router, prefix=f"{settings.api_v1_prefix}/ws", tags=['ws'])
 
 
