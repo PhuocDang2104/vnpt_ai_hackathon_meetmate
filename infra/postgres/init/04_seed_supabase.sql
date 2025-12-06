@@ -238,7 +238,7 @@ INSERT INTO preread_document (id, meeting_id, title, source, url, snippet, relev
 ON CONFLICT (id) DO NOTHING;
 
 -- 11. TRANSCRIPT CHUNKS (for Meeting 1)
-INSERT INTO transcript_chunk (id, meeting_id, chunk_index, start_time_seconds, end_time_seconds, speaker_id, text_content) VALUES
+INSERT INTO transcript_chunk (id, meeting_id, chunk_index, start_time, end_time, speaker_user_id, text) VALUES
     ('ac000001-0000-0000-0000-000000000001',
      'c0000001-0000-0000-0000-000000000001',
      1, 0, 45,
