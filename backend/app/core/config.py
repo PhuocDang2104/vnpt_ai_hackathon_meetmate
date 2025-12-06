@@ -5,16 +5,17 @@ from pathlib import Path
 
 
 def find_env_file():
-    """Find .env.local file in project"""
+    """Find .env.local file in project (for local development only)"""
     possible_paths = [
+        Path(__file__).parent.parent.parent / '.env.local',  # backend/.env.local
         Path(__file__).parent.parent.parent.parent / 'infra' / 'env' / '.env.local',
+        Path.cwd() / '.env.local',
         Path.cwd() / 'infra' / 'env' / '.env.local',
-        Path.cwd().parent / 'infra' / 'env' / '.env.local',
     ]
     for p in possible_paths:
         if p.exists():
             return str(p)
-    return None
+    return None  # No env file found, will use environment variables
 
 
 class Settings(BaseSettings):
@@ -23,9 +24,10 @@ class Settings(BaseSettings):
     project_name: str = 'MeetMate'
     
     # Database - supports both local and cloud (Supabase/Railway)
+    # Production: Set DATABASE_URL environment variable
     database_url: str = 'postgresql+psycopg2://meetmate:meetmate@localhost:5433/meetmate'
     
-    # AI API Keys
+    # AI API Keys - Set via environment variable in production
     openai_api_key: str = ''
     gemini_api_key: str = ''
     
@@ -43,14 +45,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=find_env_file(),
         env_file_encoding='utf-8',
-        extra='ignore'
+        extra='ignore',
+        # Environment variables take priority over .env file
+        env_priority='environment'
     )
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    settings = Settings()
-    # Fallback to environment variable
-    if not settings.gemini_api_key:
-        settings.gemini_api_key = os.getenv('GEMINI_API_KEY', '')
-    return settings
+    """Get cached settings instance"""
+    return Settings()

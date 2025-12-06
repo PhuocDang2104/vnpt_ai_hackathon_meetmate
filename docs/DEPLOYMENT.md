@@ -66,6 +66,9 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
 ```
 
+```
+postgresql://postgres:Meetmate1234@db.guvhuhegitzeztuoxueb.supabase.co:5432/postgres
+```
 ---
 
 ### 2️⃣ Deploy Backend: Render
