@@ -1,14 +1,55 @@
-from pydantic import BaseModel
+"""
+Document schemas for pre-read documents
+"""
+from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from uuid import UUID
 
 
 class DocumentBase(BaseModel):
-    name: str | None = None
-    source_url: str | None = None
-    meeting_id: str | None = None
+    """Base document schema"""
+    title: str
+    file_type: str = Field(description="pdf, docx, xlsx, pptx, etc.")
+    file_size: Optional[int] = None
+    description: Optional[str] = None
+
+
+class DocumentCreate(DocumentBase):
+    """Create document request"""
+    meeting_id: UUID
+    uploaded_by: Optional[UUID] = None
+    # For mock: we won't actually store file, just metadata
+    file_url: Optional[str] = None
+
+
+class DocumentUpdate(BaseModel):
+    """Update document request"""
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 
 class Document(DocumentBase):
-    id: str
-
+    """Document response"""
+    id: UUID
+    meeting_id: UUID
+    uploaded_by: Optional[UUID] = None
+    file_url: Optional[str] = None
+    uploaded_at: datetime
+    
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class DocumentList(BaseModel):
+    """List of documents response"""
+    documents: List[Document]
+    total: int
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response after uploading a document"""
+    id: UUID
+    title: str
+    file_url: str
+    message: str = "Tài liệu đã được tải lên thành công"

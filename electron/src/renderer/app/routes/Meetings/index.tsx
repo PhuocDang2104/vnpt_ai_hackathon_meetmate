@@ -271,7 +271,7 @@ const MeetingCard = ({ meeting }: MeetingCardProps) => {
 
   return (
     <Link
-      to={`/meetings/${meeting.id}/detail`}
+      to={`/app/meetings/${meeting.id}/detail`}
       style={{ textDecoration: 'none', color: 'inherit' }}
     >
       <div className="meeting-item">

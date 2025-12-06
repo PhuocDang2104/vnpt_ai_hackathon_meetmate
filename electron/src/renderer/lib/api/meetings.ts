@@ -20,7 +20,7 @@ export const meetingsApi = {
    * List all meetings with optional filters
    */
   list: async (filters?: MeetingFilters): Promise<MeetingListResponse> => {
-    return api.get<MeetingListResponse>(ENDPOINT, filters as Record<string, string | number | undefined>);
+    return api.get<MeetingListResponse>(`${ENDPOINT}/`, filters as Record<string, string | number | undefined>);
   },
 
   /**
@@ -34,7 +34,7 @@ export const meetingsApi = {
    * Create a new meeting
    */
   create: async (data: MeetingCreate): Promise<Meeting> => {
-    return api.post<Meeting>(ENDPOINT, data);
+    return api.post<Meeting>(`${ENDPOINT}/`, data);
   },
 
   /**
@@ -67,4 +67,3 @@ export const meetingsApi = {
 };
 
 export default meetingsApi;
-

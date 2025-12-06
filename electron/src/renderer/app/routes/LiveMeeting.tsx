@@ -23,7 +23,7 @@ const LiveMeeting = () => {
               <div className="empty-state__description">
                 Hiện tại không có cuộc họp nào đang diễn ra. Khi bạn bắt đầu một cuộc họp, nó sẽ xuất hiện ở đây.
               </div>
-              <Link to="/meetings" className="btn btn--primary" style={{ marginTop: 'var(--space-lg)' }}>
+              <Link to="/app/meetings" className="btn btn--primary" style={{ marginTop: 'var(--space-lg)' }}>
                 Xem danh sách cuộc họp
               </Link>
             </div>

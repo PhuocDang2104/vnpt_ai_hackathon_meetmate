@@ -156,7 +156,7 @@ const Dashboard = () => {
               <Calendar size={18} className="card__title-icon" />
               Cuộc họp sắp tới
             </h3>
-            <Link to="/meetings" className="btn btn--ghost btn--sm">
+            <Link to="/app/meetings" className="btn btn--ghost btn--sm">
               Xem tất cả
               <ArrowRight size={14} />
             </Link>
@@ -166,7 +166,7 @@ const Dashboard = () => {
               {upcomingMeetings.map(meeting => (
                 <Link 
                   key={meeting.id} 
-                  to={`/meetings/${meeting.id}/${meeting.phase}`}
+                  to={`/app/meetings/${meeting.id}/detail`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <div className="meeting-item">
@@ -209,7 +209,7 @@ const Dashboard = () => {
               <CheckSquare size={18} className="card__title-icon" />
               Action Items cần xử lý
             </h3>
-            <Link to="/tasks" className="btn btn--ghost btn--sm">
+            <Link to="/app/tasks" className="btn btn--ghost btn--sm">
               Xem tất cả
               <ArrowRight size={14} />
             </Link>

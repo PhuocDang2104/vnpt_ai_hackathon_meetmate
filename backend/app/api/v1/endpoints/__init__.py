@@ -1,10 +1,28 @@
-from . import auth, users, meetings, documents, in_meeting, pre_meeting, post_meeting, rag, agents, chat_http, health
+from . import (
+    auth,
+    users,
+    meetings,
+    documents,
+    agenda,
+    in_meeting,
+    pre_meeting,
+    post_meeting,
+    rag,
+    agents,
+    chat_http,
+    health,
+    action_items,
+    transcripts,
+    participants,
+    minutes,
+)
 
 __all__ = [
     'auth',
     'users',
     'meetings',
     'documents',
+    'agenda',
     'in_meeting',
     'pre_meeting',
     'post_meeting',
@@ -12,4 +30,8 @@ __all__ = [
     'agents',
     'chat_http',
     'health',
+    'action_items',
+    'transcripts',
+    'participants',
+    'minutes',
 ]

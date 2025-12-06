@@ -1,5 +1,101 @@
 # Changelog
 
+## [v0.5.0] - 2024-12-06
+
+### 📄 Documents & Agenda Management
+
+Xây dựng hệ thống quản lý tài liệu và agenda với AI generation.
+
+#### ✨ Features
+
+**Documents API** (`/api/v1/documents`)
+- `GET /documents/meeting/{meeting_id}` - Lấy danh sách tài liệu của cuộc họp
+- `GET /documents/{document_id}` - Lấy chi tiết tài liệu
+- `POST /documents/upload` - Upload tài liệu mới (mock implementation)
+- `PUT /documents/{document_id}` - Cập nhật metadata tài liệu
+- `DELETE /documents/{document_id}` - Xóa tài liệu
+
+**Agenda API** (`/api/v1/agenda`)
+- `GET /agenda/meeting/{meeting_id}` - Lấy danh sách agenda items
+- `GET /agenda/item/{item_id}` - Lấy chi tiết một agenda item
+- `POST /agenda/generate` - **AI tạo agenda tự động với Gemini** ✨
+- `POST /agenda/save` - Lưu agenda đã chỉnh sửa
+- `POST /agenda/meeting/{meeting_id}/item` - Thêm agenda item mới
+- `PUT /agenda/item/{item_id}` - Cập nhật agenda item
+- `DELETE /agenda/item/{item_id}` - Xóa agenda item
+- `POST /agenda/meeting/{meeting_id}/reorder` - Sắp xếp lại thứ tự items
+
+**Frontend Features**
+- **Tab "Chương trình" (Agenda)**:
+  - Xem danh sách agenda items với thời lượng
+  - AI tạo agenda tự động dựa trên meeting type, duration, participants
+  - Chỉnh sửa inline: tiêu đề, người trình bày, thời lượng
+  - Thêm/xóa agenda items
+  - Lưu thay đổi
+  - Hiển thị ghi chú từ AI
+  
+- **Tab "Tài liệu"**:
+  - Xem danh sách tài liệu pre-read
+  - Upload tài liệu mới (mock - chỉ lưu metadata)
+  - Xóa tài liệu
+  - Hiển thị loại file, mô tả
+
+#### 📁 New Files
+
+**Backend:**
+- `backend/app/schemas/document.py` - Document schemas
+- `backend/app/schemas/agenda.py` - Agenda schemas
+- `backend/app/services/document_service.py` - Document service (mock implementation)
+- `backend/app/services/agenda_service.py` - Agenda service với AI generation
+- `backend/app/api/v1/endpoints/documents.py` - Documents endpoints
+- `backend/app/api/v1/endpoints/agenda.py` - Agenda endpoints
+
+**Frontend:**
+- `electron/src/renderer/lib/api/documents.ts` - Documents API client
+- `electron/src/renderer/lib/api/agenda.ts` - Agenda API client
+
+#### 🔧 Updated Files
+
+**Backend:**
+- `backend/app/main.py` - Added documents & agenda routers
+- `backend/app/services/__init__.py` - Export document_service, agenda_service
+- `backend/app/api/v1/endpoints/__init__.py` - Export documents, agenda modules
+
+**Frontend:**
+- `electron/src/renderer/features/meetings/components/tabs/PreMeetTab.tsx` - Full implementation với AI generation & editing
+- `electron/src/renderer/styles/global.css` - Styles cho editable agenda, upload form
+
+#### 🤖 AI Features
+
+**Agenda Generation:**
+- Sử dụng Gemini API để tạo agenda thông minh
+- Phân tích meeting type, duration, participants
+- Tạo agenda items phù hợp với từng loại cuộc họp:
+  - Steering Committee: Review, Budget, Risk, Decisions
+  - Weekly Status: Sprint review, Demo, Blockers
+  - Workshop: Presentation, Practice, Discussion
+- Fallback mock agenda khi AI không available
+
+#### 📝 Mock Data
+
+**Documents:**
+- 5 mock documents cho các meetings khác nhau
+- Hỗ trợ PDF, DOCX, XLSX, PPTX
+- Metadata: title, file_type, file_size, description
+
+**Agenda:**
+- 9 mock agenda items cho 2 meetings
+- Bao gồm order_index, duration, presenter, status
+
+#### 🔑 Technical Details
+
+- **Mock Storage**: In-memory dictionary (không dùng database)
+- **File Upload**: Mock implementation - chỉ lưu metadata, không lưu file thực tế
+- **AI Integration**: Gemini 2.5 Flash Lite model
+- **Error Handling**: Graceful fallback khi AI không available
+
+---
+
 ## [v0.4.0] - 2024-12-06
 
 ### 🔐 Authentication System

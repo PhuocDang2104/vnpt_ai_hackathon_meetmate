@@ -7,6 +7,7 @@ import { API_URL } from '../config/env';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || API_URL;
 const API_PREFIX = '/api/v1';
+const ACCESS_TOKEN_KEY = 'meetmate_access_token';
 
 export class ApiError extends Error {
   constructor(
@@ -21,13 +22,22 @@ export class ApiError extends Error {
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | undefined>;
+  skipAuth?: boolean; // Skip adding Authorization header
+}
+
+/**
+ * Get access token from localStorage
+ */
+function getAccessToken(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { params, ...init } = options;
+  const { params, skipAuth, ...init } = options;
   
   // Build URL with query params
   let url = `${API_BASE_URL}${API_PREFIX}${endpoint}`;
@@ -45,16 +55,35 @@ async function request<T>(
     }
   }
   
-  // Default headers
+  // Build headers with auth token
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...init.headers,
   };
   
+  // Add Authorization header if token exists and not skipped
+  if (!skipAuth) {
+    const token = getAccessToken();
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  
   const response = await fetch(url, {
     ...init,
     headers,
   });
+  
+  // Handle 401 - could trigger re-login
+  if (response.status === 401) {
+    // Clear token if it's invalid
+    if (typeof localStorage !== 'undefined') {
+      // Don't clear on login endpoint
+      if (!endpoint.includes('/auth/login')) {
+        console.warn('[API] Token expired or invalid');
+      }
+    }
+  }
   
   if (!response.ok) {
     let data;
@@ -79,10 +108,11 @@ export const api = {
   get: <T>(endpoint: string, params?: Record<string, string | number | undefined>) =>
     request<T>(endpoint, { method: 'GET', params }),
   
-  post: <T>(endpoint: string, data?: unknown) =>
+  post: <T>(endpoint: string, data?: unknown, options?: { skipAuth?: boolean }) =>
     request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      skipAuth: options?.skipAuth,
     }),
   
   put: <T>(endpoint: string, data?: unknown) =>

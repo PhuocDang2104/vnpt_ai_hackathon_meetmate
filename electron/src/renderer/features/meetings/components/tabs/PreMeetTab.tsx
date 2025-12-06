@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Users,
@@ -9,14 +9,19 @@ import {
   Clock,
   User,
   ExternalLink,
-  AlertTriangle,
-  HelpCircle,
   Loader2,
   Send,
   Bot,
+  Save,
+  Edit2,
+  Trash2,
+  GripVertical,
+  Upload,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { aiApi } from '../../../../lib/api/ai';
+import { agendaApi, type AgendaItem, type AgendaItemCreate } from '../../../../lib/api/agenda';
+import { documentsApi, type Document } from '../../../../lib/api/documents';
 
 interface PreMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -71,23 +76,58 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
   );
 };
 
-// Agenda Section
+// ============================================
+// AGENDA SECTION - with AI generation and editing
+// ============================================
 const AgendaSection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [agenda, setAgenda] = useState<Array<{ title: string; duration: number; presenter: string }>>([
-    { title: 'Khai mạc & Điểm danh', duration: 5, presenter: 'Chủ tọa' },
-    { title: 'Báo cáo tiến độ dự án', duration: 15, presenter: 'PM' },
-    { title: 'Thảo luận vấn đề & Blockers', duration: 20, presenter: 'Tất cả' },
-    { title: 'Quyết định & Action Items', duration: 15, presenter: 'Chủ tọa' },
-    { title: 'Kết luận', duration: 5, presenter: 'Chủ tọa' },
-  ]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editedItems, setEditedItems] = useState<AgendaItemCreate[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [aiNotes, setAiNotes] = useState<string | null>(null);
+
+  // Load agenda on mount
+  useEffect(() => {
+    loadAgenda();
+  }, [meeting.id]);
+
+  const loadAgenda = async () => {
+    setIsLoading(true);
+    try {
+      const result = await agendaApi.listByMeeting(meeting.id);
+      setAgendaItems(result.items);
+      setEditedItems(result.items.map(item => ({
+        order_index: item.order_index,
+        title: item.title,
+        duration_minutes: item.duration_minutes,
+        presenter_name: item.presenter_name,
+        description: item.description,
+      })));
+    } catch (err) {
+      console.error('Failed to load agenda:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGenerateAgenda = async () => {
     setIsGenerating(true);
     try {
-      const result = await aiApi.generateAgenda(meeting.id, meeting.meeting_type);
-      // Parse result and set agenda
-      console.log('Generated agenda:', result);
+      const result = await agendaApi.generate({
+        meeting_id: meeting.id,
+        meeting_title: meeting.title,
+        meeting_type: meeting.meeting_type,
+        meeting_description: meeting.description || undefined,
+        duration_minutes: getDurationMinutes(),
+        participants: meeting.participants?.map(p => p.display_name || p.email) || [],
+      });
+      
+      setEditedItems(result.items);
+      setAiNotes(result.ai_notes || null);
+      setHasChanges(true);
     } catch (err) {
       console.error('Failed to generate agenda:', err);
     } finally {
@@ -95,89 +135,390 @@ const AgendaSection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
     }
   };
 
-  const totalDuration = agenda.reduce((sum, item) => sum + item.duration, 0);
+  const getDurationMinutes = (): number => {
+    if (meeting.start_time && meeting.end_time) {
+      const start = new Date(meeting.start_time).getTime();
+      const end = new Date(meeting.end_time).getTime();
+      return Math.round((end - start) / 60000);
+    }
+    return 60;
+  };
+
+  const handleSaveAgenda = async () => {
+    setIsSaving(true);
+    try {
+      const result = await agendaApi.save({
+        meeting_id: meeting.id,
+        items: editedItems,
+      });
+      setAgendaItems(result.items);
+      setHasChanges(false);
+      setAiNotes(null);
+    } catch (err) {
+      console.error('Failed to save agenda:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateItem = (index: number, field: keyof AgendaItemCreate, value: string | number) => {
+    const updated = [...editedItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditedItems(updated);
+    setHasChanges(true);
+  };
+
+  const handleDeleteItem = (index: number) => {
+    const updated = editedItems.filter((_, i) => i !== index);
+    // Reindex
+    updated.forEach((item, i) => item.order_index = i);
+    setEditedItems(updated);
+    setHasChanges(true);
+  };
+
+  const handleAddItem = () => {
+    setEditedItems([...editedItems, {
+      order_index: editedItems.length,
+      title: 'Mục mới',
+      duration_minutes: 10,
+      presenter_name: '',
+    }]);
+    setHasChanges(true);
+  };
+
+  const totalDuration = editedItems.reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+  const displayItems = hasChanges ? editedItems : agendaItems;
+
+  if (isLoading) {
+    return (
+      <div className="agenda-section">
+        <div className="section-loading">
+          <Loader2 size={24} className="animate-spin" />
+          <span>Đang tải agenda...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="agenda-section">
       <div className="section-header">
         <h3>Chương trình cuộc họp</h3>
-        <button className="btn btn--secondary btn--sm" onClick={handleGenerateAgenda} disabled={isGenerating}>
-          {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          AI Tạo agenda
-        </button>
+        <div className="section-actions">
+          <button 
+            className="btn btn--secondary btn--sm" 
+            onClick={handleGenerateAgenda} 
+            disabled={isGenerating}
+          >
+            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            AI Tạo agenda
+          </button>
+          {hasChanges && (
+            <button 
+              className="btn btn--primary btn--sm" 
+              onClick={handleSaveAgenda}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Lưu
+            </button>
+          )}
+        </div>
       </div>
 
+      {aiNotes && (
+        <div className="ai-notes">
+          <Sparkles size={14} />
+          <span>{aiNotes}</span>
+        </div>
+      )}
+
       <div className="agenda-list">
-        {agenda.map((item, index) => (
-          <div key={index} className="agenda-item">
+        {displayItems.map((item, index) => (
+          <div key={item.id || index} className="agenda-item agenda-item--editable">
+            <div className="agenda-item__drag">
+              <GripVertical size={16} />
+            </div>
             <div className="agenda-item__number">{index + 1}</div>
             <div className="agenda-item__content">
-              <div className="agenda-item__title">{item.title}</div>
+              {editingItem === (item.id || String(index)) ? (
+                <input
+                  type="text"
+                  className="agenda-item__input"
+                  value={hasChanges ? editedItems[index]?.title : (item as AgendaItem).title}
+                  onChange={e => handleUpdateItem(index, 'title', e.target.value)}
+                  onBlur={() => setEditingItem(null)}
+                  autoFocus
+                />
+              ) : (
+                <div 
+                  className="agenda-item__title" 
+                  onClick={() => {
+                    setEditingItem(item.id || String(index));
+                    if (!hasChanges) {
+                      setEditedItems(agendaItems.map(a => ({
+                        order_index: a.order_index,
+                        title: a.title,
+                        duration_minutes: a.duration_minutes,
+                        presenter_name: a.presenter_name,
+                        description: a.description,
+                      })));
+                      setHasChanges(true);
+                    }
+                  }}
+                >
+                  {hasChanges ? editedItems[index]?.title : (item as AgendaItem).title}
+                  <Edit2 size={12} className="edit-icon" />
+                </div>
+              )}
               <div className="agenda-item__presenter">
                 <User size={12} />
-                {item.presenter}
+                <input
+                  type="text"
+                  className="agenda-item__input agenda-item__input--small"
+                  placeholder="Người trình bày"
+                  value={hasChanges ? editedItems[index]?.presenter_name || '' : (item as AgendaItem).presenter_name || ''}
+                  onChange={e => {
+                    if (!hasChanges) {
+                      setEditedItems(agendaItems.map(a => ({
+                        order_index: a.order_index,
+                        title: a.title,
+                        duration_minutes: a.duration_minutes,
+                        presenter_name: a.presenter_name,
+                        description: a.description,
+                      })));
+                      setHasChanges(true);
+                    }
+                    handleUpdateItem(index, 'presenter_name', e.target.value);
+                  }}
+                />
               </div>
             </div>
             <div className="agenda-item__duration">
               <Clock size={12} />
-              {item.duration} phút
+              <input
+                type="number"
+                className="agenda-item__input agenda-item__input--number"
+                value={hasChanges ? editedItems[index]?.duration_minutes : (item as AgendaItem).duration_minutes}
+                onChange={e => {
+                  if (!hasChanges) {
+                    setEditedItems(agendaItems.map(a => ({
+                      order_index: a.order_index,
+                      title: a.title,
+                      duration_minutes: a.duration_minutes,
+                      presenter_name: a.presenter_name,
+                      description: a.description,
+                    })));
+                    setHasChanges(true);
+                  }
+                  handleUpdateItem(index, 'duration_minutes', parseInt(e.target.value) || 0);
+                }}
+                min={1}
+              />
+              <span>phút</span>
             </div>
+            <button 
+              className="btn btn--ghost btn--icon btn--sm"
+              onClick={() => handleDeleteItem(index)}
+              title="Xóa"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         ))}
       </div>
 
+      <button className="btn btn--ghost btn--sm add-item-btn" onClick={handleAddItem}>
+        <Plus size={14} />
+        Thêm mục
+      </button>
+
       <div className="agenda-summary">
         <Clock size={16} />
         <span>Tổng thời gian: <strong>{totalDuration} phút</strong></span>
+        {meeting.start_time && meeting.end_time && (
+          <span className="agenda-summary__target">
+            (Mục tiêu: {getDurationMinutes()} phút)
+          </span>
+        )}
       </div>
     </div>
   );
 };
 
-// Documents Section
+// ============================================
+// DOCUMENTS SECTION - with upload and listing
+// ============================================
 const DocumentsSection = ({ meetingId }: { meetingId: string }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const documents = [
-    { id: '1', title: 'Báo cáo tiến độ Q4', source: 'SharePoint', relevance: 0.95, status: 'accepted' },
-    { id: '2', title: 'Risk Assessment Template', source: 'LOffice', relevance: 0.88, status: 'suggested' },
-    { id: '3', title: 'Thông tư 09/2020 NHNN', source: 'Wiki', relevance: 0.82, status: 'suggested' },
-  ];
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [newDoc, setNewDoc] = useState({ title: '', file_type: 'pdf', description: '' });
+
+  useEffect(() => {
+    loadDocuments();
+  }, [meetingId]);
+
+  const loadDocuments = async () => {
+    setIsLoading(true);
+    try {
+      const result = await documentsApi.listByMeeting(meetingId);
+      setDocuments(result.documents);
+    } catch (err) {
+      console.error('Failed to load documents:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!newDoc.title.trim()) return;
+    
+    setIsUploading(true);
+    try {
+      await documentsApi.upload({
+        meeting_id: meetingId,
+        title: newDoc.title,
+        file_type: newDoc.file_type,
+        description: newDoc.description || undefined,
+      });
+      setNewDoc({ title: '', file_type: 'pdf', description: '' });
+      setShowUploadForm(false);
+      loadDocuments();
+    } catch (err) {
+      console.error('Failed to upload document:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDelete = async (docId: string) => {
+    try {
+      await documentsApi.delete(docId);
+      loadDocuments();
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+    }
+  };
+
+  const getFileIcon = (fileType: string) => {
+    return <FileText size={16} />;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="documents-section">
+        <div className="section-loading">
+          <Loader2 size={24} className="animate-spin" />
+          <span>Đang tải tài liệu...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="documents-section">
       <div className="section-header">
         <h3>Tài liệu cần đọc trước</h3>
-        <button className="btn btn--secondary btn--sm" onClick={() => setIsLoading(true)}>
-          <Sparkles size={14} />
-          AI Gợi ý
+        <button 
+          className="btn btn--primary btn--sm" 
+          onClick={() => setShowUploadForm(true)}
+        >
+          <Upload size={14} />
+          Thêm tài liệu
         </button>
       </div>
 
+      {showUploadForm && (
+        <div className="upload-form">
+          <h4>Thêm tài liệu mới</h4>
+          <div className="form-group">
+            <label>Tiêu đề</label>
+            <input
+              type="text"
+              placeholder="Tên tài liệu..."
+              value={newDoc.title}
+              onChange={e => setNewDoc({ ...newDoc, title: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label>Loại file</label>
+            <select 
+              value={newDoc.file_type}
+              onChange={e => setNewDoc({ ...newDoc, file_type: e.target.value })}
+            >
+              <option value="pdf">PDF</option>
+              <option value="docx">Word (DOCX)</option>
+              <option value="xlsx">Excel (XLSX)</option>
+              <option value="pptx">PowerPoint (PPTX)</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Mô tả (tùy chọn)</label>
+            <input
+              type="text"
+              placeholder="Mô tả ngắn..."
+              value={newDoc.description}
+              onChange={e => setNewDoc({ ...newDoc, description: e.target.value })}
+            />
+          </div>
+          <div className="form-actions">
+            <button 
+              className="btn btn--ghost" 
+              onClick={() => setShowUploadForm(false)}
+            >
+              Hủy
+            </button>
+            <button 
+              className="btn btn--primary" 
+              onClick={handleUpload}
+              disabled={!newDoc.title.trim() || isUploading}
+            >
+              {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              Thêm
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="document-list">
-        {documents.map(doc => (
-          <div key={doc.id} className={`document-card ${doc.status === 'accepted' ? 'document-card--accepted' : ''}`}>
+        {documents.length > 0 ? documents.map(doc => (
+          <div key={doc.id} className="document-card">
             <div className="document-card__header">
-              <FileText size={16} />
+              {getFileIcon(doc.file_type)}
               <span className="document-card__title">{doc.title}</span>
-              {doc.status === 'accepted' ? (
-                <span className="badge badge--success"><Check size={10} /> Đã chọn</span>
-              ) : (
-                <button className="btn btn--ghost btn--sm"><Plus size={14} /></button>
-              )}
+              <div className="document-card__actions">
+                <a href={doc.file_url || '#'} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14} />
+                </a>
+                <button 
+                  className="btn btn--ghost btn--icon btn--sm"
+                  onClick={() => handleDelete(doc.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
             <div className="document-card__meta">
-              <span className="badge badge--neutral">{doc.source}</span>
-              <span>Độ liên quan: {Math.round(doc.relevance * 100)}%</span>
-              <ExternalLink size={12} className="text-accent" />
+              <span className="badge badge--neutral">{doc.file_type.toUpperCase()}</span>
+              {doc.description && <span>{doc.description}</span>}
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="empty-state-mini">
+            <FileText size={24} />
+            <p>Chưa có tài liệu nào</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// Participants Section
+// ============================================
+// PARTICIPANTS SECTION
+// ============================================
 const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParticipants; onRefresh: () => void }) => {
   const participants = meeting.participants || [];
 
@@ -193,7 +534,7 @@ const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParti
 
       <div className="participant-list">
         {participants.length > 0 ? participants.map((p: any) => (
-          <div key={p.id} className="participant-item">
+          <div key={p.user_id || p.id} className="participant-item">
             <div className="participant-item__avatar">
               {p.display_name?.charAt(0) || p.email?.charAt(0) || '?'}
             </div>
@@ -202,7 +543,7 @@ const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParti
               <div className="participant-item__role">{p.role || 'Thành viên'}</div>
             </div>
             <span className={`badge badge--${p.role === 'organizer' ? 'accent' : 'neutral'}`}>
-              {p.role === 'organizer' ? 'Chủ trì' : 'Thành viên'}
+              {p.role === 'organizer' ? 'Chủ trì' : p.role === 'chair' ? 'Chủ tọa' : 'Thành viên'}
             </span>
           </div>
         )) : (
@@ -221,7 +562,9 @@ const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParti
   );
 };
 
-// AI Q&A Section
+// ============================================
+// AI Q&A SECTION
+// ============================================
 const AIQASection = ({ meetingId }: { meetingId: string }) => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);

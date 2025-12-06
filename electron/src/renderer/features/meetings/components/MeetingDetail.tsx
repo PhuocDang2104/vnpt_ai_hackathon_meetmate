@@ -97,7 +97,7 @@ export const MeetingDetail = () => {
       <div className="empty-state">
         <AlertCircle className="empty-state__icon" />
         <h3 className="empty-state__title">{error || 'Không tìm thấy cuộc họp'}</h3>
-        <button className="btn btn--secondary" onClick={() => navigate('/meetings')}>
+        <button className="btn btn--secondary" onClick={() => navigate('/app/meetings')}>
           Quay lại
         </button>
       </div>
@@ -118,7 +118,7 @@ export const MeetingDetail = () => {
       {/* Compact Header */}
       <header className="meeting-detail-v2__header">
         <div className="meeting-detail-v2__header-left">
-          <button className="btn btn--ghost btn--icon" onClick={() => navigate('/meetings')}>
+          <button className="btn btn--ghost btn--icon" onClick={() => navigate('/app/meetings')}>
             <ArrowLeft size={20} />
           </button>
           <div className="meeting-detail-v2__header-info">

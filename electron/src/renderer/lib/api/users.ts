@@ -5,7 +5,7 @@ const ENDPOINT = '/users';
 
 export const usersApi = {
   list: async (params?: { search?: string; department_id?: string }): Promise<UserListResponse> => {
-    return api.get<UserListResponse>(ENDPOINT, params as Record<string, string>);
+    return api.get<UserListResponse>(`${ENDPOINT}/`, params as Record<string, string>);
   },
 
   getMe: async (): Promise<User> => {
@@ -38,4 +38,3 @@ export async function getUser(id: string): Promise<User> {
 export type { User, Department, UserListResponse, DepartmentListResponse };
 
 export default usersApi;
-

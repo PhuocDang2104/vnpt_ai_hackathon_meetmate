@@ -1,15 +1,89 @@
-from fastapi import APIRouter
-from app.schemas.document import Document, DocumentBase
+"""
+Documents API endpoints
+"""
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.schemas.document import (
+    Document,
+    DocumentCreate,
+    DocumentUpdate,
+    DocumentList,
+    DocumentUploadResponse,
+)
 from app.services import document_service
 
-router = APIRouter()
+router = APIRouter(tags=["documents"])
 
 
-@router.get('/', response_model=list[Document])
-def list_documents():
-    return document_service.list_documents()
+@router.get("/meeting/{meeting_id}", response_model=DocumentList)
+async def list_meeting_documents(
+    meeting_id: UUID,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """List all documents for a meeting"""
+    return await document_service.list_documents(db, meeting_id, skip, limit)
 
 
-@router.post('/', response_model=Document)
-def create_document(payload: DocumentBase):
-    return document_service.create_document(payload)
+@router.get("/{document_id}", response_model=Document)
+async def get_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Get a single document by ID"""
+    doc = await document_service.get_document(db, document_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return doc
+
+
+@router.post("/upload", response_model=DocumentUploadResponse)
+async def upload_document(
+    data: DocumentCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a new document (mock implementation).
+    
+    In production, this would handle actual file upload.
+    Currently just stores metadata.
+    """
+    return await document_service.upload_document(db, data)
+
+
+@router.put("/{document_id}", response_model=Document)
+async def update_document(
+    document_id: UUID,
+    data: DocumentUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update a document's metadata"""
+    doc = await document_service.update_document(db, document_id, data)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return doc
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a document"""
+    success = await document_service.delete_document(db, document_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return None
