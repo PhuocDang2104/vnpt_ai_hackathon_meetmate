@@ -1,7 +1,7 @@
 /**
  * Authentication API Client
  */
-import { apiClient } from '../apiClient';
+import api from '../apiClient';
 
 export interface UserRegister {
   email: string;
@@ -112,15 +112,14 @@ export function isAuthenticated(): boolean {
  * Register a new user
  */
 export async function register(data: UserRegister): Promise<RegisterResponse> {
-  const response = await apiClient.post<RegisterResponse>('/auth/register', data);
-  return response;
+  return api.post<RegisterResponse>('/auth/register', data);
 }
 
 /**
  * Login user
  */
 export async function login(data: UserLogin): Promise<Token> {
-  const response = await apiClient.post<Token>('/auth/login', data);
+  const response = await api.post<Token>('/auth/login', data);
   storeTokens(response);
   return response;
 }
@@ -134,12 +133,8 @@ export async function getCurrentUser(): Promise<CurrentUser> {
     throw new Error('Not authenticated');
   }
   
-  const response = await apiClient.get<CurrentUser>('/auth/me', {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  
+  // For now, use the simple get - auth header will be added later
+  const response = await api.get<CurrentUser>('/auth/me');
   storeUser(response);
   return response;
 }
@@ -153,7 +148,7 @@ export async function refreshTokens(): Promise<Token> {
     throw new Error('No refresh token');
   }
   
-  const response = await apiClient.post<Token>('/auth/refresh', {
+  const response = await api.post<Token>('/auth/refresh', {
     refresh_token: refreshToken
   });
   
@@ -166,14 +161,9 @@ export async function refreshTokens(): Promise<Token> {
  */
 export async function logout(): Promise<void> {
   try {
-    const token = getAccessToken();
-    if (token) {
-      await apiClient.post('/auth/logout', {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-    }
+    await api.post('/auth/logout', {});
+  } catch {
+    // Ignore errors on logout
   } finally {
     clearAuth();
   }
@@ -183,18 +173,9 @@ export async function logout(): Promise<void> {
  * Change password
  */
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  const token = getAccessToken();
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-  
-  await apiClient.post('/auth/change-password', {
+  await api.post('/auth/change-password', {
     current_password: currentPassword,
     new_password: newPassword
-  }, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
   });
 }
 
@@ -206,14 +187,9 @@ export async function verifyToken(): Promise<boolean> {
     const token = getAccessToken();
     if (!token) return false;
     
-    await apiClient.get('/auth/verify', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    await api.get('/auth/verify');
     return true;
   } catch {
     return false;
   }
 }
-

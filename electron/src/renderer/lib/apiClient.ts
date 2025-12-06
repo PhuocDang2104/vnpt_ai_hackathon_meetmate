@@ -101,4 +101,7 @@ export const api = {
     request<T>(endpoint, { method: 'DELETE' }),
 };
 
+// Alias for backward compatibility
+export const apiClient = api;
+
 export default api;
