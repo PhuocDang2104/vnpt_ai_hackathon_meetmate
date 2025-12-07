@@ -64,7 +64,7 @@
   /* Layout */
   --sidebar-width: 260px;
   --topbar-height: 64px;
-  --app-zoom: 0.9;
+  --app-zoom: 1;
   
   /* Transitions - Smooth, professional */
   --transition-fast: 150ms ease;
@@ -89,7 +89,7 @@ html, body, #root {
 
 body {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 1.6;
   background: var(--bg-base);
