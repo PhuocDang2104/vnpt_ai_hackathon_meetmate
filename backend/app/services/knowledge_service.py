@@ -32,7 +32,7 @@ def _init_mock_knowledge_docs():
     """Initialize with mock knowledge documents"""
     mock_data = [
         {
-            "id": UUID("k0000001-0000-0000-0000-000000000001"),
+            "id": UUID("a0000001-0000-0000-0000-000000000001"),
             "title": "Thông tư 09/2020/TT-NHNN - Quản lý rủi ro CNTT",
             "description": "Quy định về quản lý rủi ro công nghệ thông tin trong hoạt động ngân hàng",
             "document_type": "regulation",
@@ -49,7 +49,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000002-0000-0000-0000-000000000002"),
+            "id": UUID("a0000002-0000-0000-0000-000000000002"),
             "title": "LPBank Security Policy v3.0",
             "description": "Chính sách bảo mật thông tin của LPBank - Phiên bản 3.0",
             "document_type": "policy",
@@ -66,7 +66,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000003-0000-0000-0000-000000000003"),
+            "id": UUID("a0000003-0000-0000-0000-000000000003"),
             "title": "Core Banking Integration Guide",
             "description": "Hướng dẫn tích hợp với hệ thống Core Banking mới",
             "document_type": "technical",
@@ -83,7 +83,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000004-0000-0000-0000-000000000004"),
+            "id": UUID("a0000004-0000-0000-0000-000000000004"),
             "title": "KYC Policy 2024",
             "description": "Chính sách Know Your Customer - Cập nhật 2024",
             "document_type": "policy",
@@ -100,7 +100,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000005-0000-0000-0000-000000000005"),
+            "id": UUID("a0000005-0000-0000-0000-000000000005"),
             "title": "Risk Assessment Template",
             "description": "Template đánh giá rủi ro dự án",
             "document_type": "template",
@@ -117,7 +117,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000006-0000-0000-0000-000000000006"),
+            "id": UUID("a0000006-0000-0000-0000-000000000006"),
             "title": "Thông tư 35/2016/TT-NHNN - Chuyển mạch thanh toán",
             "description": "Quy định về chuyển mạch thanh toán điện tử",
             "document_type": "regulation",
@@ -134,7 +134,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000007-0000-0000-0000-000000000007"),
+            "id": UUID("a0000007-0000-0000-0000-000000000007"),
             "title": "Mobile Banking API Documentation",
             "description": "Tài liệu API cho ứng dụng Mobile Banking",
             "document_type": "technical",
@@ -151,7 +151,7 @@ def _init_mock_knowledge_docs():
             "last_accessed_at": datetime.now(),
         },
         {
-            "id": UUID("k0000008-0000-0000-0000-000000000008"),
+            "id": UUID("a0000008-0000-0000-0000-000000000008"),
             "title": "Change Request Process Guide",
             "description": "Hướng dẫn quy trình xử lý Change Request",
             "document_type": "policy",

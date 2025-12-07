@@ -1,3 +1,8 @@
+/**
+ * Calendar - Meeting schedule view
+ * Uses MeetingService for unified data fetching
+ */
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Calendar as CalendarIcon,
@@ -7,40 +12,138 @@ import {
   Clock,
   Users,
   MapPin,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react'
-import { meetings, formatTime, getMeetingTypeLabel } from '../../store/mockData'
+import {
+  useCalendarMeetings,
+  useTodayMeetings,
+  type NormalizedMeeting,
+} from '../../services/meeting'
+
+// Skeleton Loader
+const SkeletonMeetingCard = () => (
+  <div style={{
+    padding: 'var(--space-md)',
+    background: 'var(--bg-surface)',
+    borderRadius: 'var(--radius-sm)',
+    opacity: 0.5,
+  }}>
+    <div style={{ width: '50%', height: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
+    <div style={{ width: '80%', height: 14, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
+    <div style={{ width: '60%', height: 10, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+  </div>
+)
 
 const Calendar = () => {
-  const today = new Date()
-  const currentMonth = today.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+  const [currentDate, setCurrentDate] = useState(new Date())
   
-  // Get days in current month
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getDay()
-  
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  const emptyDays = Array.from({ length: firstDayOfMonth }, (_, i) => i)
+  // Calculate month boundaries for calendar view
+  const { startOfMonth, endOfMonth, monthLabel, daysInMonth, firstDayOfWeek } = useMemo(() => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const start = new Date(year, month, 1)
+    const end = new Date(year, month + 1, 0, 23, 59, 59)
+    
+    return {
+      startOfMonth: start,
+      endOfMonth: end,
+      monthLabel: currentDate.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }),
+      daysInMonth: end.getDate(),
+      firstDayOfWeek: start.getDay(),
+    }
+  }, [currentDate])
 
-  const todayMeetings = meetings.filter(m => {
-    const meetingDate = m.startTime.toDateString()
-    return meetingDate === today.toDateString()
-  })
+  // Use service hooks for data fetching
+  const { 
+    data: monthMeetings, 
+    isLoading: loadingMonth, 
+    error: monthError,
+    refetch: refetchMonth 
+  } = useCalendarMeetings(startOfMonth, endOfMonth)
+  
+  const { 
+    data: todayMeetings, 
+    isLoading: loadingToday,
+    error: todayError,
+    refetch: refetchToday 
+  } = useTodayMeetings()
+
+  const today = new Date()
+  const isCurrentMonth = today.getMonth() === currentDate.getMonth() && today.getFullYear() === currentDate.getFullYear()
+
+  // Calendar navigation
+  const goToPreviousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+  }
+
+  const goToNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+  }
+
+  const goToToday = () => {
+    setCurrentDate(new Date())
+  }
+
+  const handleRefresh = () => {
+    refetchMonth()
+    refetchToday()
+  }
+
+  // Check if a day has meetings
+  const getMeetingsForDay = (day: number): NormalizedMeeting[] => {
+    if (!monthMeetings) return []
+    return monthMeetings.filter(m => {
+      const meetingDate = m.startTime
+      return meetingDate.getDate() === day && 
+             meetingDate.getMonth() === currentDate.getMonth() &&
+             meetingDate.getFullYear() === currentDate.getFullYear()
+    })
+  }
+
+  // Generate calendar days
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  const emptyDays = Array.from({ length: firstDayOfWeek }, (_, i) => i)
+
+  const hasError = monthError || todayError
 
   return (
     <div>
       {/* Page Header */}
       <div className="page-header">
-  <div>
+        <div>
           <h1 className="page-header__title">Lịch họp</h1>
           <p className="page-header__subtitle">Quản lý lịch họp của bạn</p>
         </div>
         <div className="page-header__actions">
-          <button className="btn btn--primary">
+          <button className="btn btn--ghost" onClick={handleRefresh} title="Làm mới">
+            <RefreshCw size={16} />
+          </button>
+          <Link to="/app/meetings" className="btn btn--primary">
             <Plus size={16} />
             Tạo cuộc họp
-          </button>
+          </Link>
         </div>
       </div>
+
+      {/* Error Toast */}
+      {hasError && (
+        <div className="card mb-4" style={{ borderColor: 'var(--error)', borderLeftWidth: 3 }}>
+          <div className="card__body" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+            <AlertTriangle size={20} style={{ color: 'var(--error)' }} />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Không thể tải dữ liệu</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Đang sử dụng dữ liệu mẫu.
+              </div>
+            </div>
+            <button className="btn btn--ghost btn--sm" onClick={handleRefresh} style={{ marginLeft: 'auto' }}>
+              Thử lại
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid--2" style={{ gridTemplateColumns: '1fr 360px' }}>
         {/* Calendar Grid */}
@@ -48,14 +151,20 @@ const Calendar = () => {
           <div className="card__header">
             <h3 className="card__title">
               <CalendarIcon size={18} className="card__title-icon" />
-              {currentMonth}
+              {monthLabel}
+              {loadingMonth && <Loader2 size={14} className="animate-spin" style={{ marginLeft: 8 }} />}
             </h3>
             <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-              <button className="btn btn--ghost btn--icon">
+              <button className="btn btn--ghost btn--icon" onClick={goToPreviousMonth}>
                 <ChevronLeft size={18} />
               </button>
-              <button className="btn btn--secondary btn--sm">Hôm nay</button>
-              <button className="btn btn--ghost btn--icon">
+              <button 
+                className={`btn btn--sm ${isCurrentMonth ? 'btn--secondary' : 'btn--ghost'}`}
+                onClick={goToToday}
+              >
+                Hôm nay
+              </button>
+              <button className="btn btn--ghost btn--icon" onClick={goToNextMonth}>
                 <ChevronRight size={18} />
               </button>
             </div>
@@ -91,12 +200,10 @@ const Calendar = () => {
                 <div key={`empty-${i}`} style={{ padding: 'var(--space-md)' }}></div>
               ))}
               {days.map(day => {
-                const isToday = day === today.getDate()
-                const hasMeetings = meetings.some(m => {
-                  const meetingDay = m.startTime.getDate()
-                  const meetingMonth = m.startTime.getMonth()
-                  return meetingDay === day && meetingMonth === today.getMonth()
-                })
+                const isToday = isCurrentMonth && day === today.getDate()
+                const dayMeetings = getMeetingsForDay(day)
+                const hasMeetings = dayMeetings.length > 0
+                const hasLive = dayMeetings.some(m => m.status === 'in_progress')
                 
                 return (
                   <div 
@@ -105,12 +212,14 @@ const Calendar = () => {
                       textAlign: 'center', 
                       padding: 'var(--space-md)',
                       borderRadius: 'var(--radius-sm)',
-                      background: isToday ? 'var(--accent)' : 'transparent',
+                      background: isToday ? 'var(--accent)' : hasMeetings ? 'var(--bg-surface)' : 'transparent',
                       color: isToday ? 'var(--bg-base)' : 'var(--text-primary)',
-                      cursor: 'pointer',
+                      cursor: hasMeetings ? 'pointer' : 'default',
                       position: 'relative',
                       fontWeight: isToday ? 600 : 400,
+                      transition: 'all 0.15s',
                     }}
+                    title={hasMeetings ? `${dayMeetings.length} cuộc họp` : ''}
                   >
                     {day}
                     {hasMeetings && !isToday && (
@@ -119,11 +228,21 @@ const Calendar = () => {
                         bottom: '4px',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        width: '4px',
-                        height: '4px',
-                        background: 'var(--accent)',
-                        borderRadius: '50%'
-                      }}></div>
+                        display: 'flex',
+                        gap: '2px',
+                      }}>
+                        {dayMeetings.slice(0, 3).map((_, idx) => (
+                          <div 
+                            key={idx}
+                            style={{
+                              width: '4px',
+                              height: '4px',
+                              background: hasLive ? 'var(--error)' : 'var(--accent)',
+                              borderRadius: '50%'
+                            }}
+                          />
+                        ))}
+                      </div>
                     )}
                   </div>
                 )
@@ -138,24 +257,31 @@ const Calendar = () => {
             <h3 className="card__title">
               <Clock size={18} className="card__title-icon" />
               Hôm nay
+              {loadingToday && <Loader2 size={14} className="animate-spin" style={{ marginLeft: 8 }} />}
             </h3>
-            <span className="badge badge--info">{todayMeetings.length} cuộc họp</span>
+            <span className="badge badge--info">{todayMeetings?.length ?? 0} cuộc họp</span>
           </div>
           <div className="card__body">
-            {todayMeetings.length > 0 ? (
+            {loadingToday ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                {todayMeetings.map(meeting => (
+                <SkeletonMeetingCard />
+                <SkeletonMeetingCard />
+              </div>
+            ) : todayMeetings && todayMeetings.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                {todayMeetings.map((meeting: NormalizedMeeting) => (
                   <Link 
                     key={meeting.id}
-                    to={`/meetings/${meeting.id}/${meeting.phase}`}
+                    to={`/app/meetings/${meeting.id}/detail`}
                     style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     <div style={{
                       padding: 'var(--space-md)',
                       background: 'var(--bg-surface)',
                       borderRadius: 'var(--radius-sm)',
-                      borderLeft: `3px solid var(--${meeting.phase === 'in' ? 'error' : meeting.phase === 'pre' ? 'info' : 'success'})`,
+                      borderLeft: `3px solid var(--${meeting.status === 'in_progress' ? 'error' : meeting.phase === 'pre' ? 'info' : 'success'})`,
                       cursor: 'pointer',
+                      transition: 'all 0.15s',
                     }}>
                       <div style={{ 
                         display: 'flex', 
@@ -164,10 +290,10 @@ const Calendar = () => {
                         marginBottom: 'var(--space-sm)'
                       }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>
-                          {formatTime(meeting.startTime)}
+                          {meeting.start}
                         </span>
                         <span className={`meeting-item__phase meeting-item__phase--${meeting.phase}`}>
-                          {meeting.phase === 'in' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Xong'}
+                          {meeting.status === 'in_progress' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Xong'}
                         </span>
                       </div>
                       <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: 'var(--space-xs)' }}>
@@ -176,12 +302,14 @@ const Calendar = () => {
                       <div style={{ display: 'flex', gap: 'var(--space-md)', fontSize: '11px', color: 'var(--text-muted)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Users size={12} />
-                          {meeting.participants.length}
+                          {meeting.participants}
                         </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={12} />
-                          {meeting.location}
-                        </span>
+                        {meeting.location && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={12} />
+                            {meeting.location}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Link>
@@ -199,8 +327,8 @@ const Calendar = () => {
           </div>
         </div>
       </div>
-  </div>
-)
+    </div>
+  )
 }
 
 export default Calendar

@@ -1,3 +1,7 @@
+/**
+ * Dashboard - Overview page with real-time data
+ * Uses MeetingService for unified data fetching
+ */
 import { Link } from 'react-router-dom'
 import {
   Calendar,
@@ -17,27 +21,64 @@ import {
   Download,
   Plus,
   Check,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import {
-  meetings,
   actionItems,
-  dashboardStats,
   formatTime,
   isOverdue,
 } from '../../store/mockData'
+import {
+  useUpcomingMeetings,
+  useDashboardStats,
+  useLiveMeeting,
+  type NormalizedMeeting,
+} from '../../services/meeting'
+
+// Skeleton Loader Component
+const SkeletonCard = () => (
+  <div className="card stats-card">
+    <div className="stats-card__icon" style={{ background: 'var(--bg-surface)', opacity: 0.5 }}>
+      <div style={{ width: 22, height: 22, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+    </div>
+    <div className="stats-card__content">
+      <div style={{ width: 80, height: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
+      <div style={{ width: 40, height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+    </div>
+  </div>
+)
+
+const SkeletonMeetingItem = () => (
+  <div className="meeting-item" style={{ opacity: 0.5 }}>
+    <div className="meeting-item__time">
+      <div style={{ width: 40, height: 16, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+    </div>
+    <div className="meeting-item__divider"></div>
+    <div className="meeting-item__content">
+      <div style={{ width: '80%', height: 14, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
+      <div style={{ width: '50%', height: 12, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+    </div>
+  </div>
+)
 
 const Dashboard = () => {
-  const upcomingMeetings = meetings
-    .filter(m => m.phase !== 'post')
-    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-    .slice(0, 4)
+  // Use service hooks for data fetching
+  const { data: upcomingMeetings, isLoading: loadingMeetings, error: meetingsError, refetch: refetchMeetings } = useUpcomingMeetings(4)
+  const { data: stats, isLoading: loadingStats, error: statsError, refetch: refetchStats } = useDashboardStats()
+  const { data: liveMeeting, isLoading: loadingLive } = useLiveMeeting()
 
+  // Action items from mock data (backend not ready)
   const pendingActions = actionItems
     .filter(a => a.status !== 'completed' && a.status !== 'cancelled')
     .sort((a, b) => a.deadline.getTime() - b.deadline.getTime())
     .slice(0, 5)
 
-  const liveMeeting = meetings.find(m => m.phase === 'in')
+  // Handle refresh
+  const handleRefresh = () => {
+    refetchMeetings()
+    refetchStats()
+  }
 
   return (
     <div>
@@ -45,23 +86,44 @@ const Dashboard = () => {
       <div className="page-header">
         <div>
           <h1 className="page-header__title">Dashboard</h1>
-          <p className="page-header__subtitle">Xin chào, Nguyễn Văn A! Đây là tổng quan hôm nay.</p>
+          <p className="page-header__subtitle">Xin chào! Đây là tổng quan hôm nay.</p>
         </div>
         <div className="page-header__actions">
+          <button className="btn btn--ghost" onClick={handleRefresh} title="Làm mới">
+            <RefreshCw size={16} />
+          </button>
           <button className="btn btn--secondary">
             <Download size={16} />
             Export Report
           </button>
-          <button className="btn btn--primary">
+          <Link to="/app/meetings" className="btn btn--primary">
             <Plus size={16} />
             Tạo cuộc họp
-          </button>
+          </Link>
         </div>
       </div>
 
+      {/* Error Toast */}
+      {(meetingsError || statsError) && (
+        <div className="card mb-4" style={{ borderColor: 'var(--error)', borderLeftWidth: 3 }}>
+          <div className="card__body" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+            <AlertTriangle size={20} style={{ color: 'var(--error)' }} />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Không thể tải dữ liệu</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {meetingsError || statsError}. Đang sử dụng dữ liệu mẫu.
+              </div>
+            </div>
+            <button className="btn btn--ghost btn--sm" onClick={handleRefresh} style={{ marginLeft: 'auto' }}>
+              Thử lại
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Live Meeting Alert */}
-      {liveMeeting && (
-        <Link to={`/meetings/${liveMeeting.id}/in`} style={{ textDecoration: 'none' }}>
+      {!loadingLive && liveMeeting && (
+        <Link to={`/app/meetings/${liveMeeting.id}/detail`} style={{ textDecoration: 'none' }}>
           <div className="card card--interactive mb-6" style={{ 
             borderColor: 'var(--error)',
             borderLeftWidth: '3px'
@@ -76,7 +138,7 @@ const Dashboard = () => {
                   <div style={{ fontWeight: 600, fontSize: '14px' }}>{liveMeeting.title}</div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginTop: '4px' }}>
                     <Users size={14} />
-                    {liveMeeting.participants.length} người tham gia
+                    {liveMeeting.participants} người tham gia
                   </div>
                 </div>
               </div>
@@ -91,60 +153,71 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid--4 mb-6">
-        <div className="card stats-card">
-          <div className="stats-card__icon stats-card__icon--info">
-            <Calendar size={22} />
-          </div>
-          <div className="stats-card__content">
-            <div className="stats-card__label">Cuộc họp hôm nay</div>
-            <div className="stats-card__value">{dashboardStats.totalMeetingsToday}</div>
-            <div className="stats-card__trend stats-card__trend--up">
-              <Check size={12} />
-              {dashboardStats.meetingsCompleted} hoàn thành
+        {loadingStats ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          <>
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--info">
+                <Calendar size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Cuộc họp hôm nay</div>
+                <div className="stats-card__value">{stats?.todayMeetings ?? 0}</div>
+                <div className="stats-card__trend stats-card__trend--up">
+                  <Check size={12} />
+                  {stats?.completed ?? 0} hoàn thành
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="card stats-card">
-          <div className="stats-card__icon stats-card__icon--success">
-            <CheckSquare size={22} />
-          </div>
-          <div className="stats-card__content">
-            <div className="stats-card__label">Action Items</div>
-            <div className="stats-card__value">{dashboardStats.totalActions}</div>
-            <div className="stats-card__trend stats-card__trend--down">
-              <TrendingDown size={12} />
-              {dashboardStats.actionsOverdue} quá hạn
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--success">
+                <CheckSquare size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Action Items</div>
+                <div className="stats-card__value">{stats?.totalActions ?? 0}</div>
+                <div className="stats-card__trend stats-card__trend--down">
+                  <TrendingDown size={12} />
+                  {stats?.actionsOverdue ?? 0} quá hạn
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="card stats-card">
-          <div className="stats-card__icon stats-card__icon--accent">
-            <FileText size={22} />
-          </div>
-          <div className="stats-card__content">
-            <div className="stats-card__label">Quyết định</div>
-            <div className="stats-card__value">{dashboardStats.totalDecisions}</div>
-            <div className="stats-card__trend stats-card__trend--up">
-              <TrendingUp size={12} />
-              {dashboardStats.decisionsConfirmed} đã xác nhận
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--accent">
+                <FileText size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Quyết định</div>
+                <div className="stats-card__value">{stats?.totalDecisions ?? 0}</div>
+                <div className="stats-card__trend stats-card__trend--up">
+                  <TrendingUp size={12} />
+                  {stats?.decisionsConfirmed ?? 0} đã xác nhận
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="card stats-card">
-          <div className="stats-card__icon stats-card__icon--warning">
-            <AlertTriangle size={22} />
-          </div>
-          <div className="stats-card__content">
-            <div className="stats-card__label">Rủi ro</div>
-            <div className="stats-card__value">{dashboardStats.totalRisks}</div>
-            <div className="stats-card__trend">
-              {dashboardStats.risksHigh} cao/khẩn cấp
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--warning">
+                <AlertTriangle size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Rủi ro</div>
+                <div className="stats-card__value">{stats?.totalRisks ?? 0}</div>
+                <div className="stats-card__trend">
+                  {stats?.risksHigh ?? 0} cao/khẩn cấp
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Main Content Grid */}
@@ -162,43 +235,61 @@ const Dashboard = () => {
             </Link>
           </div>
           <div className="card__body">
-            <div className="meeting-list">
-              {upcomingMeetings.map(meeting => (
-                <Link 
-                  key={meeting.id} 
-                  to={`/app/meetings/${meeting.id}/detail`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  <div className="meeting-item">
-                    <div className="meeting-item__time">
-                      <div className="meeting-item__time-value">
-                        {formatTime(meeting.startTime)}
+            {loadingMeetings ? (
+              <div className="meeting-list">
+                <SkeletonMeetingItem />
+                <SkeletonMeetingItem />
+                <SkeletonMeetingItem />
+              </div>
+            ) : upcomingMeetings && upcomingMeetings.length > 0 ? (
+              <div className="meeting-list">
+                {upcomingMeetings.map((meeting: NormalizedMeeting) => (
+                  <Link 
+                    key={meeting.id} 
+                    to={`/app/meetings/${meeting.id}/detail`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <div className="meeting-item">
+                      <div className="meeting-item__time">
+                        <div className="meeting-item__time-value">
+                          {meeting.start}
+                        </div>
+                        <div className="meeting-item__time-period">
+                          {meeting.status === 'in_progress' ? 'Đang họp' : 'Sắp tới'}
+                        </div>
                       </div>
-                      <div className="meeting-item__time-period">
-                        {meeting.phase === 'in' ? 'Đang họp' : 'Sắp tới'}
+                      <div className="meeting-item__divider"></div>
+                      <div className="meeting-item__content">
+                        <div className="meeting-item__title">{meeting.title}</div>
+                        <div className="meeting-item__meta">
+                          <span className="meeting-item__meta-item">
+                            <Users size={12} />
+                            {meeting.participants}
+                          </span>
+                          {meeting.location && (
+                            <span className="meeting-item__meta-item">
+                              <MapPin size={12} />
+                              {meeting.location}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <span className={`meeting-item__phase meeting-item__phase--${meeting.phase}`}>
+                        {meeting.status === 'in_progress' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Xong'}
+                      </span>
                     </div>
-                    <div className="meeting-item__divider"></div>
-                    <div className="meeting-item__content">
-                      <div className="meeting-item__title">{meeting.title}</div>
-                      <div className="meeting-item__meta">
-                        <span className="meeting-item__meta-item">
-                          <Users size={12} />
-                          {meeting.participants.length}
-                        </span>
-                        <span className="meeting-item__meta-item">
-                          <MapPin size={12} />
-                          {meeting.location}
-                        </span>
-                      </div>
-                    </div>
-                    <span className={`meeting-item__phase meeting-item__phase--${meeting.phase}`}>
-                      {meeting.phase === 'in' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Xong'}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <Calendar size={48} className="empty-state__icon" />
+                <div className="empty-state__title">Không có cuộc họp</div>
+                <div className="empty-state__description">
+                  Bạn không có cuộc họp nào sắp tới
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -271,7 +362,7 @@ const Dashboard = () => {
                 Cảnh báo
               </div>
               <div className="insight-box__content">
-                1 action item đang quá hạn 3 ngày. Cần escalate với Tech Lead để đẩy nhanh tiến độ.
+                {stats?.actionsOverdue ?? 1} action item đang quá hạn. Cần escalate với Tech Lead để đẩy nhanh tiến độ.
               </div>
             </div>
             <div className="insight-box insight-box--success">
