@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, MessageCircle, Sparkles, X, Link as LinkIcon } from 'lucide-react';
+import { Bot, MessageCircle, X, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { aiApi } from '../../../lib/api/ai';
 import { aiQueries } from '../../../store/mockData';
 import type { Citation } from '../../../shared/dto/ai';
@@ -164,34 +164,11 @@ export const AIAssistantChat = ({ meetingId, meetingTitle }: AIAssistantChatProp
 
   return (
     <>
-      <div className="ai-chat-launcher">
-        <div className="ai-chat-launcher__label">
-          <Sparkles size={14} />
-          Hỏi nhanh AI (Q&A RAG)
-        </div>
-        <div className="ai-chat-launcher__body">
-          <div>
-            <div className="ai-chat-launcher__title">Chatbox trong cuộc họp</div>
-            <p className="ai-chat-launcher__desc">
-              Live recap + ADR + RAG. Nhấn để mở hộp chat AI, chỉ hiển thị ở giai đoạn Trong họp.
-            </p>
-          </div>
-          <button className="btn btn--primary btn--sm" onClick={() => setIsOpen(true)}>
-            Mở chat
-          </button>
-        </div>
-        <div className="ai-chat-launcher__chips">
-          <span className="pill pill--live">In-meeting</span>
-          <span className="pill">Semantic Router + RAG</span>
-        </div>
-        <div className="ai-chat-launcher__prompts">
-          {quickPrompts.slice(0, 2).map(prompt => (
-            <button key={prompt} className="ai-chat-chip" onClick={() => handleQuickPrompt(prompt)}>
-              {prompt}
-            </button>
-          ))}
-        </div>
-      </div>
+      {!isOpen && (
+        <button className="ai-chat-trigger" onClick={() => setIsOpen(true)} title="AI Q&A Chatbox">
+          <MessageSquare size={18} />
+        </button>
+      )}
 
       {isOpen && (
         <div className="ai-chatbox">
@@ -201,7 +178,7 @@ export const AIAssistantChat = ({ meetingId, meetingTitle }: AIAssistantChatProp
                 <Bot size={14} />
                 In-Meeting AI
               </div>
-              <div className="ai-chatbox__title">AI Chatbox</div>
+              <div className="ai-chatbox__title">AI Q&A Chatbox</div>
               <div className="ai-chatbox__subtitle">
                 {meetingTitle || 'Cuộc họp'} · Q&A RAG + Recap + ADR
               </div>
@@ -209,11 +186,6 @@ export const AIAssistantChat = ({ meetingId, meetingTitle }: AIAssistantChatProp
             <button className="btn btn--ghost btn--icon" onClick={() => setIsOpen(false)}>
               <X size={16} />
             </button>
-          </div>
-
-          <div className="ai-chatbox__meta">
-            <span className="badge badge--ghost badge--pill">Context: transcript_window + ADR + topic</span>
-            <span className="badge badge--ghost badge--pill">RAG Priority: meeting → topic → global</span>
           </div>
 
           <div className="ai-chatbox__messages">
