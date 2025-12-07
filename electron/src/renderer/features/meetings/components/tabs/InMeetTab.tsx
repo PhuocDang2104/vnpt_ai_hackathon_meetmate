@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
-  Bot,
   Calendar,
   Check,
   CheckSquare,
@@ -11,7 +9,6 @@ import {
   FileText,
   Link as LinkIcon,
   Mic,
-  Send,
   Sparkles,
   User,
   Wand2,
@@ -20,14 +17,13 @@ import {
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import {
   actionItems,
-  aiQueries,
   decisions,
   formatDuration,
   getInitials,
   risks,
   transcriptChunks,
 } from '../../../../store/mockData';
-import { aiApi } from '../../../../lib/api/ai';
+import { AIAssistantChat } from '../AIAssistantChat';
 
 interface InMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -73,7 +69,7 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
             risks={meetingRisks}
           />
           <ToolSuggestionsPanel />
-          <AIAssistantMini meetingId={meeting.id} />
+          <AIAssistantChat meetingId={meeting.id} meetingTitle={meeting.title} />
         </div>
       </div>
     </div>
@@ -403,63 +399,6 @@ const ToolSuggestionsPanel = () => {
             </div>
           </div>
         ))}
-      </div>
-    </div>
-  );
-};
-
-const AIAssistantMini = ({ meetingId }: { meetingId: string }) => {
-  const [query, setQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const lastQA = aiQueries.find(q => q.meetingId === meetingId);
-
-  const handleAsk = async () => {
-    if (!query.trim() || isLoading) return;
-    setIsLoading(true);
-    try {
-      await aiApi.sendMessage(query, meetingId);
-    } finally {
-      setIsLoading(false);
-      setQuery('');
-    }
-  };
-
-  return (
-    <div className="ai-mini ai-mini--glass">
-      <div className="ai-mini__header">
-        <Bot size={14} />
-        <span>Hỏi nhanh AI (Q&A RAG)</span>
-      </div>
-
-      {lastQA && (
-        <div className="ai-mini__response ai-mini__response--stacked">
-          <div className="ai-mini__qa">
-            <div className="ai-mini__label">Bạn hỏi</div>
-            <p className="ai-mini__question">{lastQA.query}</p>
-          </div>
-          <div className="ai-mini__qa">
-            <div className="ai-mini__label">AI trả lời</div>
-            <p className="ai-mini__answer">{lastQA.answer}</p>
-            <div className="ai-mini__citation">
-              <LinkIcon size={12} />
-              {lastQA.citations.map(c => c.title).join(', ')}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="ai-mini__input">
-        <input
-          type="text"
-          placeholder="VD: Data retention policy là gì?"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAsk()}
-        />
-        <button className="btn btn--primary btn--icon btn--sm" onClick={handleAsk} disabled={isLoading}>
-          {isLoading ? <Activity size={14} className="animate-spin" /> : <Send size={14} />}
-        </button>
       </div>
     </div>
   );
