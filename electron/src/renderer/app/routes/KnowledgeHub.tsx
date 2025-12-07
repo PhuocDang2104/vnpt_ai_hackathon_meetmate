@@ -11,8 +11,10 @@ import {
   Loader2,
   Plus,
   X,
+  MessageCircle,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
+import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
 
 const KnowledgeHub = () => {
   const [query, setQuery] = useState('')
@@ -22,6 +24,7 @@ const KnowledgeHub = () => {
   const [suggestedDocs, setSuggestedDocs] = useState<KnowledgeDocument[]>([])
   const [isLoadingDocs, setIsLoadingDocs] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [isChatExpanded, setIsChatExpanded] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -103,7 +106,7 @@ const KnowledgeHub = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Hỏi AI về policies, tài liệu, hoặc thông tin từ các cuộc họp trước..."
+              placeholder="Tìm kiếm tài liệu theo từ khóa..."
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -122,30 +125,13 @@ const KnowledgeHub = () => {
               Tìm kiếm
             </button>
           </div>
-
-          {/* Quick suggestions */}
-          <div style={{ marginTop: 'var(--space-base)', display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Gợi ý:</span>
-            {['Data retention policy', 'KYC requirements', 'Security standards'].map(suggestion => (
-              <button 
-                key={suggestion}
-                className="btn btn--ghost btn--sm"
-                onClick={() => {
-                  setQuery(suggestion)
-                  setTimeout(() => handleSearch(), 100)
-                }}
-                style={{ fontSize: '12px' }}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
-      <div className="grid grid--2">
-        {/* Documents List */}
-        <div>
+      {/* Main Layout: 60/40 split - Documents & Chat */}
+      <div className="knowledge-hub-layout">
+        {/* Left: Documents List */}
+        <div className="knowledge-hub-layout__main">
           <div className="card mb-4">
             <div className="card__header">
               <h3 className="card__title">
@@ -229,12 +215,9 @@ const KnowledgeHub = () => {
               )}
             </div>
           </div>
-        </div>
 
-        {/* Right Panel */}
-        <div>
           {/* Recent Queries */}
-          <div className="card mb-4">
+          <div className="card">
             <div className="card__header">
               <h3 className="card__title">
                 <Clock size={18} className="card__title-icon" />
@@ -276,7 +259,24 @@ const KnowledgeHub = () => {
             </div>
           </div>
         </div>
+
+        {/* Right: AI Chat Panel */}
+        <div className="knowledge-hub-layout__chat">
+          <KnowledgeHubChat 
+            isExpanded={isChatExpanded}
+            onToggle={() => setIsChatExpanded(!isChatExpanded)}
+          />
+        </div>
       </div>
+
+      {/* Mobile Chat Toggle Button */}
+      <button 
+        className="knowledge-chat-toggle"
+        onClick={() => setIsChatExpanded(!isChatExpanded)}
+        title="Hỏi AI"
+      >
+        <MessageCircle size={24} />
+      </button>
 
       {/* Upload Document Modal */}
       <UploadDocumentModal
