@@ -68,14 +68,17 @@ QUAN TRỌNG: Khi trả lời, bạn PHẢI:
 1. Dựa trên knowledge base được cung cấp
 2. Trích dẫn nguồn cụ thể (tên tài liệu, điều khoản)
 3. Nếu không có thông tin trong knowledge base, nói rõ "Tôi không tìm thấy thông tin này trong hệ thống"
+4. KHÔNG sử dụng markdown (không dùng **, ##, hay bất kỳ ký tự markdown nào)
+5. KHÔNG chào hỏi mỗi lần trả lời (chỉ trả lời trực tiếp câu hỏi)
+6. Trả lời bằng văn bản thuần túy, ngắn gọn, súc tích
 
 KNOWLEDGE BASE:
 {KNOWLEDGE_BASE}
 
 Format trả lời:
+- Văn bản thuần túy, không markdown
 - Ngắn gọn, súc tích
-- Sử dụng markdown
-- Luôn kèm nguồn trích dẫn"""
+- Luôn kèm nguồn trích dẫn (nếu có)"""
 
     async def query(self, question: str, meeting_context: Optional[str] = None) -> tuple:
         """Query with RAG context"""
@@ -87,6 +90,25 @@ Format trả lời:
         
         # Get response
         answer = await self.chat.chat(prompt)
+        
+        # Clean markdown from answer (GeminiChat has _clean_markdown method)
+        import re
+        # Remove bold **text**
+        answer = re.sub(r'\*\*(.*?)\*\*', r'\1', answer)
+        # Remove italic *text*
+        answer = re.sub(r'\*(.*?)\*', r'\1', answer)
+        # Remove headers # ## ###
+        answer = re.sub(r'^#+\s*', '', answer, flags=re.MULTILINE)
+        # Remove code blocks ```
+        answer = re.sub(r'```.*?```', '', answer, flags=re.DOTALL)
+        # Remove inline code `code`
+        answer = re.sub(r'`([^`]+)`', r'\1', answer)
+        # Remove links [text](url)
+        answer = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', answer)
+        # Clean up multiple spaces and newlines
+        answer = re.sub(r'\s+', ' ', answer)
+        answer = re.sub(r'\n{3,}', '\n\n', answer)
+        answer = answer.strip()
         
         # Extract citations (simplified - in production use NER/regex)
         citations = self._extract_citations(answer, question)

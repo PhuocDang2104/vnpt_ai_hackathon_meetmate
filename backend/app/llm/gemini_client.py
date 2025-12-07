@@ -51,9 +51,11 @@ Nhiệm vụ của bạn:
 2. Hỗ trợ trong cuộc họp (In-meeting): Ghi chép, phát hiện action items, decisions, risks
 3. Hỗ trợ sau cuộc họp (Post-meeting): Tạo biên bản, theo dõi tasks, Q&A
 
-Nguyên tắc trả lời:
-- Trả lời bằng tiếng Việt, ngắn gọn, chuyên nghiệp
-- Sử dụng markdown để format (bold, bullet points)
+QUAN TRỌNG - Nguyên tắc trả lời:
+- Trả lời bằng tiếng Việt, ngắn gọn, chuyên nghiệp, trực tiếp
+- KHÔNG sử dụng markdown (không dùng **, ##, hay bất kỳ ký tự markdown nào)
+- KHÔNG chào hỏi mỗi lần trả lời (chỉ trả lời trực tiếp câu hỏi)
+- Trả lời bằng văn bản thuần túy, dễ đọc
 - Nếu được hỏi về policy/quy định, trích dẫn nguồn cụ thể
 - Nếu không chắc chắn, nói rõ "Tôi không có thông tin về điều này"
 - Với câu hỏi về dự án, tham chiếu các tài liệu nội bộ
@@ -95,6 +97,9 @@ Bạn có kiến thức về:
             
             assistant_message = response.text
             
+            # Clean markdown from response
+            assistant_message = self._clean_markdown(assistant_message)
+            
             # Save to history
             self.history.append({
                 'user': message,
@@ -109,95 +114,116 @@ Bạn có kiến thức về:
             print(f"[Gemini] Traceback: {traceback.format_exc()}")
             return self._mock_response(message)
     
+    def _clean_markdown(self, text: str) -> str:
+        """Remove markdown formatting from text"""
+        import re
+        # Remove bold **text**
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        # Remove italic *text*
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        # Remove headers # ## ###
+        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+        # Remove code blocks ```
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        # Remove inline code `code`
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        # Remove links [text](url)
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        # Clean up multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        # Clean up multiple newlines
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
+    
     def _mock_response(self, message: str) -> str:
         """Fallback mock response when API is not available"""
         message_lower = message.lower()
         
         if 'retention' in message_lower or 'lưu trữ' in message_lower:
-            return """Theo **Thông tư 09/2020/TT-NHNN** về quản lý rủi ro CNTT:
+            return """Theo Thông tư 09/2020/TT-NHNN về quản lý rủi ro CNTT:
 
-- **Dữ liệu giao dịch (transaction logs)**: Lưu trữ tối thiểu **10 năm**
-- **Dữ liệu khách hàng**: Lưu trữ **5 năm** sau khi kết thúc quan hệ
-- **Logs hệ thống**: Tối thiểu **3 năm**
+Dữ liệu giao dịch (transaction logs): Lưu trữ tối thiểu 10 năm
+Dữ liệu khách hàng: Lưu trữ 5 năm sau khi kết thúc quan hệ
+Logs hệ thống: Tối thiểu 3 năm
 
-📌 *Nguồn: Điều 15, Thông tư 09/2020/TT-NHNN*"""
+Nguồn: Điều 15, Thông tư 09/2020/TT-NHNN"""
 
         elif 'security' in message_lower or 'bảo mật' in message_lower:
-            return """Theo **Security Policy v3.0** của LPBank:
+            return """Theo Security Policy v3.0 của LPBank:
 
-**Encryption Requirements:**
-- Data at rest: **AES-256**
-- Data in transit: **TLS 1.3**
+Encryption Requirements:
+- Data at rest: AES-256
+- Data in transit: TLS 1.3
 
-**Access Control:**
+Access Control:
 - Multi-factor authentication (MFA) bắt buộc
 - Role-based access control (RBAC)
 - Session timeout: 15 phút
 
-**Audit:**
+Audit:
 - Penetration testing: Quarterly
 - Security review: Monthly
 
-📌 *Nguồn: LPBank Security Policy v3.0, Section 4*"""
+Nguồn: LPBank Security Policy v3.0, Section 4"""
 
         elif 'agenda' in message_lower or 'chương trình' in message_lower:
-            return """Dựa trên loại cuộc họp, tôi đề xuất **chương trình** sau:
+            return """Dựa trên loại cuộc họp, đề xuất chương trình sau:
 
-**1. Khai mạc & Điểm danh** (5 phút)
+1. Khai mạc & Điểm danh (5 phút)
 - Chủ tịch khai mạc
 - Xác nhận quorum
 
-**2. Báo cáo tiến độ** (15 phút)
+2. Báo cáo tiến độ (15 phút)
 - PM trình bày status
 - Demo features mới
 
-**3. Thảo luận Issues** (20 phút)
+3. Thảo luận Issues (20 phút)
 - Blockers
 - Risks
 
-**4. Quyết định & Action Items** (10 phút)
+4. Quyết định & Action Items (10 phút)
 - Vote các decisions
 - Assign owners & deadlines
 
-**5. Kết luận** (5 phút)
+5. Kết luận (5 phút)
 
-⏱️ *Tổng thời gian: ~55 phút*"""
+Tổng thời gian: ~55 phút"""
 
         elif 'risk' in message_lower or 'rủi ro' in message_lower:
-            return """**Các rủi ro chính cần lưu ý:**
+            return """Các rủi ro chính cần lưu ý:
 
-🔴 **Critical:**
+Critical:
 - Delay go-live Core Banking ảnh hưởng chiến dịch cuối năm
 
-🟠 **High:**
+High:
 - 3 security issues từ Pentest chưa fix
 - Resource shortage trong Q4
 
-🟡 **Medium:**
+Medium:
 - Integration với LOS có thể gặp vấn đề performance
 - Documentation chưa hoàn thiện
 
-**Đề xuất:**
+Đề xuất:
 1. Escalate resource issue lên Steering
 2. Set deadline cứng cho security fixes
 3. Thêm performance testing cho integration
 
-📌 *Tham khảo: Risk Register Dashboard*"""
+Tham khảo: Risk Register Dashboard"""
 
         else:
-            return """Cảm ơn câu hỏi của bạn. Dựa trên knowledge base của MeetMate, tôi có thể hỗ trợ bạn về:
+            return """Dựa trên knowledge base của MeetMate, tôi có thể hỗ trợ bạn về:
 
-📋 **Pre-meeting:**
+Pre-meeting:
 - Tạo agenda tự động
 - Gợi ý tài liệu pre-read
 - Đề xuất người tham gia
 
-🎙️ **In-meeting:**
+In-meeting:
 - Ghi chép real-time
 - Phát hiện Action Items, Decisions, Risks
 - Hỏi đáp policy/documents
 
-📝 **Post-meeting:**
+Post-meeting:
 - Tạo biên bản tự động
 - Sync tasks với Jira/Planner
 - Q&A về nội dung cuộc họp

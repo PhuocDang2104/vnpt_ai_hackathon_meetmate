@@ -604,7 +604,7 @@ const AIQASection = ({ meetingId }: { meetingId: string }) => {
         {messages.length === 0 ? (
           <div className="ai-welcome">
             <Bot size={32} />
-            <p>Xin chào! Tôi có thể giúp bạn tìm hiểu về policy, tài liệu, hoặc context cuộc họp.</p>
+            <p>Tôi có thể giúp bạn tìm hiểu về policy, tài liệu, hoặc context cuộc họp.</p>
             <div className="suggested-questions">
               {suggestedQuestions.map((q, i) => (
                 <button key={i} className="suggested-btn" onClick={() => setQuery(q)}>

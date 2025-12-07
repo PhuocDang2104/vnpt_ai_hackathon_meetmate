@@ -3204,8 +3204,9 @@ a {
 }
 
 .ai-message--user {
-  background: var(--accent-subtle);
+  background: var(--accent);
   justify-content: flex-end;
+  color: #ffffff;
 }
 
 .ai-message--ai {
@@ -3221,6 +3222,10 @@ a {
   max-width: 80%;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.ai-message--user .ai-message__content {
+  color: #ffffff;
 }
 
 .ai-input {
