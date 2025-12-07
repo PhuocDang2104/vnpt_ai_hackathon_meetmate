@@ -1,5 +1,78 @@
 # Changelog
 
+## [v0.7.0] - 2024-12-07
+
+### 📚 Knowledge Hub - Document Upload & AI Search
+
+Xây dựng trang Knowledge Hub với tính năng upload tài liệu và tìm kiếm AI.
+
+#### ✨ Features
+
+**Knowledge API** (`/api/v1/knowledge`)
+- `GET /documents` - Danh sách tài liệu với filters (type, source, category)
+- `GET /documents/{id}` - Chi tiết tài liệu (tăng view count)
+- `POST /documents/upload` - **Upload tài liệu mới** ✨
+- `PUT /documents/{id}` - Cập nhật metadata
+- `DELETE /documents/{id}` - Xóa tài liệu
+- `POST /search` - Tìm kiếm tài liệu theo query
+- `POST /query` - **AI Q&A trên knowledge base** (Gemini)
+- `GET /recent-queries` - Lịch sử tìm kiếm gần đây
+
+**Frontend Features**
+- **Trang Knowledge Hub** (`/app/knowledge`):
+  - Danh sách tài liệu phổ biến với metadata
+  - Tìm kiếm real-time với suggestions
+  - Lịch sử tìm kiếm gần đây
+  - **Upload tài liệu mới**:
+    - Form với title, description, type, source, category
+    - Hỗ trợ tags (thêm/xóa)
+    - File upload (mock - chỉ lưu metadata)
+  - Hiển thị kết quả tìm kiếm
+
+#### 📁 New Files
+
+**Backend:**
+- `backend/app/schemas/knowledge.py` - Knowledge document schemas
+- `backend/app/services/knowledge_service.py` - Knowledge service với mock data
+- `backend/app/api/v1/endpoints/knowledge.py` - Knowledge API endpoints
+
+**Frontend:**
+- `electron/src/renderer/lib/api/knowledge.ts` - Knowledge API client
+
+#### 🔧 Updated Files
+
+**Backend:**
+- `backend/app/main.py` - Added knowledge router
+- `backend/app/services/__init__.py` - Export knowledge_service
+- `backend/app/api/v1/endpoints/__init__.py` - Export knowledge module
+
+**Frontend:**
+- `electron/src/renderer/app/routes/KnowledgeHub.tsx` - Full implementation với search & upload
+
+#### 📝 Mock Data
+
+8 tài liệu mẫu:
+- Thông tư 09/2020/TT-NHNN (NHNN)
+- LPBank Security Policy v3.0 (SharePoint)
+- Core Banking Integration Guide (SharePoint)
+- KYC Policy 2024 (LOffice)
+- Risk Assessment Template (SharePoint)
+- Thông tư 35/2016/TT-NHNN (NHNN)
+- Mobile Banking API Documentation (Wiki)
+- Change Request Process Guide (SharePoint)
+
+---
+
+## [v0.6.0] - 2024-12-07
+
+### 🎨 Pre-meet AI Q&A Improvements
+
+- User messages hiển thị màu trắng
+- AI không còn chào hỏi sau mỗi tin nhắn
+- Loại bỏ markdown formatting từ AI responses
+
+---
+
 ## [v0.5.0] - 2024-12-06
 
 ### 📄 Documents & Agenda Management
