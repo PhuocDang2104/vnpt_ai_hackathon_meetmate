@@ -22,10 +22,10 @@
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
   
-  /* Accent - Yellow */
-  --accent: #eab308;
-  --accent-hover: #ca8a04;
-  --accent-subtle: rgba(234, 179, 8, 0.12);
+  /* Accent - Microsoft Teams Purple */
+  --accent: #5b5fc7;
+  --accent-hover: #4c4fba;
+  --accent-subtle: rgba(91, 95, 199, 0.16);
   
   /* Status */
   --success: #22c55e;
