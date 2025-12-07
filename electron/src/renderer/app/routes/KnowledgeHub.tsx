@@ -3,7 +3,6 @@ import {
   Search,
   BookOpen,
   FileText,
-  Bot,
   Send,
   ExternalLink,
   Clock,
@@ -12,11 +11,8 @@ import {
   Loader2,
   Plus,
   X,
-  Trash2,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
-import { Modal } from '../../components/ui/Modal'
-import { FormField } from '../../components/ui/FormField'
 
 const KnowledgeHub = () => {
   const [query, setQuery] = useState('')
@@ -295,7 +291,7 @@ const KnowledgeHub = () => {
   )
 }
 
-// Upload Document Modal Component
+// Upload Document Modal Component - Modern Design
 interface UploadDocumentModalProps {
   isOpen: boolean
   onClose: () => void
@@ -304,6 +300,7 @@ interface UploadDocumentModalProps {
 
 const UploadDocumentModal = ({ isOpen, onClose, onSuccess }: UploadDocumentModalProps) => {
   const [isUploading, setIsUploading] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -359,142 +356,276 @@ const UploadDocumentModal = ({ isOpen, onClose, onSuccess }: UploadDocumentModal
     setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) })
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setSelectedFile(file)
-      // Auto-detect file type
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-      setFormData({ ...formData, file_type: ext })
-      
-      // Auto-fill title if empty
-      if (!formData.title) {
-        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
-        setFormData({ ...formData, title: nameWithoutExt, file_type: ext })
-      }
-    }
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file)
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+    const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
+    setFormData(prev => ({ 
+      ...prev, 
+      file_type: ext,
+      title: prev.title || nameWithoutExt
+    }))
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileSelect(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFileSelect(file)
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const getFileIcon = (ext: string) => {
+    const icons: Record<string, string> = {
+      pdf: '📄', docx: '📝', xlsx: '📊', pptx: '📊', 
+      txt: '📃', md: '📋', default: '📁'
+    }
+    return icons[ext] || icons.default
+  }
+
+  if (!isOpen) return null
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Upload tài liệu mới" size="lg">
-      <form onSubmit={handleSubmit}>
-        <FormField label="Tên tài liệu *">
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="Nhập tên tài liệu..."
-            required
-          />
-        </FormField>
-
-        <FormField label="Mô tả">
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Mô tả ngắn về tài liệu..."
-            rows={3}
-          />
-        </FormField>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-          <FormField label="Loại tài liệu">
-            <select
-              value={formData.document_type}
-              onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-            >
-              <option value="document">Tài liệu</option>
-              <option value="regulation">Quy định</option>
-              <option value="policy">Chính sách</option>
-              <option value="technical">Kỹ thuật</option>
-              <option value="template">Template</option>
-              <option value="meeting_minutes">Biên bản</option>
-            </select>
-          </FormField>
-
-          <FormField label="Nguồn">
-            <select
-              value={formData.source}
-              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-            >
-              <option value="Uploaded">Đã upload</option>
-              <option value="SharePoint">SharePoint</option>
-              <option value="Wiki">Wiki</option>
-              <option value="LOffice">LOffice</option>
-              <option value="NHNN">NHNN</option>
-            </select>
-          </FormField>
+    <div className="upload-modal-overlay" onClick={onClose}>
+      <div className="upload-modal" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="upload-modal__header">
+          <div className="upload-modal__header-content">
+            <div className="upload-modal__icon">
+              <Upload size={20} />
+            </div>
+            <div>
+              <h2 className="upload-modal__title">Upload tài liệu mới</h2>
+              <p className="upload-modal__subtitle">Thêm tài liệu vào Knowledge Hub</p>
+            </div>
+          </div>
+          <button className="upload-modal__close" onClick={onClose} type="button">
+            <X size={20} />
+          </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-          <FormField label="File">
-            <input
-              type="file"
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="upload-modal__body">
+          {/* Drag & Drop Zone */}
+          <div 
+            className={`upload-dropzone ${isDragOver ? 'upload-dropzone--active' : ''} ${selectedFile ? 'upload-dropzone--has-file' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <input 
+              type="file" 
+              id="file-upload"
+              className="upload-dropzone__input"
               onChange={handleFileChange}
               accept=".pdf,.docx,.xlsx,.pptx,.txt,.md"
             />
-            {selectedFile && (
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-              </div>
-            )}
-          </FormField>
-
-          <FormField label="Danh mục">
-            <input
-              type="text"
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              placeholder="Compliance, Technical, etc."
-            />
-          </FormField>
-        </div>
-
-        <FormField label="Tags">
-          <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap', marginBottom: 'var(--space-sm)' }}>
-            {formData.tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="badge badge--neutral"
-                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTag(tag)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            
+            {selectedFile ? (
+              <div className="upload-dropzone__file">
+                <span className="upload-dropzone__file-icon">{getFileIcon(formData.file_type)}</span>
+                <div className="upload-dropzone__file-info">
+                  <span className="upload-dropzone__file-name">{selectedFile.name}</span>
+                  <span className="upload-dropzone__file-size">{formatFileSize(selectedFile.size)}</span>
+                </div>
+                <button 
+                  type="button" 
+                  className="upload-dropzone__file-remove"
+                  onClick={() => setSelectedFile(null)}
                 >
-                  <X size={12} />
+                  <X size={16} />
                 </button>
-              </span>
-            ))}
+              </div>
+            ) : (
+              <label htmlFor="file-upload" className="upload-dropzone__content">
+                <div className="upload-dropzone__icon">
+                  <Upload size={32} />
+                </div>
+                <div className="upload-dropzone__text">
+                  <span className="upload-dropzone__primary">Kéo thả file vào đây</span>
+                  <span className="upload-dropzone__secondary">hoặc <span className="upload-dropzone__link">chọn file</span></span>
+                </div>
+                <span className="upload-dropzone__hint">PDF, DOCX, XLSX, PPTX, TXT, MD • Tối đa 50MB</span>
+              </label>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-              placeholder="Nhập tag và nhấn Enter..."
-              style={{ flex: 1 }}
-            />
-            <button type="button" className="btn btn--ghost btn--sm" onClick={handleAddTag}>
-              <Plus size={14} />
-            </button>
-          </div>
-        </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)', marginTop: 'var(--space-lg)' }}>
-          <button type="button" className="btn btn--ghost" onClick={onClose}>
-            Hủy
+          {/* Form Grid */}
+          <div className="upload-form-grid">
+            {/* Title - Full width */}
+            <div className="upload-field upload-field--full">
+              <label className="upload-field__label">
+                Tên tài liệu <span className="upload-field__required">*</span>
+              </label>
+              <input
+                type="text"
+                className="upload-field__input"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="VD: Thông tư 09/2020 - Quản lý rủi ro CNTT"
+                required
+              />
+            </div>
+
+            {/* Description - Full width */}
+            <div className="upload-field upload-field--full">
+              <label className="upload-field__label">Mô tả</label>
+              <textarea
+                className="upload-field__textarea"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Mô tả ngắn gọn nội dung và mục đích của tài liệu..."
+                rows={3}
+              />
+            </div>
+
+            {/* Document Type & Source - 2 columns */}
+            <div className="upload-field">
+              <label className="upload-field__label">Loại tài liệu</label>
+              <div className="upload-select">
+                <select
+                  className="upload-select__input"
+                  value={formData.document_type}
+                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+                >
+                  <option value="document">📄 Tài liệu chung</option>
+                  <option value="regulation">📜 Quy định</option>
+                  <option value="policy">📋 Chính sách</option>
+                  <option value="technical">⚙️ Kỹ thuật</option>
+                  <option value="template">📐 Template</option>
+                  <option value="meeting_minutes">📝 Biên bản</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="upload-field">
+              <label className="upload-field__label">Nguồn</label>
+              <div className="upload-select">
+                <select
+                  className="upload-select__input"
+                  value={formData.source}
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                >
+                  <option value="Uploaded">📤 Uploaded</option>
+                  <option value="SharePoint">📁 SharePoint</option>
+                  <option value="Wiki">📖 Wiki</option>
+                  <option value="LOffice">🏢 LOffice</option>
+                  <option value="NHNN">🏛️ NHNN</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Category - Full width */}
+            <div className="upload-field upload-field--full">
+              <label className="upload-field__label">Danh mục</label>
+              <input
+                type="text"
+                className="upload-field__input"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="VD: Compliance, Technical, Security, Project..."
+              />
+            </div>
+
+            {/* Tags - Full width */}
+            <div className="upload-field upload-field--full">
+              <label className="upload-field__label">Tags</label>
+              <div className="upload-tags">
+                {formData.tags.length > 0 && (
+                  <div className="upload-tags__list">
+                    {formData.tags.map((tag, idx) => (
+                      <span key={idx} className="upload-tag">
+                        <span className="upload-tag__text">{tag}</span>
+                        <button
+                          type="button"
+                          className="upload-tag__remove"
+                          onClick={() => handleRemoveTag(tag)}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="upload-tags__input-wrapper">
+                  <input
+                    type="text"
+                    className="upload-tags__input"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddTag()
+                      }
+                    }}
+                    placeholder={formData.tags.length > 0 ? "Thêm tag..." : "Nhập tag và nhấn Enter..."}
+                  />
+                  {tagInput.trim() && (
+                    <button 
+                      type="button" 
+                      className="upload-tags__add"
+                      onClick={handleAddTag}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <span className="upload-field__hint">Nhấn Enter để thêm tag mới</span>
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="upload-modal__footer">
+          <button type="button" className="upload-btn upload-btn--ghost" onClick={onClose}>
+            Hủy bỏ
           </button>
-          <button type="submit" className="btn btn--primary" disabled={!formData.title.trim() || isUploading}>
-            {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            Upload
+          <button 
+            type="submit" 
+            className="upload-btn upload-btn--primary"
+            disabled={!formData.title.trim() || isUploading}
+            onClick={handleSubmit}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Đang upload...
+              </>
+            ) : (
+              <>
+                <Upload size={18} />
+                Upload tài liệu
+              </>
+            )}
           </button>
         </div>
-      </form>
-    </Modal>
+      </div>
+    </div>
   )
 }
 
