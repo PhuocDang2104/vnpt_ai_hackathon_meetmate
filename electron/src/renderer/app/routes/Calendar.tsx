@@ -1,6 +1,6 @@
 /**
- * Calendar - Meeting schedule view
- * Uses MeetingService for unified data fetching
+ * Calendar - Notion-style meeting schedule view
+ * Supports Year, Month, Week views with day selection
  */
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
@@ -15,101 +15,142 @@ import {
   Loader2,
   RefreshCw,
   AlertTriangle,
+  Grid3X3,
+  LayoutGrid,
+  CalendarDays,
+  X,
+  Video,
+  ExternalLink,
 } from 'lucide-react'
 import {
   useCalendarMeetings,
-  useTodayMeetings,
   type NormalizedMeeting,
 } from '../../services/meeting'
 
-// Skeleton Loader
-const SkeletonMeetingCard = () => (
-  <div style={{
-    padding: 'var(--space-md)',
-    background: 'var(--bg-surface)',
-    borderRadius: 'var(--radius-sm)',
-    opacity: 0.5,
-  }}>
-    <div style={{ width: '50%', height: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-    <div style={{ width: '80%', height: 14, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-    <div style={{ width: '60%', height: 10, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-  </div>
-)
+type ViewMode = 'year' | 'month' | 'week'
+
+// Days of week in Vietnamese
+const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+const WEEKDAYS_FULL = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy']
+const MONTHS = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
+                'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
+
+// Helper functions
+const isSameDay = (d1: Date, d2: Date) => 
+  d1.getDate() === d2.getDate() && 
+  d1.getMonth() === d2.getMonth() && 
+  d1.getFullYear() === d2.getFullYear()
+
+const isToday = (date: Date) => isSameDay(date, new Date())
+
+const getWeekStart = (date: Date) => {
+  const d = new Date(date)
+  const day = d.getDay()
+  d.setDate(d.getDate() - day)
+  return d
+}
+
+const getWeekDays = (date: Date) => {
+  const start = getWeekStart(date)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    return d
+  })
+}
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
-  
-  // Calculate month boundaries for calendar view
-  const { startOfMonth, endOfMonth, monthLabel, daysInMonth, firstDayOfWeek } = useMemo(() => {
+  const [viewMode, setViewMode] = useState<ViewMode>('month')
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
+
+  // Calculate date range based on view mode
+  const { startDate, endDate, title } = useMemo(() => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
-    const start = new Date(year, month, 1)
-    const end = new Date(year, month + 1, 0, 23, 59, 59)
     
-    return {
-      startOfMonth: start,
-      endOfMonth: end,
-      monthLabel: currentDate.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }),
-      daysInMonth: end.getDate(),
-      firstDayOfWeek: start.getDay(),
+    switch (viewMode) {
+      case 'year':
+        return {
+          startDate: new Date(year, 0, 1),
+          endDate: new Date(year, 11, 31, 23, 59, 59),
+          title: `Năm ${year}`,
+        }
+      case 'week':
+        const weekStart = getWeekStart(currentDate)
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6)
+        weekEnd.setHours(23, 59, 59)
+        return {
+          startDate: weekStart,
+          endDate: weekEnd,
+          title: `${weekStart.getDate()}/${weekStart.getMonth() + 1} - ${weekEnd.getDate()}/${weekEnd.getMonth() + 1}/${year}`,
+        }
+      default: // month
+        return {
+          startDate: new Date(year, month, 1),
+          endDate: new Date(year, month + 1, 0, 23, 59, 59),
+          title: `${MONTHS[month]} ${year}`,
+        }
     }
-  }, [currentDate])
+  }, [currentDate, viewMode])
 
-  // Use service hooks for data fetching
+  // Fetch meetings for the current view range
   const { 
-    data: monthMeetings, 
-    isLoading: loadingMonth, 
-    error: monthError,
-    refetch: refetchMonth 
-  } = useCalendarMeetings(startOfMonth, endOfMonth)
-  
-  const { 
-    data: todayMeetings, 
-    isLoading: loadingToday,
-    error: todayError,
-    refetch: refetchToday 
-  } = useTodayMeetings()
+    data: meetings, 
+    isLoading, 
+    error,
+    refetch 
+  } = useCalendarMeetings(startDate, endDate)
 
-  const today = new Date()
-  const isCurrentMonth = today.getMonth() === currentDate.getMonth() && today.getFullYear() === currentDate.getFullYear()
-
-  // Calendar navigation
-  const goToPreviousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+  // Get meetings for a specific date
+  const getMeetingsForDate = (date: Date): NormalizedMeeting[] => {
+    if (!meetings) return []
+    return meetings.filter(m => isSameDay(m.startTime, date))
+      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
   }
 
-  const goToNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+  // Navigation functions
+  const goToPrevious = () => {
+    const d = new Date(currentDate)
+    switch (viewMode) {
+      case 'year':
+        d.setFullYear(d.getFullYear() - 1)
+        break
+      case 'week':
+        d.setDate(d.getDate() - 7)
+        break
+      default:
+        d.setMonth(d.getMonth() - 1)
+    }
+    setCurrentDate(d)
+  }
+
+  const goToNext = () => {
+    const d = new Date(currentDate)
+    switch (viewMode) {
+      case 'year':
+        d.setFullYear(d.getFullYear() + 1)
+        break
+      case 'week':
+        d.setDate(d.getDate() + 7)
+        break
+      default:
+        d.setMonth(d.getMonth() + 1)
+    }
+    setCurrentDate(d)
   }
 
   const goToToday = () => {
     setCurrentDate(new Date())
+    setSelectedDate(new Date())
   }
 
-  const handleRefresh = () => {
-    refetchMonth()
-    refetchToday()
-  }
-
-  // Check if a day has meetings
-  const getMeetingsForDay = (day: number): NormalizedMeeting[] => {
-    if (!monthMeetings) return []
-    return monthMeetings.filter(m => {
-      const meetingDate = m.startTime
-      return meetingDate.getDate() === day && 
-             meetingDate.getMonth() === currentDate.getMonth() &&
-             meetingDate.getFullYear() === currentDate.getFullYear()
-    })
-  }
-
-  // Generate calendar days
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  const emptyDays = Array.from({ length: firstDayOfWeek }, (_, i) => i)
-
-  const hasError = monthError || todayError
+  // Selected date meetings
+  const selectedMeetings = selectedDate ? getMeetingsForDate(selectedDate) : []
 
   return (
-    <div>
+    <div className="calendar-page">
       {/* Page Header */}
       <div className="page-header">
         <div>
@@ -117,8 +158,8 @@ const Calendar = () => {
           <p className="page-header__subtitle">Quản lý lịch họp của bạn</p>
         </div>
         <div className="page-header__actions">
-          <button className="btn btn--ghost" onClick={handleRefresh} title="Làm mới">
-            <RefreshCw size={16} />
+          <button className="btn btn--ghost" onClick={() => refetch()} title="Làm mới">
+            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </button>
           <Link to="/app/meetings" className="btn btn--primary">
             <Plus size={16} />
@@ -128,206 +169,431 @@ const Calendar = () => {
       </div>
 
       {/* Error Toast */}
-      {hasError && (
+      {error && (
         <div className="card mb-4" style={{ borderColor: 'var(--error)', borderLeftWidth: 3 }}>
           <div className="card__body" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
             <AlertTriangle size={20} style={{ color: 'var(--error)' }} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Không thể tải dữ liệu</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Đang sử dụng dữ liệu mẫu.
-              </div>
-            </div>
-            <button className="btn btn--ghost btn--sm" onClick={handleRefresh} style={{ marginLeft: 'auto' }}>
-              Thử lại
-            </button>
+            <span>Không thể tải dữ liệu. Đang sử dụng dữ liệu mẫu.</span>
           </div>
         </div>
       )}
 
-      <div className="grid grid--2" style={{ gridTemplateColumns: '1fr 360px' }}>
-        {/* Calendar Grid */}
-        <div className="card">
-          <div className="card__header">
-            <h3 className="card__title">
-              <CalendarIcon size={18} className="card__title-icon" />
-              {monthLabel}
-              {loadingMonth && <Loader2 size={14} className="animate-spin" style={{ marginLeft: 8 }} />}
-            </h3>
-            <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-              <button className="btn btn--ghost btn--icon" onClick={goToPreviousMonth}>
-                <ChevronLeft size={18} />
+      <div className="calendar-layout">
+        {/* Calendar Main */}
+        <div className="calendar-main">
+          {/* Calendar Controls */}
+          <div className="calendar-controls">
+            <div className="calendar-controls__left">
+              <button className="btn btn--ghost btn--icon" onClick={goToPrevious}>
+                <ChevronLeft size={20} />
               </button>
-              <button 
-                className={`btn btn--sm ${isCurrentMonth ? 'btn--secondary' : 'btn--ghost'}`}
-                onClick={goToToday}
-              >
+              <button className="btn btn--secondary btn--sm" onClick={goToToday}>
                 Hôm nay
               </button>
-              <button className="btn btn--ghost btn--icon" onClick={goToNextMonth}>
-                <ChevronRight size={18} />
+              <button className="btn btn--ghost btn--icon" onClick={goToNext}>
+                <ChevronRight size={20} />
               </button>
+              <h2 className="calendar-title">{title}</h2>
+              {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-muted)' }} />}
+            </div>
+            <div className="calendar-controls__right">
+              <div className="view-toggle">
+                <button 
+                  className={`view-toggle__btn ${viewMode === 'year' ? 'view-toggle__btn--active' : ''}`}
+                  onClick={() => setViewMode('year')}
+                  title="Xem theo năm"
+                >
+                  <Grid3X3 size={16} />
+                  Năm
+                </button>
+                <button 
+                  className={`view-toggle__btn ${viewMode === 'month' ? 'view-toggle__btn--active' : ''}`}
+                  onClick={() => setViewMode('month')}
+                  title="Xem theo tháng"
+                >
+                  <LayoutGrid size={16} />
+                  Tháng
+                </button>
+                <button 
+                  className={`view-toggle__btn ${viewMode === 'week' ? 'view-toggle__btn--active' : ''}`}
+                  onClick={() => setViewMode('week')}
+                  title="Xem theo tuần"
+                >
+                  <CalendarDays size={16} />
+                  Tuần
+                </button>
+              </div>
             </div>
           </div>
-          <div className="card__body">
-            {/* Week days header */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)', 
-              gap: '2px',
-              marginBottom: 'var(--space-sm)'
-            }}>
-              {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
-                <div key={day} style={{ 
-                  textAlign: 'center', 
-                  padding: 'var(--space-sm)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)'
-                }}>
-                  {day}
+
+          {/* Calendar Views */}
+          <div className="calendar-view">
+            {viewMode === 'year' && (
+              <YearView 
+                year={currentDate.getFullYear()}
+                meetings={meetings || []}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+              />
+            )}
+            {viewMode === 'month' && (
+              <MonthView 
+                currentDate={currentDate}
+                meetings={meetings || []}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+              />
+            )}
+            {viewMode === 'week' && (
+              <WeekView 
+                currentDate={currentDate}
+                meetings={meetings || []}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Selected Day Panel */}
+        <div className="calendar-sidebar">
+          <div className="calendar-sidebar__header">
+            {selectedDate ? (
+              <>
+                <div>
+                  <div className="calendar-sidebar__date">
+                    {selectedDate.getDate()}
+                  </div>
+                  <div className="calendar-sidebar__weekday">
+                    {WEEKDAYS_FULL[selectedDate.getDay()]}
+                  </div>
+                  <div className="calendar-sidebar__month">
+                    {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                  </div>
                 </div>
-              ))}
+                {!isToday(selectedDate) && (
+                  <button 
+                    className="btn btn--ghost btn--icon" 
+                    onClick={() => setSelectedDate(null)}
+                    title="Đóng"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="calendar-sidebar__placeholder">
+                <CalendarIcon size={24} />
+                <span>Chọn một ngày để xem lịch họp</span>
+              </div>
+            )}
+          </div>
+
+          {selectedDate && (
+            <div className="calendar-sidebar__content">
+              {selectedMeetings.length > 0 ? (
+                <div className="meeting-list">
+                  {selectedMeetings.map(meeting => (
+                    <MeetingCard key={meeting.id} meeting={meeting} />
+                  ))}
+                </div>
+              ) : (
+                <div className="calendar-sidebar__empty">
+                  <Clock size={32} />
+                  <p>Không có cuộc họp nào</p>
+                  <Link to="/app/meetings" className="btn btn--secondary btn--sm">
+                    <Plus size={14} />
+                    Tạo cuộc họp
+                  </Link>
+                </div>
+              )}
             </div>
-            
-            {/* Calendar days */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)', 
-              gap: '2px'
-            }}>
-              {emptyDays.map(i => (
-                <div key={`empty-${i}`} style={{ padding: 'var(--space-md)' }}></div>
-              ))}
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Year View Component
+interface YearViewProps {
+  year: number
+  meetings: NormalizedMeeting[]
+  selectedDate: Date | null
+  onSelectDate: (date: Date) => void
+}
+
+const YearView = ({ year, meetings, selectedDate, onSelectDate }: YearViewProps) => {
+  const getMeetingCount = (month: number, day: number) => {
+    return meetings.filter(m => 
+      m.startTime.getFullYear() === year &&
+      m.startTime.getMonth() === month &&
+      m.startTime.getDate() === day
+    ).length
+  }
+
+  return (
+    <div className="year-view">
+      {MONTHS.map((monthName, monthIndex) => {
+        const firstDay = new Date(year, monthIndex, 1)
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+        const startDay = firstDay.getDay()
+        const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+        const emptyDays = Array.from({ length: startDay }, (_, i) => i)
+
+        return (
+          <div key={monthIndex} className="mini-month">
+            <div className="mini-month__header">{monthName}</div>
+            <div className="mini-month__weekdays">
+              {WEEKDAYS.map(d => <div key={d}>{d}</div>)}
+            </div>
+            <div className="mini-month__days">
+              {emptyDays.map(i => <div key={`e-${i}`} />)}
               {days.map(day => {
-                const isToday = isCurrentMonth && day === today.getDate()
-                const dayMeetings = getMeetingsForDay(day)
-                const hasMeetings = dayMeetings.length > 0
-                const hasLive = dayMeetings.some(m => m.status === 'in_progress')
-                
+                const date = new Date(year, monthIndex, day)
+                const meetingCount = getMeetingCount(monthIndex, day)
+                const isSelected = selectedDate && isSameDay(date, selectedDate)
+                const isTodayDate = isToday(date)
+
                 return (
-                  <div 
-                    key={day} 
-                    style={{ 
-                      textAlign: 'center', 
-                      padding: 'var(--space-md)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: isToday ? 'var(--accent)' : hasMeetings ? 'var(--bg-surface)' : 'transparent',
-                      color: isToday ? 'var(--bg-base)' : 'var(--text-primary)',
-                      cursor: hasMeetings ? 'pointer' : 'default',
-                      position: 'relative',
-                      fontWeight: isToday ? 600 : 400,
-                      transition: 'all 0.15s',
-                    }}
-                    title={hasMeetings ? `${dayMeetings.length} cuộc họp` : ''}
+                  <div
+                    key={day}
+                    className={`mini-month__day ${isSelected ? 'mini-month__day--selected' : ''} ${isTodayDate ? 'mini-month__day--today' : ''} ${meetingCount > 0 ? 'mini-month__day--has-meeting' : ''}`}
+                    onClick={() => onSelectDate(date)}
                   >
                     {day}
-                    {hasMeetings && !isToday && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '4px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        gap: '2px',
-                      }}>
-                        {dayMeetings.slice(0, 3).map((_, idx) => (
-                          <div 
-                            key={idx}
-                            style={{
-                              width: '4px',
-                              height: '4px',
-                              background: hasLive ? 'var(--error)' : 'var(--accent)',
-                              borderRadius: '50%'
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    {meetingCount > 0 && <span className="mini-month__dot" />}
                   </div>
                 )
               })}
             </div>
           </div>
-        </div>
+        )
+      })}
+    </div>
+  )
+}
 
-        {/* Today's Schedule */}
-        <div className="card">
-          <div className="card__header">
-            <h3 className="card__title">
-              <Clock size={18} className="card__title-icon" />
-              Hôm nay
-              {loadingToday && <Loader2 size={14} className="animate-spin" style={{ marginLeft: 8 }} />}
-            </h3>
-            <span className="badge badge--info">{todayMeetings?.length ?? 0} cuộc họp</span>
-          </div>
-          <div className="card__body">
-            {loadingToday ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                <SkeletonMeetingCard />
-                <SkeletonMeetingCard />
-              </div>
-            ) : todayMeetings && todayMeetings.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                {todayMeetings.map((meeting: NormalizedMeeting) => (
-                  <Link 
-                    key={meeting.id}
-                    to={`/app/meetings/${meeting.id}/detail`}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
+// Month View Component
+interface MonthViewProps {
+  currentDate: Date
+  meetings: NormalizedMeeting[]
+  selectedDate: Date | null
+  onSelectDate: (date: Date) => void
+}
+
+const MonthView = ({ currentDate, meetings, selectedDate, onSelectDate }: MonthViewProps) => {
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const startDay = firstDay.getDay()
+  
+  // Include days from previous month to fill the first week
+  const prevMonthDays = new Date(year, month, 0).getDate()
+  const prevDays = Array.from({ length: startDay }, (_, i) => ({
+    day: prevMonthDays - startDay + i + 1,
+    date: new Date(year, month - 1, prevMonthDays - startDay + i + 1),
+    isCurrentMonth: false,
+  }))
+  
+  const currentDays = Array.from({ length: daysInMonth }, (_, i) => ({
+    day: i + 1,
+    date: new Date(year, month, i + 1),
+    isCurrentMonth: true,
+  }))
+  
+  // Include days from next month to fill the last week
+  const totalDays = prevDays.length + currentDays.length
+  const nextDaysCount = totalDays % 7 === 0 ? 0 : 7 - (totalDays % 7)
+  const nextDays = Array.from({ length: nextDaysCount }, (_, i) => ({
+    day: i + 1,
+    date: new Date(year, month + 1, i + 1),
+    isCurrentMonth: false,
+  }))
+  
+  const allDays = [...prevDays, ...currentDays, ...nextDays]
+
+  const getMeetingsForDay = (date: Date) => 
+    meetings.filter(m => isSameDay(m.startTime, date))
+
+  return (
+    <div className="month-view">
+      <div className="month-view__header">
+        {WEEKDAYS.map(d => <div key={d} className="month-view__weekday">{d}</div>)}
+      </div>
+      <div className="month-view__grid">
+        {allDays.map((item, index) => {
+          const dayMeetings = getMeetingsForDay(item.date)
+          const isSelected = selectedDate && isSameDay(item.date, selectedDate)
+          const isTodayDate = isToday(item.date)
+
+          return (
+            <div
+              key={index}
+              className={`month-view__day ${!item.isCurrentMonth ? 'month-view__day--other' : ''} ${isSelected ? 'month-view__day--selected' : ''} ${isTodayDate ? 'month-view__day--today' : ''}`}
+              onClick={() => onSelectDate(item.date)}
+            >
+              <div className="month-view__day-number">{item.day}</div>
+              <div className="month-view__day-meetings">
+                {dayMeetings.slice(0, 3).map(m => (
+                  <div 
+                    key={m.id} 
+                    className={`month-view__meeting month-view__meeting--${m.status === 'in_progress' ? 'live' : m.phase}`}
+                    title={m.title}
                   >
-                    <div style={{
-                      padding: 'var(--space-md)',
-                      background: 'var(--bg-surface)',
-                      borderRadius: 'var(--radius-sm)',
-                      borderLeft: `3px solid var(--${meeting.status === 'in_progress' ? 'error' : meeting.phase === 'pre' ? 'info' : 'success'})`,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        marginBottom: 'var(--space-sm)'
-                      }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>
-                          {meeting.start}
-                        </span>
-                        <span className={`meeting-item__phase meeting-item__phase--${meeting.phase}`}>
-                          {meeting.status === 'in_progress' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Xong'}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: 'var(--space-xs)' }}>
-                        {meeting.title}
-                      </div>
-                      <div style={{ display: 'flex', gap: 'var(--space-md)', fontSize: '11px', color: 'var(--text-muted)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Users size={12} />
-                          {meeting.participants}
-                        </span>
-                        {meeting.location && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <MapPin size={12} />
-                            {meeting.location}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
+                    <span className="month-view__meeting-time">{m.start}</span>
+                    <span className="month-view__meeting-title">{m.title}</span>
+                  </div>
                 ))}
+                {dayMeetings.length > 3 && (
+                  <div className="month-view__more">+{dayMeetings.length - 3} more</div>
+                )}
               </div>
-            ) : (
-              <div className="empty-state">
-                <CalendarIcon size={48} className="empty-state__icon" />
-                <div className="empty-state__title">Không có cuộc họp</div>
-                <div className="empty-state__description">
-                  Hôm nay bạn không có cuộc họp nào được lên lịch
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )
+        })}
       </div>
     </div>
+  )
+}
+
+// Week View Component
+interface WeekViewProps {
+  currentDate: Date
+  meetings: NormalizedMeeting[]
+  selectedDate: Date | null
+  onSelectDate: (date: Date) => void
+}
+
+const WeekView = ({ currentDate, meetings, selectedDate, onSelectDate }: WeekViewProps) => {
+  const weekDays = getWeekDays(currentDate)
+  const hours = Array.from({ length: 12 }, (_, i) => i + 7) // 7am to 6pm
+
+  const getMeetingsForDay = (date: Date) => 
+    meetings.filter(m => isSameDay(m.startTime, date))
+      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+
+  return (
+    <div className="week-view">
+      {/* Header */}
+      <div className="week-view__header">
+        <div className="week-view__time-gutter" />
+        {weekDays.map((date, i) => {
+          const isSelected = selectedDate && isSameDay(date, selectedDate)
+          const isTodayDate = isToday(date)
+          
+          return (
+            <div 
+              key={i} 
+              className={`week-view__day-header ${isSelected ? 'week-view__day-header--selected' : ''} ${isTodayDate ? 'week-view__day-header--today' : ''}`}
+              onClick={() => onSelectDate(date)}
+            >
+              <div className="week-view__weekday">{WEEKDAYS[date.getDay()]}</div>
+              <div className="week-view__day-number">{date.getDate()}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Grid */}
+      <div className="week-view__body">
+        <div className="week-view__time-column">
+          {hours.map(hour => (
+            <div key={hour} className="week-view__time-slot">
+              {hour}:00
+            </div>
+          ))}
+        </div>
+        
+        {weekDays.map((date, dayIndex) => {
+          const dayMeetings = getMeetingsForDay(date)
+          
+          return (
+            <div key={dayIndex} className="week-view__day-column">
+              {hours.map(hour => (
+                <div key={hour} className="week-view__cell" />
+              ))}
+              {/* Render meetings */}
+              {dayMeetings.map(meeting => {
+                const startHour = meeting.startTime.getHours()
+                const startMin = meeting.startTime.getMinutes()
+                const endHour = meeting.endTime.getHours()
+                const endMin = meeting.endTime.getMinutes()
+                
+                const top = ((startHour - 7) * 60 + startMin) * (60 / 60) // 60px per hour
+                const height = ((endHour - startHour) * 60 + (endMin - startMin)) * (60 / 60)
+                
+                if (startHour < 7 || startHour > 18) return null
+                
+                return (
+                  <Link
+                    key={meeting.id}
+                    to={`/app/meetings/${meeting.id}/detail`}
+                    className={`week-view__event week-view__event--${meeting.status === 'in_progress' ? 'live' : meeting.phase}`}
+                    style={{ top: `${top}px`, height: `${Math.max(height, 30)}px` }}
+                  >
+                    <div className="week-view__event-time">{meeting.start}</div>
+                    <div className="week-view__event-title">{meeting.title}</div>
+                  </Link>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Meeting Card Component
+const MeetingCard = ({ meeting }: { meeting: NormalizedMeeting }) => {
+  const statusColors = {
+    in_progress: 'var(--error)',
+    upcoming: 'var(--info)',
+    completed: 'var(--success)',
+    cancelled: 'var(--text-muted)',
+  }
+
+  return (
+    <Link 
+      to={`/app/meetings/${meeting.id}/detail`}
+      className="meeting-card"
+      style={{ borderLeftColor: statusColors[meeting.status] }}
+    >
+      <div className="meeting-card__header">
+        <span className="meeting-card__time">
+          <Clock size={12} />
+          {meeting.start} - {meeting.end}
+        </span>
+        {meeting.status === 'in_progress' && (
+          <span className="meeting-card__live">
+            <span className="meeting-card__live-dot" />
+            Live
+          </span>
+        )}
+      </div>
+      <h4 className="meeting-card__title">{meeting.title}</h4>
+      <div className="meeting-card__meta">
+        <span>
+          <Users size={12} />
+          {meeting.participants} người
+        </span>
+        {meeting.location && (
+          <span>
+            <MapPin size={12} />
+            {meeting.location}
+          </span>
+        )}
+      </div>
+      {meeting.teamsLink && (
+        <div className="meeting-card__action">
+          <Video size={14} />
+          Tham gia Teams
+          <ExternalLink size={12} />
+        </div>
+      )}
+    </Link>
   )
 }
 

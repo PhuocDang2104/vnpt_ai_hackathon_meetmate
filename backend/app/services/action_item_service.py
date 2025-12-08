@@ -18,6 +18,84 @@ from app.schemas.action_item import (
 # ACTION ITEM CRUD
 # ============================================
 
+def list_all_action_items(
+    db: Session, 
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    owner_user_id: Optional[str] = None,
+    overdue_only: bool = False
+) -> ActionItemList:
+    """List all action items with optional filters"""
+    conditions = []
+    params = {}
+    
+    if status:
+        conditions.append("ai.status = :status")
+        params['status'] = status
+    if priority:
+        conditions.append("ai.priority = :priority")
+        params['priority'] = priority
+    if owner_user_id:
+        conditions.append("ai.owner_user_id = :owner_user_id")
+        params['owner_user_id'] = owner_user_id
+    if overdue_only:
+        conditions.append("ai.deadline < :now AND ai.status != 'completed'")
+        params['now'] = datetime.utcnow()
+    
+    where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+    
+    query = text(f"""
+        SELECT 
+            ai.id::text, ai.meeting_id::text, ai.owner_user_id::text,
+            ai.description, ai.deadline, ai.priority, ai.status,
+            ai.source_chunk_id::text, ai.source_text, ai.external_task_link,
+            ai.external_task_id, ai.confirmed_by::text, ai.confirmed_at,
+            ai.created_at, ai.updated_at,
+            u.display_name as owner_name,
+            m.title as meeting_title
+        FROM action_item ai
+        LEFT JOIN user_account u ON ai.owner_user_id = u.id
+        LEFT JOIN meeting m ON ai.meeting_id = m.id
+        {where_clause}
+        ORDER BY 
+            CASE ai.priority 
+                WHEN 'critical' THEN 1 
+                WHEN 'high' THEN 2 
+                WHEN 'medium' THEN 3 
+                ELSE 4 
+            END,
+            ai.deadline ASC NULLS LAST,
+            ai.created_at DESC
+    """)
+    
+    result = db.execute(query, params)
+    rows = result.fetchall()
+    
+    items = []
+    for row in rows:
+        items.append(ActionItemResponse(
+            id=row[0],
+            meeting_id=row[1],
+            owner_user_id=row[2],
+            description=row[3],
+            deadline=row[4],
+            priority=row[5],
+            status=row[6],
+            source_chunk_id=row[7],
+            source_text=row[8],
+            external_task_link=row[9],
+            external_task_id=row[10],
+            confirmed_by=row[11],
+            confirmed_at=row[12],
+            created_at=row[13],
+            updated_at=row[14],
+            owner_name=row[15],
+            meeting_title=row[16]
+        ))
+    
+    return ActionItemList(items=items, total=len(items))
+
+
 def list_action_items(db: Session, meeting_id: str) -> ActionItemList:
     """List all action items for a meeting"""
     query = text("""

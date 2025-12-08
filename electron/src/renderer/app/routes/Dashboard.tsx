@@ -80,6 +80,63 @@ const Dashboard = () => {
     refetchStats()
   }
 
+  // Export Report as CSV
+  const handleExportReport = () => {
+    const today = new Date().toLocaleDateString('vi-VN')
+    
+    // Build CSV content
+    const csvRows: string[] = []
+    
+    // Header
+    csvRows.push('MeetMate - Báo cáo Dashboard')
+    csvRows.push(`Ngày xuất: ${today}`)
+    csvRows.push('')
+    
+    // Stats section
+    csvRows.push('=== THỐNG KÊ TỔNG QUAN ===')
+    csvRows.push(`Tổng cuộc họp,${stats?.totalMeetings || 0}`)
+    csvRows.push(`Cuộc họp hôm nay,${stats?.todayMeetings || 0}`)
+    csvRows.push(`Sắp diễn ra,${stats?.upcoming || 0}`)
+    csvRows.push(`Đã hoàn thành,${stats?.completed || 0}`)
+    csvRows.push(`Action items,${stats?.totalActions || 0}`)
+    csvRows.push(`Actions hoàn thành,${stats?.actionsCompleted || 0}`)
+    csvRows.push(`Actions quá hạn,${stats?.actionsOverdue || 0}`)
+    csvRows.push(`Decisions,${stats?.totalDecisions || 0}`)
+    csvRows.push(`Risks cao/nghiêm trọng,${stats?.risksHigh || 0}`)
+    csvRows.push('')
+    
+    // Upcoming meetings
+    csvRows.push('=== CUỘC HỌP SẮP TỚI ===')
+    csvRows.push('Tiêu đề,Ngày,Giờ bắt đầu,Giờ kết thúc,Địa điểm,Số người tham gia')
+    if (upcomingMeetings && upcomingMeetings.length > 0) {
+      upcomingMeetings.forEach(m => {
+        csvRows.push(`"${m.title}",${m.date},${m.start},${m.end},"${m.location || 'Online'}",${m.participants}`)
+      })
+    } else {
+      csvRows.push('Không có cuộc họp sắp tới')
+    }
+    csvRows.push('')
+    
+    // Pending actions
+    csvRows.push('=== ACTION ITEMS ĐANG CHỜ ===')
+    csvRows.push('Mô tả,Người phụ trách,Deadline,Độ ưu tiên,Trạng thái')
+    pendingActions.forEach(a => {
+      csvRows.push(`"${a.description}","${a.owner.displayName}",${a.deadline.toLocaleDateString('vi-VN')},${a.priority},${a.status}`)
+    })
+    
+    // Create and download file
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `MeetMate_Report_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       {/* Page Header */}
@@ -92,7 +149,7 @@ const Dashboard = () => {
           <button className="btn btn--ghost" onClick={handleRefresh} title="Làm mới">
             <RefreshCw size={16} />
           </button>
-          <button className="btn btn--secondary">
+          <button className="btn btn--secondary" onClick={handleExportReport}>
             <Download size={16} />
             Export Report
           </button>

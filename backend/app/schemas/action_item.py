@@ -40,6 +40,7 @@ class ActionItemResponse(ActionItemBase):
     meeting_id: str
     owner_user_id: Optional[str] = None
     owner_name: Optional[str] = None
+    meeting_title: Optional[str] = None  # For list all items
     source_chunk_id: Optional[str] = None
     external_task_id: Optional[str] = None
     confirmed_by: Optional[str] = None

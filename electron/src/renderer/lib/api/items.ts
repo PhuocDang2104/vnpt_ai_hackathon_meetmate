@@ -10,13 +10,43 @@ export interface ActionItem {
   meeting_id: string;
   owner_user_id?: string;
   owner_name?: string;
+  meeting_title?: string;
   description: string;
   deadline?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'pending' | 'in_progress' | 'completed' | 'confirmed';
+  status: 'proposed' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   source_text?: string;
+  external_task_link?: string;
+  external_task_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ActionItemCreate {
+  meeting_id: string;
+  description: string;
+  owner_user_id?: string;
+  deadline?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  status?: string;
+  external_task_link?: string;
+}
+
+export interface ActionItemUpdate {
+  description?: string;
+  owner_user_id?: string;
+  deadline?: string;
+  priority?: string;
+  status?: string;
+  external_task_link?: string;
+  external_task_id?: string;
+}
+
+export interface ActionItemFilters {
+  status?: string;
+  priority?: string;
+  owner_user_id?: string;
+  overdue_only?: boolean;
 }
 
 export interface ActionItemList {
@@ -63,13 +93,37 @@ export interface RiskItemList {
 const ENDPOINT = '/items';
 
 export const itemsApi = {
-  // Action Items
+  // Action Items - List all with filters
+  listAllActions: async (filters?: ActionItemFilters): Promise<ActionItemList> => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.priority) params.append('priority', filters.priority);
+    if (filters?.owner_user_id) params.append('owner_user_id', filters.owner_user_id);
+    if (filters?.overdue_only) params.append('overdue_only', 'true');
+    
+    const query = params.toString();
+    return api.get<ActionItemList>(`${ENDPOINT}/actions${query ? `?${query}` : ''}`);
+  },
+
+  // Action Items - List by meeting
   listActions: async (meetingId: string): Promise<ActionItemList> => {
     return api.get<ActionItemList>(`${ENDPOINT}/actions/${meetingId}`);
   },
 
   getAction: async (itemId: string): Promise<ActionItem> => {
     return api.get<ActionItem>(`${ENDPOINT}/actions/item/${itemId}`);
+  },
+
+  createAction: async (data: ActionItemCreate): Promise<ActionItem> => {
+    return api.post<ActionItem>(`${ENDPOINT}/actions`, data);
+  },
+
+  updateAction: async (itemId: string, data: ActionItemUpdate): Promise<ActionItem> => {
+    return api.put<ActionItem>(`${ENDPOINT}/actions/${itemId}`, data);
+  },
+
+  deleteAction: async (itemId: string): Promise<void> => {
+    return api.delete(`${ENDPOINT}/actions/${itemId}`);
   },
 
   // Decisions

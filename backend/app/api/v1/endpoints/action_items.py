@@ -23,6 +23,24 @@ router = APIRouter()
 # ACTION ITEMS
 # ============================================
 
+@router.get('/actions', response_model=ActionItemList)
+def list_all_action_items(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    owner_user_id: Optional[str] = None,
+    overdue_only: bool = False,
+    db: Session = Depends(get_db)
+):
+    """List all action items with optional filters"""
+    return action_item_service.list_all_action_items(
+        db, 
+        status=status,
+        priority=priority,
+        owner_user_id=owner_user_id,
+        overdue_only=overdue_only
+    )
+
+
 @router.get('/actions/{meeting_id}', response_model=ActionItemList)
 def list_action_items(
     meeting_id: str,

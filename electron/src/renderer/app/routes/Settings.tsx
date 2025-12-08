@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import {
   Settings as SettingsIcon,
   User,
@@ -8,10 +9,99 @@ import {
   Bot,
   ExternalLink,
   Check,
+  Save,
+  Loader2,
 } from 'lucide-react'
 import { currentUser } from '../../store/mockData'
 
+// Settings storage key
+const SETTINGS_KEY = 'meetmate_settings'
+
+interface UserSettings {
+  displayName: string
+  department: string
+  notifications: {
+    meetingReminder: boolean
+    newActionItem: boolean
+    overdueActionItem: boolean
+    newMinutes: boolean
+  }
+  ai: {
+    autoAgenda: boolean
+    documentSuggestions: boolean
+    actionItemDetection: boolean
+    liveRecap: boolean
+  }
+}
+
+const defaultSettings: UserSettings = {
+  displayName: currentUser.displayName,
+  department: currentUser.department,
+  notifications: {
+    meetingReminder: true,
+    newActionItem: true,
+    overdueActionItem: true,
+    newMinutes: true,
+  },
+  ai: {
+    autoAgenda: true,
+    documentSuggestions: true,
+    actionItemDetection: true,
+    liveRecap: true,
+  },
+}
+
 const Settings = () => {
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  // Load settings from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY)
+      if (saved) {
+        setSettings({ ...defaultSettings, ...JSON.parse(saved) })
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err)
+    }
+  }, [])
+
+  // Save settings
+  const handleSave = async () => {
+    setIsSaving(true)
+    setSaveMessage(null)
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setSaveMessage('Đã lưu thành công!')
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (err) {
+      console.error('Failed to save settings:', err)
+      setSaveMessage('Lỗi khi lưu. Vui lòng thử lại.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Update notification settings
+  const updateNotification = (key: keyof UserSettings['notifications'], value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      notifications: { ...prev.notifications, [key]: value },
+    }))
+  }
+
+  // Update AI settings
+  const updateAI = (key: keyof UserSettings['ai'], value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      ai: { ...prev.ai, [key]: value },
+    }))
+  }
+
   const integrations = [
     { name: 'Microsoft Teams', status: 'connected', icon: '📞' },
     { name: 'Microsoft Planner', status: 'connected', icon: '📋' },
@@ -27,6 +117,25 @@ const Settings = () => {
         <div>
           <h1 className="page-header__title">Cài đặt</h1>
           <p className="page-header__subtitle">Quản lý tài khoản và tích hợp</p>
+        </div>
+        <div className="page-header__actions">
+          {saveMessage && (
+            <span style={{ 
+              color: saveMessage.includes('thành công') ? 'var(--success)' : 'var(--error)',
+              fontSize: 13,
+              marginRight: 'var(--space-md)',
+            }}>
+              {saveMessage}
+            </span>
+          )}
+          <button 
+            className="btn btn--primary" 
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Lưu thay đổi
+          </button>
         </div>
       </div>
 
@@ -53,10 +162,10 @@ const Settings = () => {
                 fontWeight: 700,
                 color: 'var(--bg-base)'
               }}>
-                {currentUser.displayName.split(' ').slice(-1)[0][0]}
+                {settings.displayName.split(' ').slice(-1)[0][0]}
               </div>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 600 }}>{currentUser.displayName}</div>
+                <div style={{ fontSize: '16px', fontWeight: 600 }}>{settings.displayName}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{currentUser.email}</div>
                 <span className="badge badge--accent" style={{ marginTop: 'var(--space-xs)' }}>
                   {currentUser.role}
@@ -71,7 +180,8 @@ const Settings = () => {
                 </label>
                 <input 
                   type="text" 
-                  defaultValue={currentUser.displayName}
+                  value={settings.displayName}
+                  onChange={e => setSettings(prev => ({ ...prev, displayName: e.target.value }))}
                   style={{
                     width: '100%',
                     padding: 'var(--space-sm) var(--space-md)',
@@ -108,7 +218,8 @@ const Settings = () => {
                 </label>
                 <input 
                   type="text" 
-                  defaultValue={currentUser.department}
+                  value={settings.department}
+                  onChange={e => setSettings(prev => ({ ...prev, department: e.target.value }))}
                   style={{
                     width: '100%',
                     padding: 'var(--space-sm) var(--space-md)',
@@ -121,10 +232,6 @@ const Settings = () => {
                 />
               </div>
             </div>
-
-            <button className="btn btn--primary" style={{ marginTop: 'var(--space-lg)' }}>
-              Lưu thay đổi
-            </button>
           </div>
         </div>
 
@@ -171,7 +278,10 @@ const Settings = () => {
                       Connected
                     </span>
                   ) : (
-                    <button className="btn btn--secondary btn--sm">
+                    <button 
+                      className="btn btn--secondary btn--sm"
+                      onClick={() => alert(`Kết nối ${integration.name} sẽ được hỗ trợ trong phiên bản tiếp theo.`)}
+                    >
                       <ExternalLink size={12} />
                       Connect
                     </button>
@@ -193,13 +303,13 @@ const Settings = () => {
           <div className="card__body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-base)' }}>
               {[
-                { label: 'Nhắc nhở trước cuộc họp', description: '15 phút trước khi họp' },
-                { label: 'Action items mới', description: 'Khi có action item được giao' },
-                { label: 'Action items quá hạn', description: 'Cảnh báo khi quá deadline' },
-                { label: 'Biên bản họp', description: 'Khi có biên bản mới' },
-              ].map((item, index) => (
+                { key: 'meetingReminder', label: 'Nhắc nhở trước cuộc họp', description: '15 phút trước khi họp' },
+                { key: 'newActionItem', label: 'Action items mới', description: 'Khi có action item được giao' },
+                { key: 'overdueActionItem', label: 'Action items quá hạn', description: 'Cảnh báo khi quá deadline' },
+                { key: 'newMinutes', label: 'Biên bản họp', description: 'Khi có biên bản mới' },
+              ].map((item) => (
                 <div 
-                  key={index}
+                  key={item.key}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -210,24 +320,10 @@ const Settings = () => {
                     <div style={{ fontSize: '13px', fontWeight: 500 }}>{item.label}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.description}</div>
                   </div>
-                  <div style={{
-                    width: '40px',
-                    height: '22px',
-                    background: 'var(--accent)',
-                    borderRadius: '11px',
-                    position: 'relative',
-                    cursor: 'pointer',
-                  }}>
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      background: 'white',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      right: '2px',
-                      top: '2px',
-                    }}></div>
-                  </div>
+                  <Toggle
+                    checked={settings.notifications[item.key as keyof UserSettings['notifications']]}
+                    onChange={(checked) => updateNotification(item.key as keyof UserSettings['notifications'], checked)}
+                  />
                 </div>
               ))}
             </div>
@@ -245,49 +341,68 @@ const Settings = () => {
           <div className="card__body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-base)' }}>
               {[
-                { label: 'Tự động tạo agenda', description: 'AI tạo agenda dựa trên lịch sử họp' },
-                { label: 'Gợi ý tài liệu', description: 'RAG tìm tài liệu liên quan' },
-                { label: 'Phát hiện action items', description: 'Tự động nhận diện trong transcript' },
-                { label: 'Live recap', description: 'Tóm tắt realtime trong cuộc họp' },
-              ].map((item, index) => (
+                { key: 'autoAgenda', label: 'Tự động tạo agenda', description: 'AI tạo agenda dựa trên lịch sử họp' },
+                { key: 'documentSuggestions', label: 'Gợi ý tài liệu', description: 'RAG tìm tài liệu liên quan' },
+                { key: 'actionItemDetection', label: 'Phát hiện action items', description: 'Tự động nhận diện trong transcript' },
+                { key: 'liveRecap', label: 'Live recap', description: 'Tóm tắt realtime trong cuộc họp' },
+              ].map((item) => (
                 <div 
-                  key={index}
+                  key={item.key}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                   }}
                 >
-  <div>
+                  <div>
                     <div style={{ fontSize: '13px', fontWeight: 500 }}>{item.label}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.description}</div>
                   </div>
-                  <div style={{
-                    width: '40px',
-                    height: '22px',
-                    background: 'var(--accent)',
-                    borderRadius: '11px',
-                    position: 'relative',
-                    cursor: 'pointer',
-                  }}>
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      background: 'white',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      right: '2px',
-                      top: '2px',
-                    }}></div>
-                  </div>
+                  <Toggle
+                    checked={settings.ai[item.key as keyof UserSettings['ai']]}
+                    onChange={(checked) => updateAI(item.key as keyof UserSettings['ai'], checked)}
+                  />
                 </div>
               ))}
             </div>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Toggle Component
+interface ToggleProps {
+  checked: boolean
+  onChange: (checked: boolean) => void
+}
+
+const Toggle = ({ checked, onChange }: ToggleProps) => (
+  <div 
+    onClick={() => onChange(!checked)}
+    style={{
+      width: '40px',
+      height: '22px',
+      background: checked ? 'var(--accent)' : 'var(--bg-surface-hover)',
+      borderRadius: '11px',
+      position: 'relative',
+      cursor: 'pointer',
+      transition: 'background 0.2s',
+    }}
+  >
+    <div style={{
+      width: '18px',
+      height: '18px',
+      background: 'white',
+      borderRadius: '50%',
+      position: 'absolute',
+      top: '2px',
+      left: checked ? '20px' : '2px',
+      transition: 'left 0.2s',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+    }}></div>
   </div>
 )
-}
 
 export default Settings
