@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText,
   Users,
@@ -44,8 +44,16 @@ interface PreMeetTabProps {
 // MAIN COMPONENT - Grid Layout like InMeet
 // ============================================
 export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+
   return (
     <div className="inmeet-tab"> {/* Reuse inmeet-tab styles for consistency */}
+      {/* Send Email Action Bar */}
+      <SendEmailActionBar 
+        meeting={meeting} 
+        onSendEmail={() => setShowSendEmailModal(true)} 
+      />
+
       <div className="inmeet-grid">
         {/* Main Column - Agenda & Preparation */}
         <div className="inmeet-column inmeet-column--main">
@@ -60,6 +68,326 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
           <DocumentsPanel meetingId={meeting.id} />
           <AIAssistantPanel meetingId={meeting.id} />
         </div>
+      </div>
+
+      {/* Send Email Modal */}
+      {showSendEmailModal && (
+        <SendPrepEmailModal 
+          meeting={meeting} 
+          onClose={() => setShowSendEmailModal(false)} 
+        />
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// SEND EMAIL ACTION BAR
+// ============================================
+const SendEmailActionBar = ({ 
+  meeting, 
+  onSendEmail 
+}: { 
+  meeting: MeetingWithParticipants; 
+  onSendEmail: () => void;
+}) => {
+  const participants = meeting.participants || [];
+  const startTime = meeting.start_time ? new Date(meeting.start_time) : null;
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('vi-VN', { 
+      weekday: 'long',
+      day: '2-digit', 
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="send-email-bar">
+      <div className="send-email-bar__info">
+        <div className="send-email-bar__title">
+          <Calendar size={16} />
+          <span>{meeting.title}</span>
+        </div>
+        <div className="send-email-bar__meta">
+          {startTime && (
+            <span className="send-email-bar__time">
+              <Clock size={12} />
+              {formatDate(startTime)}
+            </span>
+          )}
+          <span className="send-email-bar__participants">
+            <Users size={12} />
+            {participants.length} thành viên
+          </span>
+        </div>
+      </div>
+      <button 
+        className="btn btn--primary send-email-bar__btn"
+        onClick={onSendEmail}
+      >
+        <Mail size={16} />
+        Gửi thông báo cuộc họp
+      </button>
+    </div>
+  );
+};
+
+// ============================================
+// SEND PREPARATION EMAIL MODAL
+// ============================================
+const SendPrepEmailModal = ({ 
+  meeting, 
+  onClose 
+}: { 
+  meeting: MeetingWithParticipants; 
+  onClose: () => void;
+}) => {
+  const [isSending, setIsSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [includeAgenda, setIncludeAgenda] = useState(true);
+  const [includeDocuments, setIncludeDocuments] = useState(true);
+  const [includeReminders, setIncludeReminders] = useState(false);
+  const [customMessage, setCustomMessage] = useState('');
+
+  const participants = meeting.participants || [];
+
+  // Select all participants by default
+  useEffect(() => {
+    setSelectedParticipants(new Set(participants.map((p: any) => p.user_id || p.id)));
+  }, []);
+
+  const toggleParticipant = (id: string) => {
+    const newSet = new Set(selectedParticipants);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedParticipants(newSet);
+  };
+
+  const selectAll = () => {
+    setSelectedParticipants(new Set(participants.map((p: any) => p.user_id || p.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedParticipants(new Set());
+  };
+
+  const handleSend = async () => {
+    if (selectedParticipants.size === 0) return;
+
+    setIsSending(true);
+    setSendStatus('sending');
+
+    // Simulate sending (since actual email is not fully implemented)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Show success notification (simulated)
+    setSendStatus('success');
+    setIsSending(false);
+
+    // Close after 2 seconds
+    setTimeout(() => {
+      onClose();
+    }, 2000);
+  };
+
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'organizer': return 'Chủ trì';
+      case 'chair': return 'Chủ tọa';
+      case 'presenter': return 'Trình bày';
+      default: return 'Thành viên';
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal send-prep-email-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal__header">
+          <h2 className="modal__title">
+            <Mail size={20} />
+            Gửi thông báo cuộc họp
+          </h2>
+          <button className="btn btn--ghost btn--icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal__body">
+          {sendStatus === 'success' ? (
+            <div className="send-email-success">
+              <div className="send-email-success__icon">
+                <CheckCircle size={48} />
+              </div>
+              <h3>Đã gửi thông báo thành công!</h3>
+              <p>
+                Đã gửi email xác nhận cuộc họp đến {selectedParticipants.size} thành viên.
+                <br />
+                <span className="send-email-success__note">
+                  * Lưu ý: Đây là tính năng giả định. Email thực sẽ được gửi khi hệ thống hoàn thiện.
+                </span>
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Meeting Info */}
+              <div className="send-email-meeting-info">
+                <h4>{meeting.title}</h4>
+                <div className="send-email-meeting-info__details">
+                  <span><Clock size={14} /> {formatDate(meeting.start_time)}</span>
+                  {meeting.location && <span><LinkIcon size={14} /> {meeting.location}</span>}
+                </div>
+              </div>
+
+              {/* Content Options */}
+              <div className="send-email-options">
+                <h4>Nội dung email</h4>
+                <label className="send-email-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={includeAgenda} 
+                    onChange={e => setIncludeAgenda(e.target.checked)} 
+                  />
+                  <Calendar size={14} />
+                  <span>Bao gồm Chương trình họp (Agenda)</span>
+                </label>
+                <label className="send-email-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={includeDocuments} 
+                    onChange={e => setIncludeDocuments(e.target.checked)} 
+                  />
+                  <FileText size={14} />
+                  <span>Bao gồm Danh sách tài liệu</span>
+                </label>
+                <label className="send-email-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={includeReminders} 
+                    onChange={e => setIncludeReminders(e.target.checked)} 
+                  />
+                  <Bell size={14} />
+                  <span>Bao gồm Ghi nhớ cá nhân</span>
+                </label>
+              </div>
+
+              {/* Custom Message */}
+              <div className="send-email-message">
+                <h4>Lời nhắn thêm (tùy chọn)</h4>
+                <textarea
+                  placeholder="Thêm lời nhắn cho các thành viên..."
+                  value={customMessage}
+                  onChange={e => setCustomMessage(e.target.value)}
+                  rows={2}
+                />
+              </div>
+
+              {/* Recipients */}
+              <div className="send-email-recipients">
+                <div className="send-email-recipients__header">
+                  <h4>Người nhận ({selectedParticipants.size}/{participants.length})</h4>
+                  <div className="send-email-recipients__actions">
+                    <button className="btn btn--ghost btn--sm" onClick={selectAll}>Chọn tất cả</button>
+                    <button className="btn btn--ghost btn--sm" onClick={deselectAll}>Bỏ chọn</button>
+                  </div>
+                </div>
+                <div className="send-email-recipients__list">
+                  {participants.map((p: any) => (
+                    <label 
+                      key={p.user_id || p.id} 
+                      className={`send-email-recipient ${selectedParticipants.has(p.user_id || p.id) ? 'send-email-recipient--selected' : ''}`}
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={selectedParticipants.has(p.user_id || p.id)}
+                        onChange={() => toggleParticipant(p.user_id || p.id)}
+                      />
+                      <div className="send-email-recipient__avatar">
+                        {(p.display_name || p.email || '?').charAt(0)}
+                      </div>
+                      <div className="send-email-recipient__info">
+                        <span className="send-email-recipient__name">{p.display_name || p.email}</span>
+                        <span className="send-email-recipient__email">{p.email}</span>
+                      </div>
+                      <span className={`badge badge--${p.role === 'organizer' ? 'accent' : 'neutral'}`}>
+                        {getRoleLabel(p.role)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Email Preview */}
+              <div className="send-email-preview">
+                <h4>Xem trước nội dung email</h4>
+                <div className="send-email-preview__content">
+                  <div className="send-email-preview__subject">
+                    <strong>Chủ đề:</strong> [MeetMate] Thông báo cuộc họp: {meeting.title}
+                  </div>
+                  <div className="send-email-preview__body">
+                    <p>Kính gửi [Tên thành viên],</p>
+                    <p>Bạn được mời tham gia cuộc họp sau:</p>
+                    <ul>
+                      <li><strong>Cuộc họp:</strong> {meeting.title}</li>
+                      <li><strong>Thời gian:</strong> {formatDate(meeting.start_time)}</li>
+                      {meeting.location && <li><strong>Địa điểm:</strong> {meeting.location}</li>}
+                      {meeting.teams_link && <li><strong>Link tham gia:</strong> [Link MS Teams]</li>}
+                    </ul>
+                    {includeAgenda && <p>📋 <em>Chương trình họp được đính kèm</em></p>}
+                    {includeDocuments && <p>📄 <em>Tài liệu chuẩn bị được đính kèm</em></p>}
+                    {customMessage && <p style={{ fontStyle: 'italic', color: 'var(--accent)' }}>"{customMessage}"</p>}
+                    <p>Trân trọng,<br/>MeetMate AI</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {sendStatus !== 'success' && (
+          <div className="modal__footer">
+            <button className="btn btn--secondary" onClick={onClose}>
+              Hủy
+            </button>
+            <button 
+              className="btn btn--primary" 
+              onClick={handleSend}
+              disabled={selectedParticipants.size === 0 || isSending}
+            >
+              {isSending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Đang gửi...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  Gửi đến {selectedParticipants.size} người
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -683,14 +1011,16 @@ const ParticipantsPanel = ({ meeting, onRefresh }: { meeting: MeetingWithPartici
 };
 
 // ============================================
-// DOCUMENTS PANEL - Compact list
+// DOCUMENTS PANEL - With drag & drop upload
 // ============================================
 const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [newDoc, setNewDoc] = useState({ title: '', file_type: 'pdf' });
-  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadNotification, setUploadNotification] = useState<{ type: 'info' | 'warning' | 'success'; message: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadDocuments();
@@ -708,65 +1038,170 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
     }
   };
 
-  const handleUpload = async () => {
-    if (!newDoc.title.trim()) return;
-    setIsUploading(true);
-    try {
-      await documentsApi.upload({
-        meeting_id: meetingId,
-        title: newDoc.title,
-        file_type: newDoc.file_type,
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    handleFiles(files);
+  };
+
+  const handleFiles = (files: File[]) => {
+    if (files.length === 0) return;
+
+    // Validate file types
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'text/markdown'];
+    const validFiles = files.filter(f => allowedTypes.includes(f.type) || f.name.endsWith('.md') || f.name.endsWith('.txt'));
+
+    if (validFiles.length === 0) {
+      setUploadNotification({
+        type: 'warning',
+        message: 'Định dạng file không được hỗ trợ. Vui lòng chọn PDF, DOCX, XLSX, TXT hoặc MD.'
       });
-      setNewDoc({ title: '', file_type: 'pdf' });
-      setShowUpload(false);
-      loadDocuments();
-    } catch (err) {
-      console.error('Failed to upload:', err);
-    } finally {
-      setIsUploading(false);
+      setTimeout(() => setUploadNotification(null), 4000);
+      return;
     }
+
+    setUploadedFiles(validFiles);
+    
+    // Show notification that upload is pending
+    setUploadNotification({
+      type: 'info',
+      message: `Đã chọn ${validFiles.length} tài liệu. Hệ thống hiện chưa nhận được tài liệu từ người dùng. Tính năng upload đang được phát triển.`
+    });
+
+    // Auto-clear after 5 seconds
+    setTimeout(() => {
+      setUploadNotification(null);
+      setUploadedFiles([]);
+    }, 5000);
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getFileIcon = (fileName: string) => {
+    if (fileName.endsWith('.pdf')) return '📕';
+    if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) return '📘';
+    if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) return '📗';
+    if (fileName.endsWith('.txt') || fileName.endsWith('.md')) return '📄';
+    return '📎';
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   return (
-    <div className="tool-panel">
+    <div className="tool-panel tool-panel--documents">
       <div className="tool-panel__header">
         <div className="badge badge--ghost badge--pill">
           <FileText size={14} />
           Tài liệu ({documents.length})
         </div>
-        <button className="btn btn--ghost btn--sm" onClick={() => setShowUpload(!showUpload)}>
-          <Upload size={14} />
+        <button 
+          className="btn btn--ghost btn--sm" 
+          onClick={() => setShowUpload(!showUpload)}
+          title={showUpload ? 'Đóng' : 'Tải lên tài liệu'}
+        >
+          {showUpload ? <X size={14} /> : <Upload size={14} />}
         </button>
       </div>
 
-      {showUpload && (
-        <div className="doc-upload-inline">
-          <input
-            type="text"
-            placeholder="Tên tài liệu..."
-            value={newDoc.title}
-            onChange={e => setNewDoc({ ...newDoc, title: e.target.value })}
-            className="doc-upload-inline__input"
-          />
-          <select 
-            value={newDoc.file_type}
-            onChange={e => setNewDoc({ ...newDoc, file_type: e.target.value })}
-            className="doc-upload-inline__select"
-          >
-            <option value="pdf">PDF</option>
-            <option value="docx">DOCX</option>
-            <option value="xlsx">XLSX</option>
-          </select>
-          <button 
-            className="btn btn--primary btn--sm" 
-            onClick={handleUpload}
-            disabled={!newDoc.title.trim() || isUploading}
-          >
-            {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+      {/* Upload Notification */}
+      {uploadNotification && (
+        <div className={`upload-notification upload-notification--${uploadNotification.type}`}>
+          {uploadNotification.type === 'warning' && <AlertTriangle size={14} />}
+          {uploadNotification.type === 'info' && <Bell size={14} />}
+          {uploadNotification.type === 'success' && <CheckCircle size={14} />}
+          <span>{uploadNotification.message}</span>
+          <button onClick={() => setUploadNotification(null)}>
+            <X size={12} />
           </button>
         </div>
       )}
 
+      {/* Drag & Drop Upload Area */}
+      {showUpload && (
+        <div 
+          className={`doc-dropzone ${isDragging ? 'doc-dropzone--active' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
+          <div className="doc-dropzone__content">
+            <div className="doc-dropzone__icon">
+              <Upload size={24} />
+            </div>
+            <div className="doc-dropzone__text">
+              <span className="doc-dropzone__primary">
+                {isDragging ? 'Thả file vào đây' : 'Kéo thả file hoặc click để chọn'}
+              </span>
+              <span className="doc-dropzone__secondary">
+                PDF, DOCX, XLSX, TXT, MD (tối đa 10MB)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Files Preview */}
+      {uploadedFiles.length > 0 && (
+        <div className="doc-upload-preview">
+          {uploadedFiles.map((file, index) => (
+            <div key={index} className="doc-upload-preview__item">
+              <span className="doc-upload-preview__icon">{getFileIcon(file.name)}</span>
+              <div className="doc-upload-preview__info">
+                <span className="doc-upload-preview__name">{file.name}</span>
+                <span className="doc-upload-preview__size">{formatFileSize(file.size)}</span>
+              </div>
+              <div className="doc-upload-preview__status">
+                <Loader2 size={12} className="animate-spin" />
+                <span>Đang chờ...</span>
+              </div>
+              <button 
+                className="btn btn--ghost btn--icon btn--sm"
+                onClick={() => removeFile(index)}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Documents List */}
       <div className="tool-panel__list">
         {isLoading ? (
           <div className="empty-state empty-state--inline">
@@ -787,8 +1222,14 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
               </a>
             </div>
           ))
-        ) : (
-          <div className="empty-state empty-state--inline">Chưa có tài liệu</div>
+        ) : !showUpload && (
+          <div 
+            className="empty-state empty-state--clickable"
+            onClick={() => setShowUpload(true)}
+          >
+            <Upload size={20} />
+            <span>Kéo thả hoặc click để tải lên</span>
+          </div>
         )}
       </div>
     </div>
@@ -796,12 +1237,21 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
 };
 
 // ============================================
-// AI ASSISTANT PANEL - Compact chat
+// AI ASSISTANT PANEL - Enhanced chat with history
 // ============================================
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+}
+
 const AIAssistantPanel = ({ meetingId }: { meetingId: string }) => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [response, setResponse] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const suggestedQuestions = [
     'Những điểm chính cần thảo luận?',
@@ -809,68 +1259,156 @@ const AIAssistantPanel = ({ meetingId }: { meetingId: string }) => {
     'Policy liên quan cần biết?',
   ];
 
-  const handleSend = async () => {
-    if (!query.trim() || isLoading) return;
+  // Auto scroll to bottom when new message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async (customQuery?: string) => {
+    const messageText = customQuery || query.trim();
+    if (!messageText || isLoading) return;
+
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setQuery('');
     setIsLoading(true);
+
     try {
-      const result = await aiApi.sendMessage(query, meetingId);
-      setResponse(result.message);
+      const result = await aiApi.sendMessage(messageText, meetingId);
+      const aiMessage: ChatMessage = {
+        id: `msg-${Date.now()}-ai`,
+        role: 'ai',
+        content: result.message,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
-      setResponse('Xin lỗi, không thể trả lời lúc này.');
+      const errorMessage: ChatMessage = {
+        id: `msg-${Date.now()}-error`,
+        role: 'ai',
+        content: 'Xin lỗi, không thể trả lời lúc này. Vui lòng thử lại.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const clearChat = () => {
+    setMessages([]);
+    setQuery('');
+  };
+
   return (
-    <div className="tool-panel">
-      <div className="tool-panel__header">
-        <div className="badge badge--ghost badge--pill">
-          <Sparkles size={14} />
-          MeetMate AI
+    <div className={`ai-chat-panel ${isExpanded ? 'ai-chat-panel--expanded' : ''}`}>
+      {/* Header */}
+      <div className="ai-chat-panel__header">
+        <div className="ai-chat-panel__title">
+          <Bot size={16} className="ai-chat-panel__icon" />
+          <span>MeetMate AI</span>
+          <span className="ai-chat-panel__status">
+            <span className="ai-chat-panel__dot"></span>
+            Online
+          </span>
         </div>
-        {response && (
-          <button className="btn btn--ghost btn--sm" onClick={() => setResponse(null)}>
-            <X size={12} />
+        <div className="ai-chat-panel__actions">
+          {messages.length > 0 && (
+            <button className="btn btn--ghost btn--icon btn--sm" onClick={clearChat} title="Xóa cuộc trò chuyện">
+              <Trash2 size={12} />
+            </button>
+          )}
+          <button 
+            className="btn btn--ghost btn--icon btn--sm" 
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? 'Thu nhỏ' : 'Mở rộng'}
+          >
+            {isExpanded ? <X size={12} /> : <Sparkles size={12} />}
           </button>
-        )}
+        </div>
       </div>
-      <div className="ai-assistant-compact">
-        {response ? (
-          <div className="ai-response-compact">
-            <Bot size={14} />
-            <p>{response}</p>
+
+      {/* Messages Area */}
+      <div className="ai-chat-panel__messages">
+        {messages.length === 0 ? (
+          <div className="ai-chat-panel__welcome">
+            <div className="ai-chat-panel__welcome-icon">
+              <Bot size={28} />
+            </div>
+            <p className="ai-chat-panel__welcome-text">
+              Tôi là MeetMate AI, có thể giúp bạn chuẩn bị cuộc họp.
+            </p>
+            <div className="ai-chat-panel__suggestions">
+              {suggestedQuestions.map((q, i) => (
+                <button 
+                  key={i} 
+                  className="ai-suggestion-chip"
+                  onClick={() => handleSend(q)}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="ai-suggestions-compact">
-            {suggestedQuestions.map((q, i) => (
-              <button 
-                key={i} 
-                className="ai-suggestion-chip"
-                onClick={() => setQuery(q)}
-              >
-                {q}
-              </button>
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} className={`ai-chat-message ai-chat-message--${msg.role}`}>
+                {msg.role === 'ai' && (
+                  <div className="ai-chat-message__avatar">
+                    <Bot size={14} />
+                  </div>
+                )}
+                <div className="ai-chat-message__bubble">
+                  <p>{msg.content}</p>
+                  <span className="ai-chat-message__time">
+                    {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
             ))}
-          </div>
+            {isLoading && (
+              <div className="ai-chat-message ai-chat-message--ai ai-chat-message--typing">
+                <div className="ai-chat-message__avatar">
+                  <Bot size={14} />
+                </div>
+                <div className="ai-chat-message__bubble">
+                  <div className="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        <div className="ai-input-compact">
-          <input
-            type="text"
-            placeholder="Hỏi về cuộc họp..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSend()}
-            disabled={isLoading}
-          />
-          <button 
-            className="btn btn--primary btn--icon btn--sm" 
-            onClick={handleSend}
-            disabled={!query.trim() || isLoading}
-          >
-            {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          </button>
-        </div>
+      </div>
+
+      {/* Input Area */}
+      <div className="ai-chat-panel__input">
+        <input
+          type="text"
+          placeholder="Hỏi MeetMate AI..."
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          disabled={isLoading}
+        />
+        <button 
+          className="btn btn--primary btn--icon" 
+          onClick={() => handleSend()}
+          disabled={!query.trim() || isLoading}
+        >
+          {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+        </button>
       </div>
     </div>
   );
