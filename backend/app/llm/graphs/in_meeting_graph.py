@@ -50,16 +50,13 @@ def build_in_meeting_subgraph():
         state.setdefault("full_transcript", "")
         state.setdefault("semantic_intent_label", "NO_INTENT")
         state.setdefault("semantic_intent_slots", {})
-        state.setdefault("topic_segments", [])
+        # Normalize collections to lists
+        if not isinstance(state.get("topic_segments"), list):
+            state["topic_segments"] = []
         state.setdefault("current_topic_id", None)
-        state.setdefault("actions", [])
-        state.setdefault("decisions", [])
-        state.setdefault("risks", [])
-        state.setdefault("new_actions", [])
-        state.setdefault("new_decisions", [])
-        state.setdefault("new_risks", [])
-        state.setdefault("rag_docs", [])
-        state.setdefault("tool_suggestions", [])
+        for key in ["actions", "decisions", "risks", "new_actions", "new_decisions", "new_risks", "rag_docs", "tool_suggestions", "citations"]:
+            if not isinstance(state.get(key), list):
+                state[key] = []
         state.setdefault("debug_info", {})
         return state
 
