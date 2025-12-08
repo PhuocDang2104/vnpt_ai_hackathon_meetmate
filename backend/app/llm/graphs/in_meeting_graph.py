@@ -89,6 +89,9 @@ def build_in_meeting_subgraph():
         return state
 
     def topic_segmenter_node(state: MeetingState) -> MeetingState:
+        # Normalize topic_segments to list
+        if not isinstance(state.get("topic_segments"), list):
+            state["topic_segments"] = []
         payload = segment_topic(
             transcript_window=state.get("transcript_window") or "",
             current_topic_id=state.get("current_topic_id"),
