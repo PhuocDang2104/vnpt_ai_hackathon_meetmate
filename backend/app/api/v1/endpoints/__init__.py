@@ -16,6 +16,7 @@ from . import (
     transcripts,
     participants,
     minutes,
+    tools,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     'transcripts',
     'participants',
     'minutes',
+    'tools',
 ]

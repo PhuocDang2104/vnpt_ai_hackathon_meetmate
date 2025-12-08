@@ -76,12 +76,21 @@ except ImportError:
     END = "END"
 
 
-class ActionItem(TypedDict, total=False):
-    task: str
-    owner: Optional[str]
-    due_date: Optional[str]
-    priority: Optional[str]
-    source_timecode: Optional[float]
+class VNPTSegment(TypedDict, total=False):
+    text: str
+    time_start: float
+    time_end: float
+    speaker: str
+    is_final: bool
+    confidence: float
+    lang: Optional[str]
+
+
+class TopicSegment(TypedDict, total=False):
+    topic_id: str
+    title: str
+    start_t: float
+    end_t: float
 
 
 class Decision(TypedDict, total=False):
@@ -99,21 +108,51 @@ class Risk(TypedDict, total=False):
     source_timecode: Optional[float]
 
 
+class ActionItem(TypedDict, total=False):
+    task: str
+    owner: Optional[str]
+    due_date: Optional[str]
+    priority: Optional[str]
+    source_timecode: Optional[float]
+    topic_id: Optional[str]
+    external_id: Optional[str]
+
+
+class ToolSuggestion(TypedDict, total=False):
+    suggestion_id: str
+    type: Literal["task", "schedule", "doc", "other"]
+    action_hash: Optional[str]
+    payload: Dict[str, Any]
+
+
 class MeetingState(TypedDict, total=False):
     meeting_id: str
     stage: Literal["pre", "in", "post"]
+    intent: Literal["tick", "qa", "system"]
+    project_id: Optional[str]
     sensitivity: Literal["low", "medium", "high"]
     sla: Literal["realtime", "near_realtime", "batch"]
 
-    transcript_window: str
+    vnpt_segment: VNPTSegment
+    transcript_window: str  # rolling window (10-30s or N sentences)
     full_transcript: str
+    semantic_intent_label: Optional[str]
+    semantic_intent_slots: Dict[str, Any]
     last_user_question: Optional[str]
+    last_qa_answer: Optional[str]
+    citations: list
 
+    topic_segments: List[TopicSegment]
+    current_topic_id: Optional[str]
+
+    rag_docs: list
     actions: List[ActionItem]
     decisions: List[Decision]
     risks: List[Risk]
+    new_actions: List[ActionItem]
+    new_decisions: List[Decision]
+    new_risks: List[Risk]
 
-    rag_docs: list
-    citations: list
+    tool_suggestions: List[ToolSuggestion]
 
     debug_info: Dict[str, Any]

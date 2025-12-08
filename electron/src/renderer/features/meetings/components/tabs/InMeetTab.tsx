@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Calendar,
@@ -24,6 +24,9 @@ import {
   transcriptChunks,
 } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
+import { API_URL, USE_API } from '../../../../config/env';
+
+type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
 
 interface InMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -58,7 +61,11 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
     <div className="inmeet-tab">
       <div className="inmeet-grid">
         <div className="inmeet-column inmeet-column--main">
-          <LiveTranscriptPanel transcript={transcript} isRecording={isRecording} />
+          <LiveTranscriptPanel
+            transcript={transcript}
+            isRecording={isRecording}
+            meetingId={meeting.id}
+          />
           <LiveRecapPanel />
         </div>
 
@@ -79,122 +86,257 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
 const LiveTranscriptPanel = ({
   transcript,
   isRecording,
+  meetingId,
 }: {
   transcript: typeof transcriptChunks;
   isRecording: boolean;
-}) => (
-  <div className="transcript-panel transcript-panel--glass">
-    <div className="transcript-grid transcript-grid--equal">
-      <div className="transcript-col transcript-col--main">
-        <div className="transcript-header">
-          <div className="transcript-title">
-            <div className="transcript-title__icon">
-              <Mic size={16} />
-            </div>
-            <div className="transcript-title__text">
-              <div className="transcript-title__label">Live Transcript</div>
-              <div className="transcript-title__sub">
-                <Clock size={12} />
-                Context cửa sổ 30s
+  meetingId: string;
+}) => {
+  const [wsStatus, setWsStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
+  const [wsError, setWsError] = useState<string | null>(null);
+  const [mockChunk, setMockChunk] = useState('');
+  const [wsAttempt, setWsAttempt] = useState(0);
+  const [lastWsMessage, setLastWsMessage] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const wsEndpoint = useMemo(() => {
+    const wsBase = API_URL.replace(/^http/i, 'ws').replace(/\/$/, '');
+    return `${wsBase}/api/v1/ws/in-meeting/${meetingId}`;
+  }, [meetingId]);
+
+  useEffect(() => {
+    if (!USE_API) {
+      setWsStatus('disabled');
+      setWsError(null);
+      return;
+    }
+
+    setWsStatus('connecting');
+    setWsError(null);
+
+    const socket = new WebSocket(wsEndpoint);
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      setWsStatus('connected');
+      setLastWsMessage('Đã kết nối In-Meeting WS');
+    };
+
+    socket.onclose = () => {
+      setWsStatus(prev => (prev === 'error' ? 'error' : USE_API ? 'idle' : 'disabled'));
+    };
+
+    socket.onerror = event => {
+      console.error('In-Meeting WS error', event);
+      setWsStatus('error');
+      setWsError('Không kết nối được WebSocket tới backend in-meeting.');
+    };
+
+    socket.onmessage = event => {
+      const payload =
+        typeof event.data === 'string' ? event.data.slice(0, 180) : 'Đã nhận dữ liệu WS';
+      setLastWsMessage(payload);
+    };
+
+    return () => {
+      socket.close();
+      wsRef.current = null;
+    };
+  }, [wsEndpoint, wsAttempt]);
+
+  const handleSendMockChunk = () => {
+    const chunk = mockChunk.trim();
+    if (!chunk) return;
+
+    if (!wsRef.current || wsStatus !== 'connected') {
+      setWsError('WebSocket chưa sẵn sàng, thử kết nối lại.');
+      return;
+    }
+
+    const payload = {
+      meeting_id: meetingId,
+      chunk,
+      full_transcript: chunk,
+      source: 'mock_ui',
+    };
+
+    wsRef.current.send(JSON.stringify(payload));
+    setMockChunk('');
+    setLastWsMessage(`Đã gửi chunk ${new Date().toLocaleTimeString('vi-VN')}`);
+  };
+
+  const handleReconnect = () => {
+    wsRef.current?.close();
+    setWsAttempt(prev => prev + 1);
+  };
+
+  return (
+    <div className="transcript-panel transcript-panel--glass">
+      <div className="transcript-grid transcript-grid--equal">
+        <div className="transcript-col transcript-col--main">
+          <div className="transcript-header">
+            <div className="transcript-title">
+              <div className="transcript-title__icon">
+                <Mic size={16} />
+              </div>
+              <div className="transcript-title__text">
+                <div className="transcript-title__label">Live Transcript</div>
+                <div className="transcript-title__sub">
+                  <Clock size={12} />
+                  Context cửa sổ 30s
+                </div>
               </div>
             </div>
+            <div className="transcript-header__right">
+              {isRecording ? (
+                <span className="pill pill--live pill--solid">
+                  <span className="live-dot"></span>
+                  Recording
+                </span>
+              ) : (
+                <span className="pill pill--muted">Paused</span>
+              )}
+            </div>
           </div>
-          <div className="transcript-header__right">
-            {isRecording ? (
-              <span className="pill pill--live pill--solid">
-                <span className="live-dot"></span>
-                Recording
-              </span>
-            ) : (
-              <span className="pill pill--muted">Paused</span>
+
+          <div className="transcript-content transcript-content--padded">
+            {transcript.map(chunk => (
+              <div key={chunk.id} className="transcript-card">
+                <div className="transcript-card__avatar">{getInitials(chunk.speaker.displayName)}</div>
+                <div className="transcript-card__body">
+                  <div className="transcript-card__row">
+                    <span className="transcript-card__speaker">{chunk.speaker.displayName}</span>
+                    <span className="transcript-card__time">{formatDuration(chunk.startTime)}</span>
+                  </div>
+                  <p className="transcript-card__text">{chunk.text}</p>
+                </div>
+              </div>
+            ))}
+            {isRecording && (
+              <div className="transcript-card transcript-card--typing">
+                <div className="transcript-card__avatar">?</div>
+                <div className="transcript-card__body">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <p className="transcript-card__hint">Đang nhận partial từ SmartVoice...</p>
+                </div>
+              </div>
             )}
+
+            <div className="transcript-mock-box">
+              <div className="transcript-mock-box__header">
+                <div>
+                  <div className="transcript-mock-box__title">Mock raw transcript</div>
+                  <p className="transcript-mock-box__desc">
+                    Nhập transcript thô khi chưa có STT SmartVoice. Nội dung sẽ được đẩy qua WS tới
+                    in-meeting graph.
+                  </p>
+                </div>
+                <span className={`ws-status ws-status--${wsStatus}`}>
+                  {wsStatus === 'connected' && 'WS: Connected'}
+                  {wsStatus === 'connecting' && 'WS: Connecting'}
+                  {wsStatus === 'idle' && 'WS: Idle'}
+                  {wsStatus === 'error' && 'WS: Error'}
+                  {wsStatus === 'disabled' && 'WS: Disabled (mock)'}
+                </span>
+              </div>
+
+              <textarea
+                value={mockChunk}
+                onChange={e => setMockChunk(e.target.value)}
+                placeholder="Nhập transcript raw (ví dụ: SPEAKER_01: Tôi cập nhật tiến độ Sprint 5...)"
+                rows={3}
+              />
+
+              <div className="transcript-mock-box__actions">
+                <div className="transcript-mock-box__meta">
+                  Endpoint: {wsEndpoint}
+                  <br />
+                  Payload: {'{ meeting_id, chunk, full_transcript }'}
+                </div>
+                <div className="transcript-mock-box__buttons">
+                  <button
+                    className="btn btn--ghost btn--sm"
+                    onClick={handleReconnect}
+                    disabled={wsStatus === 'disabled'}
+                  >
+                    Kết nối lại
+                  </button>
+                  <button
+                    className="btn btn--primary btn--sm"
+                    onClick={handleSendMockChunk}
+                    disabled={mockChunk.trim().length === 0 || wsStatus !== 'connected'}
+                  >
+                    Gửi transcript
+                  </button>
+                </div>
+              </div>
+
+              {wsError && <div className="transcript-mock-box__error">{wsError}</div>}
+              {lastWsMessage && <div className="transcript-mock-box__foot">{lastWsMessage}</div>}
+            </div>
           </div>
         </div>
 
-        <div className="transcript-content transcript-content--padded">
-          {transcript.map(chunk => (
-            <div key={chunk.id} className="transcript-card">
-              <div className="transcript-card__avatar">{getInitials(chunk.speaker.displayName)}</div>
-              <div className="transcript-card__body">
-                <div className="transcript-card__row">
-                  <span className="transcript-card__speaker">{chunk.speaker.displayName}</span>
-                  <span className="transcript-card__time">{formatDuration(chunk.startTime)}</span>
+        <div className="transcript-col transcript-col--main">
+          <div className="live-signal-card live-signal-card--stack">
+            <div className="live-signal-card__header">
+              <div className="badge badge--ghost badge--pill">
+                <Sparkles size={14} />
+                Live recap | Semantic Router
+              </div>
+              <span className="meta-chip">SmartBot VNPT</span>
+            </div>
+
+            <div className="live-signal-card__section live-signal-card__chat">
+              <div className="live-signal-label">Recap</div>
+              <div className="live-signal-bubble">
+                <div className="live-signal-bubble__content">
+                  <p>
+                    Core Banking tiến độ 68%. Batch processing đang tối ưu, cần 2 senior dev để giữ timeline 01/01.
+                    Security: còn 3 medium issues, đang fix trước go-live.
+                  </p>
                 </div>
-                <p className="transcript-card__text">{chunk.text}</p>
               </div>
             </div>
-          ))}
-          {isRecording && (
-            <div className="transcript-card transcript-card--typing">
-              <div className="transcript-card__avatar">?</div>
-              <div className="transcript-card__body">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+
+            <div className="live-signal-card__section live-signal-card__inline">
+              <div>
+                <div className="live-signal-label">Intent</div>
+                <div className="pill pill--live">NO_INTENT</div>
+              </div>
+              <div>
+                <div className="live-signal-label">Topic</div>
+                <div className="pill">Core Banking Performance</div>
+              </div>
+            </div>
+
+            <div className="live-signal-card__section">
+              <div className="live-signal-label">Topic log (3-5 phút)</div>
+              <div className="topic-log">
+                <div className="topic-log__item">
+                  <span className="topic-log__time">00:45</span>
+                  <span className="topic-log__text">Status update</span>
                 </div>
-                <p className="transcript-card__hint">Đang nhận partial từ SmartVoice...</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="transcript-col transcript-col--main">
-        <div className="live-signal-card live-signal-card--stack">
-          <div className="live-signal-card__header">
-            <div className="badge badge--ghost badge--pill">
-              <Sparkles size={14} />
-              Live recap | Semantic Router
-            </div>
-            <span className="meta-chip">SmartBot VNPT</span>
-          </div>
-
-          <div className="live-signal-card__section live-signal-card__chat">
-            <div className="live-signal-label">Recap</div>
-            <div className="live-signal-bubble">
-              <div className="live-signal-bubble__content">
-                <p>
-                  Core Banking tiến độ 68%. Batch processing đang tối ưu, cần 2 senior dev để giữ timeline 01/01.
-                  Security: còn 3 medium issues, đang fix trước go-live.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="live-signal-card__section live-signal-card__inline">
-            <div>
-              <div className="live-signal-label">Intent</div>
-              <div className="pill pill--live">NO_INTENT</div>
-            </div>
-            <div>
-              <div className="live-signal-label">Topic</div>
-              <div className="pill">Core Banking Performance</div>
-            </div>
-          </div>
-
-          <div className="live-signal-card__section">
-            <div className="live-signal-label">Topic log (3-5 phút)</div>
-            <div className="topic-log">
-              <div className="topic-log__item">
-                <span className="topic-log__time">00:45</span>
-                <span className="topic-log__text">Status update</span>
-              </div>
-              <div className="topic-log__item">
-                <span className="topic-log__time">01:10</span>
-                <span className="topic-log__text">Performance & risk</span>
-              </div>
-              <div className="topic-log__item">
-                <span className="topic-log__time">01:40</span>
-                <span className="topic-log__text">Resource decision</span>
+                <div className="topic-log__item">
+                  <span className="topic-log__time">01:10</span>
+                  <span className="topic-log__text">Performance & risk</span>
+                </div>
+                <div className="topic-log__item">
+                  <span className="topic-log__time">01:40</span>
+                  <span className="topic-log__text">Resource decision</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const LiveRecapPanel = () => {
   const recap = [

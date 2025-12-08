@@ -3,6 +3,7 @@ from sqlalchemy import Column, String, ForeignKey, Text, Boolean, DateTime, Floa
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.models.adr import ActionItem, DecisionItem, RiskItem, TranscriptChunk, TopicSegment
 
 
 class Meeting(Base, UUIDMixin, TimestampMixin):
@@ -26,10 +27,11 @@ class Meeting(Base, UUIDMixin, TimestampMixin):
     organizer = relationship("UserAccount", back_populates="organized_meetings")
     project = relationship("Project", back_populates="meetings")
     participants = relationship("MeetingParticipant", back_populates="meeting", cascade="all, delete-orphan")
-    transcript_chunks = relationship("TranscriptChunk", back_populates="meeting", cascade="all, delete-orphan")
-    action_items = relationship("ActionItem", back_populates="meeting", cascade="all, delete-orphan")
-    decision_items = relationship("DecisionItem", back_populates="meeting", cascade="all, delete-orphan")
-    risk_items = relationship("RiskItem", back_populates="meeting", cascade="all, delete-orphan")
+    transcript_chunks = relationship(TranscriptChunk, back_populates="meeting", cascade="all, delete-orphan")
+    topic_segments = relationship(TopicSegment, back_populates="meeting", cascade="all, delete-orphan")
+    action_items = relationship(ActionItem, back_populates="meeting", cascade="all, delete-orphan")
+    decision_items = relationship(DecisionItem, back_populates="meeting", cascade="all, delete-orphan")
+    risk_items = relationship(RiskItem, back_populates="meeting", cascade="all, delete-orphan")
 
 
 class MeetingParticipant(Base):
