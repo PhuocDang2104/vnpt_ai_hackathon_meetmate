@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ''
     
     # AI Model settings
-    # Valid models: gemma-3-27b (14,400 RPD), gemini-2.5-flash (20 RPD), gemini-1.5-flash
-    gemini_model: str = 'gemma-3-27b'
+    # Valid models: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-exp
+    gemini_model: str = 'gemini-1.5-flash'
     ai_temperature: float = 0.7
     ai_max_tokens: int = 2048
     
