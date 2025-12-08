@@ -20,6 +20,13 @@ import {
   UserPlus,
   Search,
   X,
+  AlertTriangle,
+  HelpCircle,
+  MessageSquare,
+  Bell,
+  Mail,
+  CheckCircle,
+  Circle,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { aiApi } from '../../../../lib/api/ai';
@@ -32,7 +39,7 @@ interface PreMeetTabProps {
 }
 
 export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
-  const [activeSection, setActiveSection] = useState<'agenda' | 'documents' | 'participants' | 'qa'>('agenda');
+  const [activeSection, setActiveSection] = useState<'agenda' | 'documents' | 'participants' | 'reminders' | 'qa'>('agenda');
   
   return (
     <div className="premeet-tab">
@@ -60,6 +67,13 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
           Thành viên
         </button>
         <button 
+          className={`section-btn ${activeSection === 'reminders' ? 'section-btn--active' : ''}`}
+          onClick={() => setActiveSection('reminders')}
+        >
+          <Bell size={16} />
+          Ghi nhớ
+        </button>
+        <button 
           className={`section-btn ${activeSection === 'qa' ? 'section-btn--active' : ''}`}
           onClick={() => setActiveSection('qa')}
         >
@@ -73,6 +87,7 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
         {activeSection === 'agenda' && <AgendaSection meeting={meeting} />}
         {activeSection === 'documents' && <DocumentsSection meetingId={meeting.id} />}
         {activeSection === 'participants' && <ParticipantsSection meeting={meeting} onRefresh={onRefresh} />}
+        {activeSection === 'reminders' && <RemindersSection meetingId={meeting.id} />}
         {activeSection === 'qa' && <AIQASection meetingId={meeting.id} />}
       </div>
     </div>
@@ -728,6 +743,549 @@ const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParti
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ============================================
+// REMINDERS SECTION - Questions, Risks, Requests
+// ============================================
+interface ReminderItem {
+  id: string;
+  type: 'question' | 'risk' | 'request';
+  content: string;
+  priority: 'high' | 'medium' | 'low';
+  completed: boolean;
+  createdAt: Date;
+}
+
+const RemindersSection = ({ meetingId }: { meetingId: string }) => {
+  const STORAGE_KEY = `meetmate_reminders_${meetingId}`;
+  
+  const [reminders, setReminders] = useState<ReminderItem[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newReminder, setNewReminder] = useState({
+    type: 'question' as 'question' | 'risk' | 'request',
+    content: '',
+    priority: 'medium' as 'high' | 'medium' | 'low',
+  });
+  const [filter, setFilter] = useState<'all' | 'question' | 'risk' | 'request'>('all');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Save to localStorage whenever reminders change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reminders));
+  }, [reminders, STORAGE_KEY]);
+
+  const handleAddReminder = () => {
+    if (!newReminder.content.trim()) return;
+    
+    const reminder: ReminderItem = {
+      id: `rem-${Date.now()}`,
+      type: newReminder.type,
+      content: newReminder.content.trim(),
+      priority: newReminder.priority,
+      completed: false,
+      createdAt: new Date(),
+    };
+    
+    setReminders(prev => [...prev, reminder]);
+    setNewReminder({ type: 'question', content: '', priority: 'medium' });
+    setShowAddForm(false);
+  };
+
+  const handleDeleteReminder = (id: string) => {
+    setReminders(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleToggleComplete = (id: string) => {
+    setReminders(prev => prev.map(r => 
+      r.id === id ? { ...r, completed: !r.completed } : r
+    ));
+  };
+
+  const getTypeIcon = (type: 'question' | 'risk' | 'request') => {
+    switch (type) {
+      case 'question': return <HelpCircle size={16} className="reminder-icon reminder-icon--question" />;
+      case 'risk': return <AlertTriangle size={16} className="reminder-icon reminder-icon--risk" />;
+      case 'request': return <MessageSquare size={16} className="reminder-icon reminder-icon--request" />;
+    }
+  };
+
+  const getTypeLabel = (type: 'question' | 'risk' | 'request') => {
+    switch (type) {
+      case 'question': return 'Câu hỏi';
+      case 'risk': return 'Rủi ro';
+      case 'request': return 'Yêu cầu';
+    }
+  };
+
+  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high': return 'var(--danger)';
+      case 'medium': return 'var(--warning)';
+      case 'low': return 'var(--success)';
+    }
+  };
+
+  const filteredReminders = filter === 'all' 
+    ? reminders 
+    : reminders.filter(r => r.type === filter);
+
+  const stats = {
+    questions: reminders.filter(r => r.type === 'question').length,
+    risks: reminders.filter(r => r.type === 'risk').length,
+    requests: reminders.filter(r => r.type === 'request').length,
+    completed: reminders.filter(r => r.completed).length,
+  };
+
+  return (
+    <div className="reminders-section">
+      <div className="section-header">
+        <h3><Bell size={16} /> Ghi nhớ trong họp</h3>
+        <div className="section-actions">
+          <button 
+            className="btn btn--secondary btn--sm"
+            onClick={() => setShowEmailModal(true)}
+            disabled={reminders.length === 0}
+            title="Gửi email chuẩn bị cho thành viên"
+          >
+            <Mail size={14} />
+            Gửi email
+          </button>
+          <button className="btn btn--primary btn--sm" onClick={() => setShowAddForm(true)}>
+            <Plus size={14} />
+            Thêm
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="reminders-stats">
+        <div className="reminder-stat" onClick={() => setFilter('all')}>
+          <span className="reminder-stat__value">{reminders.length}</span>
+          <span className="reminder-stat__label">Tổng</span>
+        </div>
+        <div className="reminder-stat reminder-stat--question" onClick={() => setFilter('question')}>
+          <HelpCircle size={14} />
+          <span className="reminder-stat__value">{stats.questions}</span>
+        </div>
+        <div className="reminder-stat reminder-stat--risk" onClick={() => setFilter('risk')}>
+          <AlertTriangle size={14} />
+          <span className="reminder-stat__value">{stats.risks}</span>
+        </div>
+        <div className="reminder-stat reminder-stat--request" onClick={() => setFilter('request')}>
+          <MessageSquare size={14} />
+          <span className="reminder-stat__value">{stats.requests}</span>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="reminder-filters">
+        {(['all', 'question', 'risk', 'request'] as const).map(type => (
+          <button 
+            key={type}
+            className={`filter-btn ${filter === type ? 'filter-btn--active' : ''}`}
+            onClick={() => setFilter(type)}
+          >
+            {type === 'all' ? 'Tất cả' : getTypeLabel(type)}
+          </button>
+        ))}
+      </div>
+
+      {/* Add Form */}
+      {showAddForm && (
+        <div className="reminder-add-form">
+          <div className="form-row">
+            <select 
+              value={newReminder.type}
+              onChange={e => setNewReminder({ ...newReminder, type: e.target.value as any })}
+              className="form-select"
+            >
+              <option value="question">❓ Câu hỏi</option>
+              <option value="risk">⚠️ Rủi ro</option>
+              <option value="request">💬 Yêu cầu</option>
+            </select>
+            <select 
+              value={newReminder.priority}
+              onChange={e => setNewReminder({ ...newReminder, priority: e.target.value as any })}
+              className="form-select"
+            >
+              <option value="high">🔴 Cao</option>
+              <option value="medium">🟡 Trung bình</option>
+              <option value="low">🟢 Thấp</option>
+            </select>
+          </div>
+          <textarea
+            placeholder="Nhập nội dung cần nhớ raise trong cuộc họp..."
+            value={newReminder.content}
+            onChange={e => setNewReminder({ ...newReminder, content: e.target.value })}
+            className="form-textarea"
+            rows={3}
+            autoFocus
+          />
+          <div className="form-actions">
+            <button className="btn btn--ghost" onClick={() => setShowAddForm(false)}>
+              Hủy
+            </button>
+            <button 
+              className="btn btn--primary" 
+              onClick={handleAddReminder}
+              disabled={!newReminder.content.trim()}
+            >
+              <Plus size={14} />
+              Thêm
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reminders List */}
+      <div className="reminders-list">
+        {filteredReminders.length > 0 ? (
+          filteredReminders.map(reminder => (
+            <div 
+              key={reminder.id} 
+              className={`reminder-item ${reminder.completed ? 'reminder-item--completed' : ''}`}
+            >
+              <button 
+                className="reminder-item__check"
+                onClick={() => handleToggleComplete(reminder.id)}
+              >
+                {reminder.completed ? (
+                  <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                ) : (
+                  <Circle size={18} />
+                )}
+              </button>
+              <div className="reminder-item__content">
+                <div className="reminder-item__header">
+                  {getTypeIcon(reminder.type)}
+                  <span 
+                    className="reminder-item__priority"
+                    style={{ background: getPriorityColor(reminder.priority) }}
+                  />
+                  <span className="reminder-item__type">{getTypeLabel(reminder.type)}</span>
+                </div>
+                <p className="reminder-item__text">{reminder.content}</p>
+              </div>
+              <button 
+                className="btn btn--ghost btn--icon btn--sm"
+                onClick={() => handleDeleteReminder(reminder.id)}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="empty-state-mini">
+            <Bell size={24} />
+            <p>Chưa có ghi nhớ nào</p>
+            <span>Thêm câu hỏi, rủi ro, hoặc yêu cầu để AI nhắc trong họp</span>
+          </div>
+        )}
+      </div>
+
+      {/* AI Suggestion */}
+      {reminders.length > 0 && (
+        <div className="ai-suggestion">
+          <Sparkles size={14} />
+          <span>
+            AI sẽ nhắc bạn {stats.questions > 0 && `${stats.questions} câu hỏi`}
+            {stats.risks > 0 && `${stats.questions > 0 ? ', ' : ''}${stats.risks} rủi ro`}
+            {stats.requests > 0 && `${(stats.questions > 0 || stats.risks > 0) ? ', ' : ''}${stats.requests} yêu cầu`}
+            {' '}trong cuộc họp
+          </span>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <SendPreparationEmailModal 
+          meetingId={meetingId}
+          reminders={reminders}
+          onClose={() => setShowEmailModal(false)}
+          isSending={isSendingEmail}
+          setIsSending={setIsSendingEmail}
+        />
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// SEND PREPARATION EMAIL MODAL
+// ============================================
+interface SendPreparationEmailModalProps {
+  meetingId: string;
+  reminders: ReminderItem[];
+  onClose: () => void;
+  isSending: boolean;
+  setIsSending: (val: boolean) => void;
+}
+
+const SendPreparationEmailModal = ({ 
+  meetingId, 
+  reminders, 
+  onClose, 
+  isSending, 
+  setIsSending 
+}: SendPreparationEmailModalProps) => {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [emailSent, setEmailSent] = useState(false);
+  const [includeAgenda, setIncludeAgenda] = useState(true);
+  const [includeDocuments, setIncludeDocuments] = useState(true);
+  const [includeReminders, setIncludeReminders] = useState(true);
+  const [personalizeByRole, setPersonalizeByRole] = useState(true);
+
+  useEffect(() => {
+    fetchParticipants();
+  }, [meetingId]);
+
+  const fetchParticipants = async () => {
+    setIsLoading(true);
+    try {
+      const { meetingsApi } = await import('../../../../lib/api/meetings');
+      const meeting = await meetingsApi.getById(meetingId);
+      const participantsList = meeting.participants || [];
+      setParticipants(participantsList);
+      // Select all by default
+      setSelectedParticipants(new Set(participantsList.map((p: any) => p.user_id || p.id)));
+    } catch (err) {
+      console.error('Failed to fetch participants:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleParticipant = (id: string) => {
+    const newSelected = new Set(selectedParticipants);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedParticipants(newSelected);
+  };
+
+  const handleSendEmails = async () => {
+    if (selectedParticipants.size === 0) return;
+    
+    setIsSending(true);
+    try {
+      const { minutesApi } = await import('../../../../lib/api/minutes');
+      
+      // For each selected participant, send personalized email
+      for (const participantId of selectedParticipants) {
+        const participant = participants.find(p => (p.user_id || p.id) === participantId);
+        if (!participant?.email) continue;
+
+        // Build personalized content based on role
+        let emailContent = `Kính gửi ${participant.display_name || 'Quý thành viên'},\n\n`;
+        emailContent += `Bạn được mời tham gia cuộc họp sắp tới. Dưới đây là thông tin chuẩn bị:\n\n`;
+
+        if (personalizeByRole && participant.role === 'organizer') {
+          emailContent += `🎯 Với vai trò Chủ trì, vui lòng:\n`;
+          emailContent += `- Kiểm tra và duyệt agenda\n`;
+          emailContent += `- Chuẩn bị điều phối các phần thảo luận\n\n`;
+        } else if (personalizeByRole && participant.role === 'chair') {
+          emailContent += `👔 Với vai trò Chủ tọa, vui lòng:\n`;
+          emailContent += `- Xem xét các điểm chính cần quyết định\n`;
+          emailContent += `- Chuẩn bị ý kiến chỉ đạo\n\n`;
+        }
+
+        if (includeReminders && reminders.length > 0) {
+          const relevantReminders = reminders.filter(r => 
+            !personalizeByRole || 
+            (participant.role === 'organizer' || participant.role === 'chair') ||
+            r.priority === 'high'
+          );
+          
+          if (relevantReminders.length > 0) {
+            emailContent += `📋 Các điểm cần lưu ý:\n`;
+            relevantReminders.forEach(r => {
+              const icon = r.type === 'question' ? '❓' : r.type === 'risk' ? '⚠️' : '💬';
+              emailContent += `${icon} ${r.content}\n`;
+            });
+            emailContent += '\n';
+          }
+        }
+
+        emailContent += `Trân trọng,\nMeetMate AI`;
+
+        // Send via API
+        await minutesApi.distribute(meetingId, {
+          channel: 'email',
+          recipients: [participant.email],
+          content: emailContent,
+        });
+      }
+
+      setEmailSent(true);
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to send emails:', err);
+      alert('Không thể gửi email. Vui lòng thử lại.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'organizer': return 'Chủ trì';
+      case 'chair': return 'Chủ tọa';
+      case 'presenter': return 'Trình bày';
+      default: return 'Thành viên';
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal email-prepare-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+        <div className="modal__header">
+          <h2 className="modal__title">
+            <Mail size={20} />
+            Gửi email chuẩn bị cuộc họp
+          </h2>
+          <button className="btn btn--ghost btn--icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal__body">
+          {emailSent ? (
+            <div className="email-sent-success">
+              <CheckCircle size={48} style={{ color: 'var(--success)' }} />
+              <h3>Đã gửi email thành công!</h3>
+              <p>Đã gửi {selectedParticipants.size} email cá nhân hóa đến các thành viên.</p>
+            </div>
+          ) : (
+            <>
+              {/* Options */}
+              <div className="email-options">
+                <h4>Nội dung email</h4>
+                <label className="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    checked={includeAgenda} 
+                    onChange={e => setIncludeAgenda(e.target.checked)} 
+                  />
+                  <Calendar size={14} />
+                  Bao gồm Agenda
+                </label>
+                <label className="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    checked={includeDocuments} 
+                    onChange={e => setIncludeDocuments(e.target.checked)} 
+                  />
+                  <FileText size={14} />
+                  Bao gồm Tài liệu
+                </label>
+                <label className="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    checked={includeReminders} 
+                    onChange={e => setIncludeReminders(e.target.checked)} 
+                  />
+                  <Bell size={14} />
+                  Bao gồm Ghi nhớ ({reminders.length})
+                </label>
+                <label className="checkbox-label checkbox-label--highlight">
+                  <input 
+                    type="checkbox" 
+                    checked={personalizeByRole} 
+                    onChange={e => setPersonalizeByRole(e.target.checked)} 
+                  />
+                  <Sparkles size={14} />
+                  Cá nhân hóa theo vai trò (AI)
+                </label>
+              </div>
+
+              {/* Participants */}
+              <div className="email-participants">
+                <h4>Chọn người nhận ({selectedParticipants.size}/{participants.length})</h4>
+                {isLoading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--space-lg)' }}>
+                    <Loader2 size={24} className="animate-spin" />
+                  </div>
+                ) : (
+                  <div className="participant-select-list">
+                    {participants.map((p: any) => (
+                      <label 
+                        key={p.user_id || p.id} 
+                        className={`participant-select-item ${selectedParticipants.has(p.user_id || p.id) ? 'selected' : ''}`}
+                      >
+                        <input 
+                          type="checkbox"
+                          checked={selectedParticipants.has(p.user_id || p.id)}
+                          onChange={() => toggleParticipant(p.user_id || p.id)}
+                        />
+                        <div className="participant-item__avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                          {(p.display_name || p.email || '?').charAt(0)}
+                        </div>
+                        <div className="participant-info">
+                          <span className="participant-name">{p.display_name || p.email}</span>
+                          <span className="participant-email">{p.email}</span>
+                        </div>
+                        <span className={`badge badge--${p.role === 'organizer' ? 'accent' : 'neutral'}`} style={{ fontSize: '10px' }}>
+                          {getRoleLabel(p.role)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Preview */}
+              {personalizeByRole && (
+                <div className="email-preview-note">
+                  <Sparkles size={14} />
+                  <span>
+                    Email sẽ được cá nhân hóa: <strong>Chủ trì</strong> nhận hướng dẫn điều phối, 
+                    <strong> Chủ tọa</strong> nhận điểm cần quyết định, 
+                    <strong> Thành viên</strong> nhận thông tin chuẩn bị chung.
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {!emailSent && (
+          <div className="modal__footer">
+            <button className="btn btn--secondary" onClick={onClose}>
+              Hủy
+            </button>
+            <button 
+              className="btn btn--primary" 
+              onClick={handleSendEmails}
+              disabled={selectedParticipants.size === 0 || isSending}
+            >
+              {isSending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Đang gửi...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  Gửi {selectedParticipants.size} email
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
