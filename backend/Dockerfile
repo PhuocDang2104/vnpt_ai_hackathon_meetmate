@@ -21,5 +21,8 @@ COPY . .
 # Set Python path
 ENV PYTHONPATH=/app
 
-# Run
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose port (Render uses $PORT env variable)
+EXPOSE 8000
+
+# Run - use shell form to expand $PORT variable
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
