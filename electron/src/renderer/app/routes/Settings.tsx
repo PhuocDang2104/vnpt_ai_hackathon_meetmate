@@ -11,8 +11,11 @@ import {
   Check,
   Save,
   Loader2,
+  Globe,
 } from 'lucide-react'
 import { currentUser } from '../../store/mockData'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { languageNames, languageFlags, type Language } from '../../i18n'
 
 // Settings storage key
 const SETTINGS_KEY = 'meetmate_settings'
@@ -55,6 +58,7 @@ const Settings = () => {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const { language, setLanguage, t } = useLanguage()
 
   // Load settings from localStorage
   useEffect(() => {
@@ -335,13 +339,13 @@ const Settings = () => {
           <div className="card__header">
             <h3 className="card__title">
               <Bot size={18} className="card__title-icon" />
-              Cài đặt AI
+              {t('settings.aiFeatures')}
             </h3>
           </div>
           <div className="card__body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-base)' }}>
               {[
-                { key: 'autoAgenda', label: 'Tự động tạo agenda', description: 'AI tạo agenda dựa trên lịch sử họp' },
+                { key: 'autoAgenda', label: t('settings.autoSummary'), description: 'AI tạo agenda dựa trên lịch sử họp' },
                 { key: 'documentSuggestions', label: 'Gợi ý tài liệu', description: 'RAG tìm tài liệu liên quan' },
                 { key: 'actionItemDetection', label: 'Phát hiện action items', description: 'Tự động nhận diện trong transcript' },
                 { key: 'liveRecap', label: 'Live recap', description: 'Tóm tắt realtime trong cuộc họp' },
@@ -363,6 +367,47 @@ const Settings = () => {
                     onChange={(checked) => updateAI(item.key as keyof UserSettings['ai'], checked)}
                   />
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Language Settings */}
+        <div className="card">
+          <div className="card__header">
+            <h3 className="card__title">
+              <Globe size={18} className="card__title-icon" />
+              {t('settings.language')}
+            </h3>
+          </div>
+          <div className="card__body">
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: 'var(--space-md)' }}>
+              {language === 'vi' ? 'Chọn ngôn ngữ hiển thị cho ứng dụng' : 'Select display language for the application'}
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+              {(['vi', 'en'] as Language[]).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setLanguage(lang)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-sm)',
+                    padding: 'var(--space-md) var(--space-lg)',
+                    background: language === lang ? 'var(--accent)' : 'var(--bg-surface)',
+                    border: `1px solid ${language === lang ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    color: language === lang ? 'white' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{languageFlags[lang]}</span>
+                  <span>{languageNames[lang]}</span>
+                  {language === lang && <Check size={14} />}
+                </button>
               ))}
             </div>
           </div>

@@ -12,41 +12,43 @@ import {
 } from 'lucide-react'
 import { currentUser, getInitials, actionItems } from '../../store/mockData'
 import { logout, getStoredUser } from '../../lib/api/auth'
+import { useLanguage } from '../../contexts/LanguageContext'
 
 interface NavItem {
   path: string
-  label: string
+  labelKey: string
   icon: React.ReactNode
   badge?: number
 }
 
-const mainNavItems: NavItem[] = [
-  { path: '/app', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-  { path: '/app/calendar', label: 'Lịch họp', icon: <Calendar size={20} /> },
-  { path: '/app/meetings', label: 'Cuộc họp', icon: <Users size={20} /> },
-  { path: '/app/live', label: 'Live Meeting', icon: <Radio size={20} /> },
-]
-
 const overdueCount = actionItems.filter(a => a.deadline < new Date() && a.status !== 'completed').length
-
-const toolsNavItems: NavItem[] = [
-  { path: '/app/knowledge', label: 'Knowledge Hub', icon: <BookOpen size={20} /> },
-  { 
-    path: '/app/tasks', 
-    label: 'Action Items', 
-    icon: <CheckSquare size={20} />,
-    badge: overdueCount > 0 ? overdueCount : undefined
-  },
-]
-
-const settingsNavItems: NavItem[] = [
-  { path: '/app/settings', label: 'Cài đặt', icon: <Settings size={20} /> },
-]
 
 const Sidebar = () => {
   const navigate = useNavigate()
   const storedUser = getStoredUser()
   const displayUser = storedUser || currentUser
+  const { t } = useLanguage()
+
+  const mainNavItems: NavItem[] = [
+    { path: '/app', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
+    { path: '/app/calendar', labelKey: 'nav.calendar', icon: <Calendar size={20} /> },
+    { path: '/app/meetings', labelKey: 'nav.meetings', icon: <Users size={20} /> },
+    { path: '/app/live', labelKey: 'dashboard.liveMeeting', icon: <Radio size={20} /> },
+  ]
+
+  const toolsNavItems: NavItem[] = [
+    { path: '/app/knowledge', labelKey: 'nav.knowledge', icon: <BookOpen size={20} /> },
+    { 
+      path: '/app/tasks', 
+      labelKey: 'nav.tasks', 
+      icon: <CheckSquare size={20} />,
+      badge: overdueCount > 0 ? overdueCount : undefined
+    },
+  ]
+
+  const settingsNavItems: NavItem[] = [
+    { path: '/app/settings', labelKey: 'nav.settings', icon: <Settings size={20} /> },
+  ]
 
   const handleLogout = async () => {
     await logout()
@@ -69,7 +71,7 @@ const Sidebar = () => {
       <nav className="sidebar__nav">
         {/* Main Section */}
         <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">Menu chính</div>
+          <div className="sidebar__nav-title">{t('common.all')}</div>
           <ul className="sidebar__nav-list">
             {mainNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
@@ -81,7 +83,7 @@ const Sidebar = () => {
                   end={item.path === '/app'}
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                   {item.badge && item.badge > 0 && (
                     <span className="sidebar__nav-badge">{item.badge}</span>
                   )}
@@ -93,7 +95,7 @@ const Sidebar = () => {
 
         {/* Tools Section */}
         <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">Công cụ AI</div>
+          <div className="sidebar__nav-title">{t('ai.assistant')}</div>
           <ul className="sidebar__nav-list">
             {toolsNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
@@ -104,7 +106,7 @@ const Sidebar = () => {
                   }
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                   {item.badge && item.badge > 0 && (
                     <span className="sidebar__nav-badge">{item.badge}</span>
                   )}
@@ -116,7 +118,7 @@ const Sidebar = () => {
 
         {/* Settings Section */}
         <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">Hệ thống</div>
+          <div className="sidebar__nav-title">{t('settings.title')}</div>
           <ul className="sidebar__nav-list">
             {settingsNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
@@ -127,7 +129,7 @@ const Sidebar = () => {
                   }
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </NavLink>
               </li>
             ))}
@@ -148,7 +150,7 @@ const Sidebar = () => {
           <button 
             className="sidebar__logout-btn" 
             onClick={handleLogout}
-            title="Đăng xuất"
+            title={t('nav.logout')}
           >
             <LogOut size={18} />
           </button>

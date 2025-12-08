@@ -506,6 +506,16 @@ a {
   justify-content: center;
 }
 
+/* Language Toggle */
+.topbar__lang-btn {
+  padding: 0 var(--space-sm);
+}
+
+.topbar__lang-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
 /* ============================================
    NOTIFICATION DROPDOWN
    ============================================ */

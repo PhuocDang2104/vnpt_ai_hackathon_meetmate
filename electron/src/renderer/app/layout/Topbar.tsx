@@ -14,7 +14,10 @@ import {
   Check,
   Clock,
   ExternalLink,
+  Globe,
 } from 'lucide-react'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { languageFlags, type Language } from '../../i18n'
 
 // Notification Types
 type NotificationType = 'meeting_reminder' | 'action_item' | 'action_overdue' | 'minutes_ready' | 'mention'
@@ -138,11 +141,19 @@ const routeTitles: Record<string, string> = {
 const Topbar = () => {
   const location = useLocation()
   const currentPath = location.pathname
+  const { language, setLanguage, t } = useLanguage()
   const pageTitle = routeTitles[currentPath] || 'MeetMate'
   
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [showLangMenu, setShowLangMenu] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const langRef = useRef<HTMLDivElement>(null)
+
+  // Toggle language
+  const toggleLanguage = () => {
+    setLanguage(language === 'vi' ? 'en' : 'vi')
+  }
 
   // Load notifications
   useEffect(() => {
@@ -293,6 +304,15 @@ const Topbar = () => {
             </div>
           )}
         </div>
+
+        {/* Language Toggle */}
+        <button 
+          className="topbar__icon-btn topbar__lang-btn"
+          onClick={toggleLanguage}
+          title={language === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+        >
+          <span className="topbar__lang-flag">{languageFlags[language]}</span>
+        </button>
 
         {/* Help */}
         <Link to="/app/about" className="topbar__icon-btn" title="Giới thiệu MeetMate">
