@@ -180,32 +180,35 @@ const Dashboard = () => {
 
       {/* Live Meeting Alert */}
       {!loadingLive && liveMeeting && (
-        <Link to={`/app/meetings/${liveMeeting.id}/detail`} style={{ textDecoration: 'none' }}>
-          <div className="card card--interactive mb-6" style={{ 
-            borderColor: 'var(--error)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="card__body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-base)' }}>
-                <div className="live-indicator">
-                  <span className="live-indicator__dot"></span>
-                  LIVE
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px' }}>{liveMeeting.title}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginTop: '4px' }}>
-                    <Users size={14} />
-                    {liveMeeting.participants} người tham gia
-                  </div>
+        <div className="card mb-6" style={{ 
+          borderColor: 'var(--error)',
+          borderLeftWidth: '3px'
+        }}>
+          <div className="card__body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Link to={`/app/meetings/${liveMeeting.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 'var(--space-base)', flex: 1 }}>
+              <div className="live-indicator">
+                <span className="live-indicator__dot"></span>
+                LIVE
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px' }}>{liveMeeting.title}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginTop: '4px' }}>
+                  <Users size={14} />
+                  {liveMeeting.participants} người tham gia
                 </div>
               </div>
-              <button className="btn btn--primary">
-                <Mic size={16} />
-                Tham gia ngay
-              </button>
-            </div>
+            </Link>
+            <a 
+              href={liveMeeting.teamsLink} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="btn btn--primary"
+            >
+              <Mic size={16} />
+              Tham gia ngay
+            </a>
           </div>
-        </Link>
+        </div>
       )}
 
       {/* Stats Grid */}

@@ -10,6 +10,7 @@ import LiveMeeting from '../routes/LiveMeeting'
 import KnowledgeHub from '../routes/KnowledgeHub'
 import Tasks from '../routes/Tasks'
 import Settings from '../routes/Settings'
+import About from '../routes/About'
 import MeetingLayout from '../layout/MeetingLayout'
 import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 import { Login, Register } from '../routes/Auth'
@@ -51,6 +52,7 @@ const router = createHashRouter([
       { path: 'knowledge', element: <KnowledgeHub /> },
       { path: 'tasks', element: <Tasks /> },
       { path: 'settings', element: <Settings /> },
+      { path: 'about', element: <About /> },
     ],
   },
 ])

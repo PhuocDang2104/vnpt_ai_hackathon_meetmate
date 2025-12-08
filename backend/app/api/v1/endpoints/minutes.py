@@ -4,6 +4,7 @@ Meeting Minutes API Endpoints
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.schemas.minutes import (
@@ -15,6 +16,72 @@ from app.schemas.minutes import (
 from app.services import minutes_service, participant_service
 
 router = APIRouter()
+
+
+class TestEmailRequest(BaseModel):
+    to_email: str
+    
+
+@router.get('/email/status')
+def get_email_status():
+    """Check if email sending is configured"""
+    from app.services.email_service import is_email_enabled
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    return {
+        'email_enabled': is_email_enabled(),
+        'smtp_host': settings.smtp_host,
+        'smtp_port': settings.smtp_port,
+        'smtp_user_configured': bool(settings.smtp_user),
+        'smtp_password_configured': bool(settings.smtp_password),
+    }
+
+
+@router.post('/email/test')
+async def send_test_email(request: TestEmailRequest):
+    """Send a test email to verify configuration"""
+    from app.services.email_service import send_email, is_email_enabled
+    
+    if not is_email_enabled():
+        return {
+            'success': False,
+            'message': 'Email not configured. Set SMTP_USER, SMTP_PASSWORD, EMAIL_ENABLED=true in environment variables.',
+            'help': 'For Gmail: Use App Password from https://myaccount.google.com/apppasswords'
+        }
+    
+    result = send_email(
+        to_emails=[request.to_email],
+        subject='[MeetMate] Test Email - Cấu hình thành công!',
+        body_text='''Xin chào!
+
+Email này xác nhận rằng cấu hình gửi email của MeetMate đã hoạt động.
+
+Bạn có thể sử dụng tính năng gửi biên bản họp qua email.
+
+Trân trọng,
+MeetMate AI Assistant
+''',
+        body_html='''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body style="font-family: Arial, sans-serif; padding: 20px;">
+    <div style="max-width: 500px; margin: 0 auto; background: #f5f5f5; padding: 20px; border-radius: 10px;">
+        <h2 style="color: #5b5fc7;">✅ Cấu hình Email Thành Công!</h2>
+        <p>Email này xác nhận rằng cấu hình gửi email của MeetMate đã hoạt động.</p>
+        <p>Bạn có thể sử dụng tính năng gửi biên bản họp qua email.</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #888; font-size: 12px;">MeetMate AI Assistant</p>
+    </div>
+</body>
+</html>
+'''
+    )
+    
+    return result
 
 
 @router.get('/{meeting_id}', response_model=MeetingMinutesList)
@@ -111,8 +178,20 @@ async def distribute_minutes(
     request: DistributeMinutesRequest,
     db: Session = Depends(get_db)
 ):
-    """Distribute meeting minutes to participants"""
+    """Distribute meeting minutes to participants via email"""
     from app.schemas.minutes import DistributionLogCreate
+    from app.services.email_service import send_meeting_minutes_email, is_email_enabled
+    from app.services import meeting_service, user_service
+    
+    # Get meeting info
+    meeting = meeting_service.get_meeting(db, request.meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Get minutes
+    minutes = minutes_service.get_minutes_by_id(db, request.minutes_id)
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
     
     # Get participants if no specific recipients
     recipients = request.recipients
@@ -120,24 +199,66 @@ async def distribute_minutes(
         participants = participant_service.list_participants(db, request.meeting_id)
         recipients = [p.user_id for p in participants.participants]
     
+    # Collect email addresses
+    emails_to_send = []
+    user_email_map = {}
+    for user_id in recipients:
+        try:
+            user = user_service.get_user(db, user_id)
+            if user and user.email:
+                emails_to_send.append(user.email)
+                user_email_map[user_id] = user.email
+        except:
+            # Try using user_id as email directly
+            if '@' in str(user_id):
+                emails_to_send.append(user_id)
+                user_email_map[user_id] = user_id
+    
+    email_result = {'success': False, 'sent_to': [], 'failed': emails_to_send}
+    
+    # Send actual email if configured
+    if 'email' in request.channels and emails_to_send:
+        if is_email_enabled():
+            from datetime import datetime
+            start_time = datetime.fromisoformat(str(meeting.start_time).replace('Z', '+00:00')) if meeting.start_time else datetime.now()
+            
+            email_result = send_meeting_minutes_email(
+                to_emails=emails_to_send,
+                meeting_title=meeting.title,
+                meeting_date=start_time.strftime('%d/%m/%Y'),
+                meeting_time=start_time.strftime('%H:%M'),
+                meeting_location=meeting.location or 'Online',
+                executive_summary=minutes.executive_summary or 'Chưa có tóm tắt.',
+            )
+        else:
+            # Demo mode - just log
+            email_result = {'success': True, 'sent_to': emails_to_send, 'failed': [], 'demo_mode': True}
+    
+    # Log distribution for each recipient
     results = []
     for channel in request.channels:
         for user_id in recipients:
-            # In production, this would send actual emails/Teams messages
-            # For demo, we just log the distribution
+            email = user_email_map.get(user_id, user_id if '@' in str(user_id) else None)
+            status = 'sent' if email in email_result.get('sent_to', []) else 'failed'
+            
             log = minutes_service.create_distribution_log(db, DistributionLogCreate(
                 minutes_id=request.minutes_id,
                 meeting_id=request.meeting_id,
                 user_id=user_id,
                 channel=channel,
-                status='sent'
+                recipient_email=email,
+                status=status,
+                error_message=email_result.get('error') if status == 'failed' else None
             ))
             results.append(log.model_dump())
     
     return {
-        'status': 'success',
-        'distributed_to': len(recipients),
+        'status': 'success' if email_result.get('success') else 'partial',
+        'distributed_to': len(email_result.get('sent_to', [])),
+        'failed': len(email_result.get('failed', [])),
         'channels': request.channels,
-        'logs': results
+        'logs': results,
+        'email_enabled': is_email_enabled(),
+        'demo_mode': email_result.get('demo_mode', False)
     }
 

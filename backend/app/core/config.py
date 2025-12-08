@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     
     # CORS - comma separated origins or "*" for all
     cors_origins: str = '*'
+    
+    # Email Settings (Gmail SMTP)
+    # For Gmail: use App Password, not regular password
+    # Get App Password: https://myaccount.google.com/apppasswords
+    smtp_host: str = 'smtp.gmail.com'
+    smtp_port: int = 587
+    smtp_user: str = ''  # your-email@gmail.com
+    smtp_password: str = ''  # App Password (16 chars, no spaces)
+    email_from_name: str = 'MeetMate AI'
+    email_enabled: bool = False  # Set to True when SMTP is configured
 
     model_config = SettingsConfigDict(
         env_file=find_env_file(),

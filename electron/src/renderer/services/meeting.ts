@@ -87,10 +87,14 @@ function parseDateTime(dateStr: string | undefined, fallback: Date): Date {
 function determineMeetingStatus(meeting: { phase: string, startTime: Date, endTime: Date }): MeetingStatus {
   const now = new Date()
   
-  if (meeting.phase === 'post') return 'completed'
+  // Check if meeting is currently live based on time
+  const isLiveByTime = now >= meeting.startTime && now <= meeting.endTime
+  
+  // Priority: time-based detection first, then phase
+  if (isLiveByTime) return 'in_progress'
+  if (meeting.phase === 'post' || meeting.endTime < now) return 'completed'
   if (meeting.phase === 'in') return 'in_progress'
   if (meeting.startTime > now) return 'upcoming'
-  if (meeting.endTime < now) return 'completed'
   
   return 'upcoming'
 }

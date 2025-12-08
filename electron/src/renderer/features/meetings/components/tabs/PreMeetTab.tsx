@@ -17,6 +17,9 @@ import {
   Trash2,
   GripVertical,
   Upload,
+  UserPlus,
+  Search,
+  X,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { aiApi } from '../../../../lib/api/ai';
@@ -520,13 +523,74 @@ const DocumentsSection = ({ meetingId }: { meetingId: string }) => {
 // PARTICIPANTS SECTION
 // ============================================
 const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParticipants; onRefresh: () => void }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const participants = meeting.participants || [];
+
+  // Fetch users when modal opens
+  useEffect(() => {
+    if (showAddModal) {
+      fetchUsers();
+    }
+  }, [showAddModal, searchQuery]);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const { usersApi } = await import('../../../../lib/api/users');
+      const response = await usersApi.list({ search: searchQuery || undefined });
+      const existingIds = new Set(participants.map((p: any) => p.user_id));
+      setAvailableUsers(response.users.filter((u: any) => !existingIds.has(u.id)));
+    } catch (err) {
+      // Mock data fallback
+      setAvailableUsers([
+        { id: 'user-1', email: 'nguyenvana@lpbank.vn', display_name: 'Nguyễn Văn A', department_name: 'PMO' },
+        { id: 'user-2', email: 'tranthib@lpbank.vn', display_name: 'Trần Thị B', department_name: 'IT' },
+        { id: 'user-3', email: 'levanc@lpbank.vn', display_name: 'Lê Văn C', department_name: 'Security' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleUser = (userId: string) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const handleAddParticipants = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    setIsLoading(true);
+    try {
+      const { meetingsApi } = await import('../../../../lib/api/meetings');
+      for (const userId of selectedUsers) {
+        await meetingsApi.addParticipant(meeting.id, userId, 'attendee');
+      }
+      setShowAddModal(false);
+      setSelectedUsers(new Set());
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to add participants:', err);
+      alert('Không thể thêm thành viên. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="participants-section">
       <div className="section-header">
         <h3>Thành viên ({participants.length})</h3>
-        <button className="btn btn--primary btn--sm">
+        <button className="btn btn--primary btn--sm" onClick={() => setShowAddModal(true)}>
           <Plus size={14} />
           Mời thêm
         </button>
@@ -558,6 +622,112 @@ const ParticipantsSection = ({ meeting, onRefresh }: { meeting: MeetingWithParti
         <Sparkles size={14} />
         <span>AI gợi ý: Nên mời thêm <strong>Security Architect</strong> cho cuộc họp này</span>
       </div>
+
+      {/* Add Participant Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal__header">
+              <h2 className="modal__title">
+                <UserPlus size={20} />
+                Thêm thành viên
+              </h2>
+              <button className="btn btn--ghost btn--icon" onClick={() => setShowAddModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="modal__body">
+              {/* Search */}
+              <div className="form-group">
+                <div style={{ position: 'relative' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Tìm theo tên hoặc email..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ paddingLeft: '40px' }}
+                  />
+                </div>
+              </div>
+
+              {/* User List */}
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {isLoading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--space-lg)' }}>
+                    <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
+                  </div>
+                ) : availableUsers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--space-lg)', color: 'var(--text-muted)' }}>
+                    Không tìm thấy người dùng
+                  </div>
+                ) : (
+                  availableUsers.map(user => (
+                    <label
+                      key={user.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-md)',
+                        padding: 'var(--space-sm) var(--space-md)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        background: selectedUsers.has(user.id) ? 'var(--accent-subtle)' : 'transparent',
+                        border: `1px solid ${selectedUsers.has(user.id) ? 'var(--accent)' : 'transparent'}`,
+                        marginBottom: 'var(--space-xs)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.has(user.id)}
+                        onChange={() => toggleUser(user.id)}
+                        style={{ accentColor: 'var(--accent)' }}
+                      />
+                      <div className="participant-item__avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                        {user.display_name?.charAt(0) || '?'}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500, fontSize: '14px' }}>{user.display_name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user.email}</div>
+                      </div>
+                      {user.department_name && (
+                        <span className="badge badge--neutral" style={{ fontSize: '11px' }}>
+                          {user.department_name}
+                        </span>
+                      )}
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            <div className="modal__footer">
+              <button className="btn btn--secondary" onClick={() => setShowAddModal(false)}>
+                Hủy
+              </button>
+              <button 
+                className="btn btn--primary" 
+                onClick={handleAddParticipants}
+                disabled={selectedUsers.size === 0 || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Đang thêm...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} />
+                    Thêm {selectedUsers.size > 0 ? `(${selectedUsers.size})` : ''}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

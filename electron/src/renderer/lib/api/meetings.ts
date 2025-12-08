@@ -55,7 +55,14 @@ export const meetingsApi = {
    * Add participant to meeting
    */
   addParticipant: async (meetingId: string, userId: string, role: string = 'attendee'): Promise<Meeting> => {
-    return api.post<Meeting>(`${ENDPOINT}/${meetingId}/participants`, null);
+    return api.post<Meeting>(`/participants/${meetingId}`, { user_id: userId, role });
+  },
+  
+  /**
+   * Remove participant from meeting
+   */
+  removeParticipant: async (meetingId: string, userId: string): Promise<void> => {
+    return api.delete<void>(`/participants/${meetingId}/user/${userId}`);
   },
 
   /**

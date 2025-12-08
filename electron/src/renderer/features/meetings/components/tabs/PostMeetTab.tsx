@@ -14,6 +14,11 @@ import {
   Loader2,
   Copy,
   RefreshCw,
+  X,
+  Send,
+  Users,
+  CheckCircle,
+  MessageSquare,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
@@ -818,10 +823,28 @@ const DistributionSection = ({ meeting }: { meeting: MeetingWithParticipants }) 
   const [isDistributing, setIsDistributing] = useState(false);
   const [distributionLogs, setDistributionLogs] = useState<any[]>([]);
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null);
+  
+  // Modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  const participants = meeting.participants || [];
 
   useEffect(() => {
     loadData();
   }, [meeting.id]);
+
+  useEffect(() => {
+    // Initialize email content when minutes are loaded
+    if (minutes && meeting) {
+      const startDate = new Date(meeting.start_time);
+      setEmailSubject(`[MeetMate] Biên bản cuộc họp: ${meeting.title} - ${startDate.toLocaleDateString('vi-VN')}`);
+      setEmailBody(generateEmailBody());
+    }
+  }, [minutes, meeting]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -839,97 +862,347 @@ const DistributionSection = ({ meeting }: { meeting: MeetingWithParticipants }) 
     }
   };
 
-  const handleDistribute = async () => {
+  const generateEmailBody = () => {
+    const startDate = new Date(meeting.start_time);
+    const summary = minutes?.executive_summary || 'Đang cập nhật...';
+    
+    return `Kính gửi Quý đồng nghiệp,
+
+Biên bản cuộc họp "${meeting.title}" đã được hoàn thành.
+
+📅 Thời gian: ${startDate.toLocaleDateString('vi-VN')} - ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+📍 Địa điểm: ${meeting.location || 'Online'}
+
+📋 TÓM TẮT:
+${summary}
+
+Vui lòng xem chi tiết biên bản đính kèm hoặc truy cập MeetMate để xem đầy đủ.
+
+Trân trọng,
+MeetMate AI Assistant`;
+  };
+
+  const handleOpenEmailModal = () => {
     if (!minutes) {
-      alert('Vui lòng tạo biên bản trước khi phân phối');
+      alert('Vui lòng tạo biên bản trước khi gửi email');
+      return;
+    }
+    // Select all participants by default
+    setSelectedRecipients(participants.map((p: any) => p.user_id || p.email).filter(Boolean));
+    setSendSuccess(false);
+    setShowEmailModal(true);
+  };
+
+  const toggleRecipient = (id: string) => {
+    setSelectedRecipients(prev => 
+      prev.includes(id) 
+        ? prev.filter(r => r !== id)
+        : [...prev, id]
+    );
+  };
+
+  const selectAllRecipients = () => {
+    setSelectedRecipients(participants.map((p: any) => p.user_id || p.email).filter(Boolean));
+  };
+
+  const deselectAllRecipients = () => {
+    setSelectedRecipients([]);
+  };
+
+  const handleSendEmail = async () => {
+    if (selectedRecipients.length === 0) {
+      alert('Vui lòng chọn ít nhất một người nhận');
       return;
     }
 
     setIsDistributing(true);
     try {
       await minutesApi.distribute({
-        minutes_id: minutes.id,
+        minutes_id: minutes!.id,
         meeting_id: meeting.id,
         channels: ['email'],
+        recipients: selectedRecipients,
       });
+      setSendSuccess(true);
       await loadData();
-      alert('Đã gửi biên bản đến tất cả participants');
+      
+      // Auto close after 2 seconds
+      setTimeout(() => {
+        setShowEmailModal(false);
+        setSendSuccess(false);
+      }, 2000);
     } catch (err) {
       console.error('Failed to distribute:', err);
-      alert('Không thể gửi biên bản. Vui lòng thử lại.');
+      alert('Không thể gửi email. Vui lòng thử lại.');
     } finally {
       setIsDistributing(false);
     }
   };
 
-  const participants = meeting.participants || [];
   const distributedEmails = new Set(distributionLogs.map(log => log.recipient_email).filter(Boolean));
 
   return (
-    <div className="card">
-      <div className="card__header">
-        <h3><Mail size={16} /> Phân phối biên bản</h3>
-        <button 
-          className="btn btn--primary btn--sm" 
-          onClick={handleDistribute}
-          disabled={!minutes || isDistributing}
-        >
-          {isDistributing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-          Gửi MoM
-        </button>
-      </div>
-      <div className="card__body">
-        {isLoading ? (
-          <div className="section-loading">
-            <Loader2 size={16} className="animate-spin" />
-          </div>
-        ) : (
-          <>
-            <div className="distribution-list">
-              {participants.slice(0, 10).map((p: any, idx: number) => {
-                const email = p.email;
-                const isDistributed = email && distributedEmails.has(email);
-                return (
-                  <div key={p.user_id || p.email || idx} className="distribution-item">
-                    <div className="distribution-avatar">
-                      {(p.display_name || p.email || '?').charAt(0)}
-                    </div>
-                    <div className="distribution-info">
-                      <div className="distribution-name">{p.display_name || p.email || 'Thành viên'}</div>
-                      <div className="distribution-email">{p.email}</div>
-                    </div>
-                    <span className={`badge badge--${isDistributed ? 'success' : 'neutral'}`}>
-                      {isDistributed ? (
-                        <>
-                          <Check size={10} />
-                          Đã gửi
-                        </>
-                      ) : (
-                        'Sẽ nhận'
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
+    <>
+      <div className="card">
+        <div className="card__header">
+          <h3><Mail size={16} /> Phân phối biên bản</h3>
+          <button 
+            className="btn btn--primary btn--sm" 
+            onClick={handleOpenEmailModal}
+            disabled={!minutes || isDistributing}
+          >
+            <Send size={14} />
+            Gửi Email
+          </button>
+        </div>
+        <div className="card__body">
+          {isLoading ? (
+            <div className="section-loading">
+              <Loader2 size={16} className="animate-spin" />
             </div>
-            {distributionLogs.length > 0 && (
-              <div className="distribution-logs">
-                <h4>Lịch sử phân phối</h4>
-                {distributionLogs.slice(0, 5).map(log => (
-                  <div key={log.id} className="distribution-log-item">
-                    <span>{log.recipient_email}</span>
-                    <span className="badge badge--neutral">{log.channel}</span>
-                    <span className="text-muted">
-                      {new Date(log.sent_at).toLocaleString('vi-VN')}
-                    </span>
+          ) : (
+            <>
+              {!minutes && (
+                <div className="empty-hint" style={{ textAlign: 'center', padding: 'var(--space-lg)', color: 'var(--text-muted)' }}>
+                  <Mail size={32} style={{ opacity: 0.5, marginBottom: 'var(--space-sm)' }} />
+                  <p>Tạo biên bản để gửi cho attendees</p>
+                </div>
+              )}
+              
+              {minutes && (
+                <>
+                  <div className="distribution-list">
+                    {participants.slice(0, 10).map((p: any, idx: number) => {
+                      const email = p.email;
+                      const isDistributed = email && distributedEmails.has(email);
+                      return (
+                        <div key={p.user_id || p.email || idx} className="distribution-item">
+                          <div className="distribution-avatar">
+                            {(p.display_name || p.email || '?').charAt(0)}
+                          </div>
+                          <div className="distribution-info">
+                            <div className="distribution-name">{p.display_name || p.email || 'Thành viên'}</div>
+                            <div className="distribution-email">{p.email}</div>
+                          </div>
+                          <span className={`badge badge--${isDistributed ? 'success' : 'neutral'}`}>
+                            {isDistributed ? (
+                              <>
+                                <Check size={10} />
+                                Đã gửi
+                              </>
+                            ) : (
+                              'Chưa gửi'
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {participants.length > 10 && (
+                      <div className="text-muted" style={{ fontSize: '13px', padding: 'var(--space-sm)' }}>
+                        + {participants.length - 10} người khác
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+                  
+                  {distributionLogs.length > 0 && (
+                    <div className="distribution-logs">
+                      <h4>Lịch sử gửi</h4>
+                      {distributionLogs.slice(0, 5).map(log => (
+                        <div key={log.id} className="distribution-log-item">
+                          <CheckCircle size={12} style={{ color: 'var(--success)' }} />
+                          <span>{log.recipient_email}</span>
+                          <span className="badge badge--neutral" style={{ fontSize: '10px' }}>{log.channel}</span>
+                          <span className="text-muted" style={{ fontSize: '11px' }}>
+                            {new Date(log.sent_at).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="modal-overlay" onClick={() => !isDistributing && setShowEmailModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
+            <div className="modal__header">
+              <h2 className="modal__title">
+                <Mail size={20} />
+                Gửi biên bản qua Email
+              </h2>
+              <button 
+                className="btn btn--ghost btn--icon" 
+                onClick={() => setShowEmailModal(false)}
+                disabled={isDistributing}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {sendSuccess ? (
+              <div className="modal__body" style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
+                <CheckCircle size={64} style={{ color: 'var(--success)', marginBottom: 'var(--space-lg)' }} />
+                <h3 style={{ color: 'var(--success)', marginBottom: 'var(--space-sm)' }}>Gửi thành công!</h3>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  Đã gửi biên bản đến {selectedRecipients.length} người nhận
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="modal__body">
+                  {/* Recipients Selection */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <Users size={14} style={{ marginRight: '6px' }} />
+                      Người nhận ({selectedRecipients.length}/{participants.length})
+                    </label>
+                    <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
+                      <button className="btn btn--ghost btn--sm" onClick={selectAllRecipients}>
+                        Chọn tất cả
+                      </button>
+                      <button className="btn btn--ghost btn--sm" onClick={deselectAllRecipients}>
+                        Bỏ chọn tất cả
+                      </button>
+                    </div>
+                    <div className="recipients-grid" style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                      gap: 'var(--space-sm)',
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      padding: 'var(--space-sm)',
+                      background: 'var(--bg-surface)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border)'
+                    }}>
+                      {participants.map((p: any, idx: number) => {
+                        const id = p.user_id || p.email;
+                        const isSelected = selectedRecipients.includes(id);
+                        const isDistributed = distributedEmails.has(p.email);
+                        return (
+                          <label 
+                            key={id || idx}
+                            className="recipient-checkbox"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-sm)',
+                              padding: 'var(--space-sm)',
+                              borderRadius: 'var(--radius-sm)',
+                              cursor: 'pointer',
+                              background: isSelected ? 'var(--accent-subtle)' : 'transparent',
+                              border: `1px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleRecipient(id)}
+                              style={{ accentColor: 'var(--accent)' }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.display_name || p.email || 'Thành viên'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.email}
+                              </div>
+                            </div>
+                            {isDistributed && (
+                              <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px' }}>
+                                Đã gửi
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Email Subject */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <MessageSquare size={14} style={{ marginRight: '6px' }} />
+                      Tiêu đề email
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={emailSubject}
+                      onChange={e => setEmailSubject(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Email Preview */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <FileText size={14} style={{ marginRight: '6px' }} />
+                      Nội dung email (xem trước)
+                    </label>
+                    <textarea
+                      className="form-input"
+                      value={emailBody}
+                      onChange={e => setEmailBody(e.target.value)}
+                      rows={10}
+                      style={{ fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.5 }}
+                    />
+                  </div>
+
+                  {/* Attachments Info */}
+                  <div className="form-group">
+                    <label className="form-label">Đính kèm</label>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-sm)',
+                      padding: 'var(--space-sm)',
+                      background: 'var(--bg-surface)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)'
+                    }}>
+                      <FileText size={16} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: '13px' }}>Biên bản cuộc họp - {meeting.title}.pdf</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="modal__footer">
+                  <button 
+                    className="btn btn--secondary" 
+                    onClick={() => setShowEmailModal(false)}
+                    disabled={isDistributing}
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    className="btn btn--primary" 
+                    onClick={handleSendEmail}
+                    disabled={isDistributing || selectedRecipients.length === 0}
+                  >
+                    {isDistributing ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Đang gửi...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        Gửi đến {selectedRecipients.length} người
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

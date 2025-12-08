@@ -295,9 +295,9 @@ const Topbar = () => {
         </div>
 
         {/* Help */}
-        <button className="topbar__icon-btn" title="Trợ giúp">
+        <Link to="/app/about" className="topbar__icon-btn" title="Giới thiệu MeetMate">
           <HelpCircle size={18} />
-        </button>
+        </Link>
       </div>
     </header>
   )

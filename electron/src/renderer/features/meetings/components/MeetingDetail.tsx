@@ -15,9 +15,13 @@ import {
   RefreshCw,
   Link as LinkIcon,
   Video,
+  Edit2,
+  Trash2,
+  X,
+  Save,
 } from 'lucide-react';
 import { meetingsApi } from '../../../lib/api/meetings';
-import type { MeetingWithParticipants } from '../../../shared/dto/meeting';
+import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 
 // Tab Components
@@ -35,6 +39,22 @@ export const MeetingDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTabType>('pre');
+  
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    start_time: '',
+    end_time: '',
+    teams_link: '',
+    location: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchMeeting = useCallback(async () => {
     if (!meetingId) return;
@@ -83,6 +103,71 @@ export const MeetingDetail = () => {
     }
   };
 
+  // Open edit modal with current meeting data
+  const handleOpenEdit = () => {
+    if (!meeting) return;
+    
+    // Format datetime for input fields
+    const formatDateTimeLocal = (dateStr: string | undefined) => {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toISOString().slice(0, 16);
+    };
+    
+    setEditForm({
+      title: meeting.title || '',
+      description: meeting.description || '',
+      start_time: formatDateTimeLocal(meeting.start_time),
+      end_time: formatDateTimeLocal(meeting.end_time),
+      teams_link: meeting.teams_link || '',
+      location: meeting.location || '',
+    });
+    setShowEditModal(true);
+  };
+
+  // Save edited meeting
+  const handleSaveEdit = async () => {
+    if (!meetingId) return;
+    
+    setIsSaving(true);
+    try {
+      const updateData: MeetingUpdate = {
+        title: editForm.title || undefined,
+        description: editForm.description || undefined,
+        start_time: editForm.start_time ? new Date(editForm.start_time).toISOString() : undefined,
+        end_time: editForm.end_time ? new Date(editForm.end_time).toISOString() : undefined,
+        teams_link: editForm.teams_link || undefined,
+        location: editForm.location || undefined,
+      };
+      
+      await meetingsApi.update(meetingId, updateData);
+      setShowEditModal(false);
+      fetchMeeting();
+    } catch (err) {
+      console.error('Failed to update meeting:', err);
+      alert('Không thể cập nhật cuộc họp');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete meeting
+  const handleDelete = async () => {
+    if (!meetingId) return;
+    
+    setIsDeleting(true);
+    try {
+      await meetingsApi.delete(meetingId);
+      navigate('/app/meetings');
+    } catch (err) {
+      console.error('Failed to delete meeting:', err);
+      alert('Không thể xóa cuộc họp');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="meeting-detail-loading">
@@ -106,6 +191,12 @@ export const MeetingDetail = () => {
 
   const startTime = meeting.start_time ? new Date(meeting.start_time) : null;
   const endTime = meeting.end_time ? new Date(meeting.end_time) : null;
+  
+  // Determine if meeting is currently live based on time
+  const now = new Date();
+  const isLiveByTime = startTime && endTime && now >= startTime && now <= endTime;
+  const isUpcoming = startTime && now < startTime;
+  const isEnded = endTime && now > endTime;
 
   const tabs: { id: MeetingTabType; label: string; icon: React.ReactNode; description: string }[] = [
     { id: 'pre', label: 'Chuẩn bị', icon: <FileText size={18} />, description: 'Agenda, Tài liệu, Thành viên' },
@@ -123,9 +214,9 @@ export const MeetingDetail = () => {
           </button>
           <div className="meeting-detail-v2__header-info">
             <div className="meeting-detail-v2__header-badges">
-              <span className={`badge badge--${meeting.phase === 'in' ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
-                {meeting.phase === 'in' && <span className="live-dot"></span>}
-                {MEETING_PHASE_LABELS[meeting.phase]}
+              <span className={`badge badge--${(meeting.phase === 'in' || isLiveByTime) ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
+                {(meeting.phase === 'in' || isLiveByTime) && <span className="live-dot"></span>}
+                {isLiveByTime && meeting.phase === 'pre' ? 'LIVE' : MEETING_PHASE_LABELS[meeting.phase]}
               </span>
               <span className="badge badge--neutral">{MEETING_TYPE_LABELS[meeting.meeting_type]}</span>
             </div>
@@ -158,6 +249,25 @@ export const MeetingDetail = () => {
               <RefreshCw size={18} />
             </button>
             
+            {/* Edit button - only for pre-meeting */}
+            {meeting.phase === 'pre' && (
+              <button className="btn btn--ghost btn--icon" onClick={handleOpenEdit} title="Chỉnh sửa">
+                <Edit2 size={18} />
+              </button>
+            )}
+            
+            {/* Delete button - only for pre-meeting (draft) */}
+            {meeting.phase === 'pre' && (
+              <button 
+                className="btn btn--ghost btn--icon" 
+                onClick={() => setShowDeleteConfirm(true)} 
+                title="Xóa cuộc họp"
+                style={{ color: 'var(--error)' }}
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            
             {meeting.teams_link && (
               <a href={meeting.teams_link} target="_blank" rel="noopener noreferrer" className="btn btn--secondary">
                 <Video size={16} />
@@ -165,7 +275,15 @@ export const MeetingDetail = () => {
               </a>
             )}
             
-            {meeting.phase === 'pre' && (
+            {/* Meeting action buttons based on phase and time */}
+            {meeting.phase === 'pre' && isLiveByTime && (
+              <button className="btn btn--accent" onClick={handleStartMeeting}>
+                <span className="live-dot" style={{ marginRight: '6px' }}></span>
+                Đang diễn ra - Tham gia
+              </button>
+            )}
+            
+            {meeting.phase === 'pre' && !isLiveByTime && !isEnded && (
               <button className="btn btn--primary" onClick={handleStartMeeting}>
                 <Play size={16} />
                 Bắt đầu họp
@@ -173,10 +291,17 @@ export const MeetingDetail = () => {
             )}
             
             {meeting.phase === 'in' && (
-              <button className="btn btn--accent" onClick={handleEndMeeting}>
+              <button className="btn btn--warning" onClick={handleEndMeeting}>
                 <CheckSquare size={16} />
-                Kết thúc
+                Kết thúc họp
               </button>
+            )}
+            
+            {meeting.phase === 'post' && (
+              <span className="badge badge--success" style={{ padding: '8px 16px' }}>
+                <CheckSquare size={14} style={{ marginRight: '6px' }} />
+                Đã kết thúc
+              </span>
             )}
           </div>
         </div>
@@ -229,6 +354,182 @@ export const MeetingDetail = () => {
           />
         )}
       </main>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal__header">
+              <h2 className="modal__title">
+                <Edit2 size={20} />
+                Chỉnh sửa cuộc họp
+              </h2>
+              <button className="btn btn--ghost btn--icon" onClick={() => setShowEditModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="modal__body">
+              <div className="form-group">
+                <label className="form-label">Tiêu đề cuộc họp</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editForm.title}
+                  onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                  placeholder="Nhập tiêu đề..."
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Mô tả</label>
+                <textarea
+                  className="form-input"
+                  value={editForm.description}
+                  onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Nhập mô tả..."
+                  rows={3}
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-base)' }}>
+                <div className="form-group">
+                  <label className="form-label">
+                    <Clock size={14} style={{ marginRight: '6px' }} />
+                    Thời gian bắt đầu
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={editForm.start_time}
+                    onChange={e => setEditForm({ ...editForm, start_time: e.target.value })}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label className="form-label">
+                    <Clock size={14} style={{ marginRight: '6px' }} />
+                    Thời gian kết thúc
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={editForm.end_time}
+                    onChange={e => setEditForm({ ...editForm, end_time: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  <Video size={14} style={{ marginRight: '6px' }} />
+                  Link MS Teams
+                </label>
+                <input
+                  type="url"
+                  className="form-input"
+                  value={editForm.teams_link}
+                  onChange={e => setEditForm({ ...editForm, teams_link: e.target.value })}
+                  placeholder="https://teams.microsoft.com/..."
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  <MapPin size={14} style={{ marginRight: '6px' }} />
+                  Địa điểm
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editForm.location}
+                  onChange={e => setEditForm({ ...editForm, location: e.target.value })}
+                  placeholder="Phòng họp hoặc Online"
+                />
+              </div>
+            </div>
+            
+            <div className="modal__footer">
+              <button className="btn btn--secondary" onClick={() => setShowEditModal(false)}>
+                Hủy
+              </button>
+              <button 
+                className="btn btn--primary" 
+                onClick={handleSaveEdit}
+                disabled={isSaving || !editForm.title}
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Lưu thay đổi
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal__header">
+              <h2 className="modal__title" style={{ color: 'var(--error)' }}>
+                <Trash2 size={20} />
+                Xóa cuộc họp
+              </h2>
+              <button className="btn btn--ghost btn--icon" onClick={() => setShowDeleteConfirm(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="modal__body">
+              <p style={{ marginBottom: 'var(--space-base)' }}>
+                Bạn có chắc chắn muốn xóa cuộc họp này?
+              </p>
+              <div className="card" style={{ background: 'var(--bg-elevated)', padding: 'var(--space-base)' }}>
+                <strong>{meeting.title}</strong>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {startTime?.toLocaleString('vi-VN')}
+                </div>
+              </div>
+              <p style={{ marginTop: 'var(--space-base)', fontSize: '13px', color: 'var(--text-muted)' }}>
+                Hành động này không thể hoàn tác.
+              </p>
+            </div>
+            
+            <div className="modal__footer">
+              <button className="btn btn--secondary" onClick={() => setShowDeleteConfirm(false)}>
+                Hủy
+              </button>
+              <button 
+                className="btn btn--error" 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                style={{ background: 'var(--error)' }}
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Xóa cuộc họp
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
