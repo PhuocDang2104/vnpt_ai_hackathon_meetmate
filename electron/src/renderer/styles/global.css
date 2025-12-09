@@ -9572,3 +9572,96 @@ a {
     flex-direction: column;
   }
 }
+
+/* ============================================
+   POST-MEETING COMPACT TWEAKS (NO ICONS)
+   ============================================ */
+
+.postmeet-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.postmeet-tab .card__header h3,
+.postmeet-tab h3,
+.postmeet-tab h4 {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.postmeet-tab .card__body {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.summary-section--with-chapters {
+  gap: var(--space-md);
+}
+
+.summary-content,
+.minutes-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.minutes-content {
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.minutes-meta {
+  gap: var(--space-sm);
+}
+
+.minutes-meta .badge {
+  font-size: 11px;
+}
+
+.action-text,
+.decision-text,
+.risk-text,
+.distribution-name,
+.distribution-email,
+.highlight-clip__title,
+.chapter-item__title,
+.task-row__description {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.distribution-item,
+.highlight-clip,
+.chapter-item,
+.task-row,
+.action-row,
+.decision-item,
+.risk-card {
+  gap: var(--space-sm);
+}
+
+.distribution-name,
+.distribution-email {
+  max-width: 100%;
+}
+
+.qa-conversation {
+  max-height: 260px;
+}
+
+.summary-content .section-loading,
+.summary-content .generating-state {
+  padding: var(--space-xl);
+}
+
+.postmeet-stats {
+  gap: var(--space-sm);
+}
+
+.stat-card__value {
+  font-size: 18px;
+}
+
+.stat-card__label {
+  font-size: 12px;
+}
