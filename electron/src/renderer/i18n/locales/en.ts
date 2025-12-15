@@ -35,6 +35,7 @@ export const en = {
     tasks: 'Tasks',
     knowledge: 'Knowledge Hub',
     settings: 'Settings',
+    adminConsole: 'Admin Console',
     help: 'Help',
     notifications: 'Notifications',
     profile: 'Profile',
@@ -228,6 +229,93 @@ export const en = {
     months: 'months',
     ago: 'ago',
     in: 'in',
+  },
+
+  // Admin Console
+  admin: {
+    title: 'Admin Console',
+    subtitle: 'Manage users, documents, meetings, and system configuration',
+    noAccess: 'You need admin role to access this area.',
+    users: {
+      title: 'User Management',
+      desc: 'Identity, roles, lifecycle',
+      items: {
+        create: 'Create / import users with email',
+        role: 'Assign/change roles (admin/PMO/chair/user)',
+        status: 'Activate/deactivate accounts, view last login',
+        audit: 'Track role and status changes',
+      },
+    },
+    docs: {
+      title: 'Document Management',
+      desc: 'Upload, classify, control visibility',
+      items: {
+        upload: 'Upload via storage with pre-signed URL',
+        labels: 'Label: global vs meeting; tags: Dev/Business/Management',
+        visibility: 'Visibility: global, meeting, explicit share',
+        meetingScope: 'Attach documents to meetings for pre/in/post scope',
+      },
+    },
+    meetings: {
+      title: 'Meeting Management',
+      desc: 'Lifecycle, participants, documents',
+      items: {
+        lifecycle: 'Track pre / in / post phases',
+        participants: 'Manage organizer/participants and roles',
+        docs: 'Link curated documents per meeting',
+        audit: 'Log changes and access',
+      },
+    },
+    ai: {
+      title: 'AI & RAG',
+      desc: 'Models, pipelines, guardrails',
+      items: {
+        model: 'Select/lock AI model versions',
+        rag: 'Configure RAG scopes: global vs meeting',
+        traces: 'Review traces/responses with citations',
+        guardrail: 'Enforce filters by role/user/meeting_id',
+      },
+    },
+    system: {
+      title: 'System Config',
+      desc: 'Core settings and secrets',
+      items: {
+        cors: 'CORS origins / client allowlist',
+        email: 'SMTP/email toggles for reset notifications',
+        secrets: 'Manage secrets (ENV/Key Vault) and rotations',
+        maintenance: 'Maintenance mode, feature flags',
+      },
+    },
+    observability: {
+      title: 'Observability',
+      desc: 'Health, metrics, logs',
+      items: {
+        metrics: 'Service health, latency, error rates',
+        logs: 'Auth/API logs and audit actions',
+        indexing: 'Document indexing jobs and failures',
+        security: '401/403 trends, anomaly monitoring',
+      },
+    },
+    data: {
+      title: 'Data & Schema',
+      desc: 'Structure, migration, backup',
+      items: {
+        schema: 'User/document/meeting metadata schema',
+        migration: 'Migrations for new columns/constraints',
+        backup: 'Backup/restore strategy for Postgres and vectors',
+        tenancy: 'Org/department filters for multi-tenant',
+      },
+    },
+    risk: {
+      title: 'Risk & Compliance',
+      desc: 'Threats and mitigations',
+      items: {
+        auth: 'Enforce admin-only access; rate limit login',
+        token: 'Short access TTL; rotate/blacklist refresh if leaked',
+        upload: 'Validate file type/size; scan if available',
+        rag: 'Filter retrieval by allowed_roles/users/meeting_id',
+      },
+    },
   },
 };
 

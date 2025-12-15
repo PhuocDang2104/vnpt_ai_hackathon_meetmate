@@ -35,6 +35,7 @@ export const vi = {
     tasks: 'Nhiệm vụ',
     knowledge: 'Kho kiến thức',
     settings: 'Cài đặt',
+    adminConsole: 'Bảng quản trị',
     help: 'Trợ giúp',
     notifications: 'Thông báo',
     profile: 'Hồ sơ',
@@ -228,6 +229,93 @@ export const vi = {
     months: 'tháng',
     ago: 'trước',
     in: 'trong',
+  },
+
+  // Admin Console
+  admin: {
+    title: 'Bảng quản trị',
+    subtitle: 'Quản lý người dùng, tài liệu, cuộc họp và cấu hình hệ thống',
+    noAccess: 'Bạn cần quyền admin để truy cập khu vực này.',
+    users: {
+      title: 'Quản lý người dùng',
+      desc: 'Danh tính, vai trò, vòng đời',
+      items: {
+        create: 'Tạo / nhập người dùng bằng email',
+        role: 'Gán/đổi vai trò (admin/PMO/chair/user)',
+        status: 'Kích hoạt/vô hiệu và xem lần đăng nhập gần nhất',
+        audit: 'Theo dõi thay đổi vai trò và trạng thái',
+      },
+    },
+    docs: {
+      title: 'Quản lý tài liệu',
+      desc: 'Tải lên, phân loại, kiểm soát hiển thị',
+      items: {
+        upload: 'Tải lên qua storage với pre-signed URL',
+        labels: 'Nhãn: tổng vs cuộc họp; tag: Phát triển/Kinh doanh/Quản lý',
+        visibility: 'Hiển thị: toàn cục, theo cuộc họp, chia sẻ cụ thể',
+        meetingScope: 'Gắn tài liệu cho cuộc họp (pre/in/post)',
+      },
+    },
+    meetings: {
+      title: 'Quản lý cuộc họp',
+      desc: 'Vòng đời, thành viên, tài liệu',
+      items: {
+        lifecycle: 'Theo dõi các pha pre / in / post',
+        participants: 'Quản lý chủ trì/thành viên và vai trò',
+        docs: 'Liên kết tài liệu được chọn cho cuộc họp',
+        audit: 'Ghi log thay đổi và truy cập',
+      },
+    },
+    ai: {
+      title: 'AI & RAG',
+      desc: 'Mô hình, pipeline, guardrail',
+      items: {
+        model: 'Chọn/khóa phiên bản mô hình AI',
+        rag: 'Cấu hình phạm vi RAG: tổng vs cuộc họp',
+        traces: 'Xem trace/response kèm trích dẫn',
+        guardrail: 'Lọc theo role/user/meeting_id bắt buộc',
+      },
+    },
+    system: {
+      title: 'Cấu hình hệ thống',
+      desc: 'Thiết lập lõi và secrets',
+      items: {
+        cors: 'Cấu hình CORS / danh sách client',
+        email: 'Bật/tắt SMTP/email cho reset',
+        secrets: 'Quản lý secrets (ENV/Key Vault) và rotation',
+        maintenance: 'Chế độ bảo trì, feature flags',
+      },
+    },
+    observability: {
+      title: 'Giám sát',
+      desc: 'Sức khỏe, metric, log',
+      items: {
+        metrics: 'Sức khỏe dịch vụ, độ trễ, lỗi',
+        logs: 'Log Auth/API và audit hành động',
+        indexing: 'Công việc index tài liệu và lỗi',
+        security: 'Theo dõi 401/403, phát hiện bất thường',
+      },
+    },
+    data: {
+      title: 'Dữ liệu & Schema',
+      desc: 'Cấu trúc, migration, sao lưu',
+      items: {
+        schema: 'Schema người dùng/tài liệu/cuộc họp',
+        migration: 'Migration cho cột/ràng buộc mới',
+        backup: 'Chiến lược backup/restore Postgres và vector',
+        tenancy: 'Lọc theo tổ chức/phòng ban cho đa tenant',
+      },
+    },
+    risk: {
+      title: 'Rủi ro & tuân thủ',
+      desc: 'Nguy cơ và biện pháp',
+      items: {
+        auth: 'Chỉ admin được phép; giới hạn tần suất đăng nhập',
+        token: 'TTL ngắn cho access; rotation/blacklist refresh nếu lộ',
+        upload: 'Kiểm tra loại/kích thước file; quét nếu có',
+        rag: 'Lọc truy vấn theo allowed_roles/users/meeting_id',
+      },
+    },
   },
 };
 

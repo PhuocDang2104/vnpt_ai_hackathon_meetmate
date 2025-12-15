@@ -28,6 +28,7 @@ const Sidebar = () => {
   const storedUser = getStoredUser()
   const displayUser = storedUser || currentUser
   const { t } = useLanguage()
+  const isAdmin = (displayUser.role || '').toLowerCase() === 'admin'
 
   const mainNavItems: NavItem[] = [
     { path: '/app', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
@@ -48,6 +49,7 @@ const Sidebar = () => {
 
   const settingsNavItems: NavItem[] = [
     { path: '/app/settings', labelKey: 'nav.settings', icon: <Settings size={20} /> },
+    ...(isAdmin ? [{ path: '/app/admin', labelKey: 'nav.adminConsole', icon: <Users size={20} /> }] : []),
   ]
 
   const handleLogout = async () => {
