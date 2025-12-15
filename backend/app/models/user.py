@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Text
+from sqlalchemy import Column, String, ForeignKey, Text, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -42,10 +42,13 @@ class UserAccount(Base, UUIDMixin, TimestampMixin):
     
     email = Column(String, unique=True, nullable=False, index=True)
     display_name = Column(String)
+    password_hash = Column(Text)
     role = Column(String, default='user')  # user / chair / PMO / admin
     organization_id = Column(UUID(as_uuid=True), ForeignKey('organization.id'))
     department_id = Column(UUID(as_uuid=True), ForeignKey('department.id'))
     avatar_url = Column(String)
+    is_active = Column(Boolean, default=True)
+    last_login_at = Column(DateTime(timezone=True))
     
     # Relationships
     organization = relationship("Organization", back_populates="users")

@@ -37,10 +37,13 @@ CREATE TABLE user_account (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
+    password_hash TEXT,
     role TEXT DEFAULT 'user', -- user / chair / PMO / admin
     organization_id UUID REFERENCES organization(id),
     department_id UUID REFERENCES department(id),
     avatar_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

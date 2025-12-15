@@ -20,84 +20,53 @@ from app.core.security import (
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[dict]:
-    """Get user by email with password hash"""
+    """Get user by email with password hash and status"""
     print(f"[AUTH] Looking up user: {email}")
-    
-    # First try with password_hash column
+    query = text("""
+        SELECT 
+            u.id::text,
+            u.email,
+            u.display_name,
+            u.role,
+            u.password_hash,
+            u.department_id::text,
+            u.avatar_url,
+            u.organization_id::text,
+            u.created_at,
+            u.is_active,
+            u.last_login_at,
+            d.name as department_name
+        FROM user_account u
+        LEFT JOIN department d ON u.department_id = d.id
+        WHERE u.email = :email
+    """)
     try:
-        query = text("""
-            SELECT 
-                u.id::text, u.email, u.display_name, u.role,
-                u.password_hash, u.department_id::text, u.avatar_url,
-                u.organization_id::text, u.created_at,
-                d.name as department_name
-            FROM user_account u
-            LEFT JOIN department d ON u.department_id = d.id
-            WHERE u.email = :email
-        """)
-        
         result = db.execute(query, {'email': email})
         row = result.fetchone()
-        
-        if not row:
-            print(f"[AUTH] User not found: {email}")
-            return None
-        
-        print(f"[AUTH] User found: {row[1]}, has_password: {row[4] is not None}")
-        return {
-            'id': row[0],
-            'email': row[1],
-            'display_name': row[2],
-            'role': row[3] or 'user',
-            'password_hash': row[4],
-            'department_id': row[5],
-            'avatar_url': row[6],
-            'organization_id': row[7],
-            'created_at': row[8],
-            'department_name': row[9]
-        }
     except Exception as e:
-        print(f"[AUTH] Query with password_hash failed: {e}, trying fallback...")
-        # IMPORTANT: Rollback the failed transaction before retry
         db.rollback()
-        
-        # Fallback: password_hash column might not exist
-        try:
-            query = text("""
-                SELECT 
-                    u.id::text, u.email, u.display_name, u.role,
-                    u.department_id::text, u.avatar_url,
-                    u.organization_id::text, u.created_at,
-                    d.name as department_name
-                FROM user_account u
-                LEFT JOIN department d ON u.department_id = d.id
-                WHERE u.email = :email
-            """)
-            
-            result = db.execute(query, {'email': email})
-            row = result.fetchone()
-            
-            if not row:
-                print(f"[AUTH] User not found (fallback): {email}")
-                return None
-            
-            print(f"[AUTH] User found (fallback, no password_hash column): {row[1]}")
-            return {
-                'id': row[0],
-                'email': row[1],
-                'display_name': row[2],
-                'role': row[3] or 'user',
-                'password_hash': None,  # No password hash column
-                'department_id': row[4],
-                'avatar_url': row[5],
-                'organization_id': row[6],
-                'created_at': row[7],
-                'department_name': row[8]
-            }
-        except Exception as e2:
-            print(f"[AUTH] Fallback query also failed: {e2}")
-            db.rollback()
-            return None
+        print(f"[AUTH] Failed to query user: {e}")
+        raise
+
+    if not row:
+        print(f"[AUTH] User not found: {email}")
+        return None
+
+    print(f"[AUTH] User found: {row[1]}, has_password: {row[4] is not None}, active: {row[9]}")
+    return {
+        'id': row[0],
+        'email': row[1],
+        'display_name': row[2],
+        'role': row[3] or 'user',
+        'password_hash': row[4],
+        'department_id': row[5],
+        'avatar_url': row[6],
+        'organization_id': row[7],
+        'created_at': row[8],
+        'is_active': row[9] if row[9] is not None else True,
+        'last_login_at': row[10],
+        'department_name': row[11]
+    }
 
 
 def get_user_by_id(db: Session, user_id: str) -> Optional[CurrentUser]:
@@ -107,6 +76,7 @@ def get_user_by_id(db: Session, user_id: str) -> Optional[CurrentUser]:
             u.id::text, u.email, u.display_name, u.role,
             u.department_id::text, u.avatar_url,
             u.organization_id::text, u.created_at,
+            u.is_active, u.last_login_at,
             d.name as department_name
         FROM user_account u
         LEFT JOIN department d ON u.department_id = d.id
@@ -128,7 +98,9 @@ def get_user_by_id(db: Session, user_id: str) -> Optional[CurrentUser]:
         avatar_url=row[5],
         organization_id=row[6],
         created_at=row[7],
-        department_name=row[8]
+        is_active=row[8] if row[8] is not None else True,
+        last_login_at=row[9],
+        department_name=row[10]
     )
 
 
@@ -149,11 +121,13 @@ def register_user(db: Session, data: UserRegister) -> UserRegisterResponse:
     query = text("""
         INSERT INTO user_account (
             id, email, display_name, password_hash, role,
-            department_id, organization_id, created_at, updated_at
+            department_id, organization_id, created_at, updated_at,
+            is_active, last_login_at
         )
         VALUES (
             :id, :email, :display_name, :password_hash, 'user',
-            :department_id, :organization_id, :created_at, :updated_at
+            :department_id, :organization_id, :created_at, :updated_at,
+            :is_active, :last_login_at
         )
         RETURNING id::text
     """)
@@ -167,7 +141,9 @@ def register_user(db: Session, data: UserRegister) -> UserRegisterResponse:
             'department_id': data.department_id,
             'organization_id': data.organization_id,
             'created_at': now,
-            'updated_at': now
+            'updated_at': now,
+            'is_active': True,
+            'last_login_at': None
         })
         db.commit()
     except Exception as e:
@@ -192,22 +168,21 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[dict]:
     
     if not user:
         return None
+
+    if not user.get('is_active', True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is deactivated"
+        )
     
-    # Check if user has password_hash (for users created before auth)
     password_hash = user.get('password_hash')
     if not password_hash:
-        # DEMO MODE: Allow login for existing users without password
-        # Accept any password for users without password_hash
-        # In production, you would require password reset
-        print(f"[AUTH] Demo mode: User {email} logged in without password verification")
-        return user
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account has no password set. Please reset your password."
+        )
     
-    # Demo password check: also accept "demo123" for any user
-    if password == "demo123":
-        print(f"[AUTH] Demo mode: User {email} logged in with demo password")
-        return user
-    
-    if not verify_password(password, user['password_hash']):
+    if not verify_password(password, password_hash):
         return None
     
     return user
@@ -239,6 +214,25 @@ def login(db: Session, data: UserLogin) -> Token:
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
     
+    # Update last login
+    try:
+        db.execute(
+            text("""
+                UPDATE user_account
+                SET last_login_at = :last_login_at, updated_at = :updated_at
+                WHERE id = :user_id
+            """),
+            {
+                'user_id': user['id'],
+                'last_login_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[AUTH] Failed to update last_login_at for {data.email}: {e}")
+    
     return Token(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -265,6 +259,12 @@ def refresh_tokens(db: Session, refresh_token: str) -> Token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is deactivated"
         )
     
     # Create new tokens

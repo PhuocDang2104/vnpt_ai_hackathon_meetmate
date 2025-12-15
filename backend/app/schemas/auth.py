@@ -82,6 +82,8 @@ class CurrentUser(BaseModel):
     organization_id: Optional[str] = None
     avatar_url: Optional[str] = None
     created_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    is_active: Optional[bool] = True
 
     class Config:
         from_attributes = True
