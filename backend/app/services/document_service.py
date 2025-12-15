@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 import logging
+import os
+from fastapi import UploadFile
 
 from sqlalchemy.orm import Session
 
@@ -160,6 +162,54 @@ async def upload_document(
         title=doc.title,
         file_url=file_url,
         message="Tài liệu đã được tải lên thành công (mock)",
+    )
+
+
+async def upload_document_file(
+    db: Session,
+    file: UploadFile,
+    meeting_id: Optional[UUID] = None,
+    uploaded_by: Optional[UUID] = None,
+    description: Optional[str] = None,
+) -> DocumentUploadResponse:
+    """Upload a real file to local storage and register metadata (still using in-memory registry)."""
+    storage_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
+    os.makedirs(storage_dir, exist_ok=True)
+
+    doc_id = uuid4()
+    filename = file.filename or f"{doc_id}"
+    file_ext = filename.split(".")[-1] if "." in filename else "bin"
+    stored_name = f"{doc_id}.{file_ext}"
+    stored_path = os.path.join(storage_dir, stored_name)
+
+    # Stream to disk
+    with open(stored_path, "wb") as out:
+        content = await file.read()
+        out.write(content)
+
+    file_size = len(content)
+    file_url = f"/files/{stored_name}"
+
+    doc = Document(
+        id=doc_id,
+        meeting_id=meeting_id or UUID("00000000-0000-0000-0000-000000000000"),
+        title=filename,
+        file_type=file_ext,
+        file_size=file_size,
+        description=description,
+        file_url=file_url,
+        uploaded_by=uploaded_by,
+        uploaded_at=datetime.now(),
+    )
+    _mock_documents[str(doc_id)] = doc
+
+    logger.info(f"[Upload] Stored file {filename} as {stored_name}, size={file_size} bytes")
+
+    return DocumentUploadResponse(
+        id=doc_id,
+        title=filename,
+        file_url=file_url,
+        message="Tải lên thành công",
     )
 
 

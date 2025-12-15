@@ -1,3 +1,43 @@
+export interface Meeting {
+  id: string
+  title: string
+  description?: string
+  organizer_id?: string
+  start_time?: string
+  end_time?: string
+  meeting_type?: string
+  phase?: string
+  project_id?: string
+  department_id?: string
+  location?: string
+  teams_link?: string
+  recording_url?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MeetingUpdate {
+  title?: string
+  description?: string
+  start_time?: string
+  end_time?: string
+  meeting_type?: string
+  phase?: string
+  location?: string
+  teams_link?: string
+}
+
+export interface Participant {
+  user_id: string
+  role?: string
+  response_status?: string
+  email?: string
+  display_name?: string
+}
+
+export interface MeetingWithParticipants extends Meeting {
+  participants: Participant[]
+}
 // ============================================
 // MEETING TYPES
 // Matches backend schemas

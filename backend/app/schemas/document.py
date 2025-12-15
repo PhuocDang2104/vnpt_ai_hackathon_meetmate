@@ -16,10 +16,10 @@ class DocumentBase(BaseModel):
 
 
 class DocumentCreate(DocumentBase):
-    """Create document request"""
-    meeting_id: UUID
+    """Create document request (metadata)"""
+    meeting_id: Optional[UUID] = None
     uploaded_by: Optional[UUID] = None
-    # For mock: we won't actually store file, just metadata
+    # For mock or manual upload
     file_url: Optional[str] = None
 
 

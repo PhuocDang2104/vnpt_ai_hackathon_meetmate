@@ -1,6 +1,17 @@
-import { ShieldCheck, Users, FileText, Settings, Activity, FolderOpen, Bot, Database, AlertTriangle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ShieldCheck, Users, FileText, Settings, Activity, FolderOpen, Bot, Database, AlertTriangle, RefreshCw, CheckCircle2, Ban, Trash2 } from 'lucide-react'
 import { getStoredUser } from '../../lib/api/auth'
 import { useLanguage } from '../../contexts/LanguageContext'
+import { adminListUsers, adminUpdateUserRole, adminUpdateUserStatus, adminListDocuments, adminDeleteDocument, adminListMeetings, adminListActionItems, adminUpdateActionItem, adminUpdateMeeting, adminDeleteActionItem, adminCreateUser } from '../../lib/api/admin'
+import { User } from '../../shared/dto/user'
+import { Document } from '../../shared/dto/document'
+import { Meeting } from '../../shared/dto/meeting'
+import { ActionItemResponse } from '../../shared/dto/actionItem'
+import { uploadFile as uploadDocumentFile } from '../../lib/api/documents'
+import { API_URL } from '../../config/env'
+
+const roles: User['role'][] = ['admin', 'PMO', 'chair', 'user']
+const actionStatuses = ['proposed', 'confirmed', 'in_progress', 'completed', 'cancelled']
 
 const SectionCard = ({ icon, title, description, items }: { icon: React.ReactNode, title: string, description: string, items: string[] }) => (
   <div className="admin-card">
@@ -24,6 +35,99 @@ const AdminConsole = () => {
   const user = getStoredUser()
   const isAdmin = (user?.role || '').toLowerCase() === 'admin'
 
+  const [users, setUsers] = useState<User[]>([])
+  const [docs, setDocs] = useState<Document[]>([])
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [actions, setActions] = useState<ActionItemResponse[]>([])
+  const [loading, setLoading] = useState(false)
+  const [creatingUser, setCreatingUser] = useState<{ email: string; password: string; display_name: string; role: User['role'] }>({
+    email: '',
+    password: '',
+    display_name: '',
+    role: 'user',
+  })
+  const [uploading, setUploading] = useState(false)
+  const [uploadMeta, setUploadMeta] = useState<{ meeting_id?: string; description?: string }>({})
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      const [u, d, m, a] = await Promise.all([
+        adminListUsers({ limit: 200 }),
+        adminListDocuments({ limit: 50 }),
+        adminListMeetings({ limit: 50 }),
+        adminListActionItems({ overdue_only: false }),
+      ])
+      setUsers(u.users)
+      setDocs(d.documents)
+      setMeetings(m)
+      setActions(a.items)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadAll()
+    }
+  }, [isAdmin])
+
+  const handleRoleChange = async (userId: string, role: User['role']) => {
+    await adminUpdateUserRole(userId, role)
+    await loadAll()
+  }
+
+  const handleStatusToggle = async (userId: string, current: boolean) => {
+    await adminUpdateUserStatus(userId, !current)
+    await loadAll()
+  }
+
+  const handleDeleteDoc = async (docId: string) => {
+    await adminDeleteDocument(docId)
+    await loadAll()
+  }
+
+  const getDocUrl = (doc: Document) => {
+    if (!doc.file_url) return ''
+    return doc.file_url.startsWith('http') ? doc.file_url : `${API_URL}${doc.file_url}`
+  }
+
+  const handleUploadFile = async (file?: File) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      await uploadDocumentFile(file, uploadMeta)
+      setUploadMeta({})
+      await loadAll()
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleUpdateActionStatus = async (itemId: string, status: string) => {
+    await adminUpdateActionItem(itemId, { status })
+    await loadAll()
+  }
+
+  const handleDeleteAction = async (itemId: string) => {
+    await adminDeleteActionItem(itemId)
+    await loadAll()
+  }
+
+  const handleUpdateMeetingPhase = async (meetingId: string, phase?: string) => {
+    if (!phase) return
+    await adminUpdateMeeting(meetingId, { phase })
+    await loadAll()
+  }
+
+  const handleCreateUser = async () => {
+    if (!creatingUser.email || !creatingUser.password || !creatingUser.display_name) return
+    await adminCreateUser(creatingUser)
+    setCreatingUser({ email: '', password: '', display_name: '', role: 'user' })
+    await loadAll()
+  }
+
   if (!isAdmin) {
     return (
       <div className="admin-console">
@@ -46,6 +150,9 @@ const AdminConsole = () => {
           <h1>{t('admin.title')}</h1>
           <p>{t('admin.subtitle')}</p>
         </div>
+        <button className="btn btn-outline" onClick={loadAll} disabled={loading} style={{ marginLeft: 'auto' }}>
+          <RefreshCw size={16} style={{ marginRight: 6 }} /> {loading ? t('common.loading') : 'Reload'}
+        </button>
       </div>
 
       <div className="admin-console__grid">
@@ -60,7 +167,6 @@ const AdminConsole = () => {
             t('admin.users.items.audit'),
           ]}
         />
-
         <SectionCard
           icon={<FileText size={20} />}
           title={t('admin.docs.title')}
@@ -72,7 +178,6 @@ const AdminConsole = () => {
             t('admin.docs.items.meetingScope'),
           ]}
         />
-
         <SectionCard
           icon={<FolderOpen size={20} />}
           title={t('admin.meetings.title')}
@@ -84,31 +189,6 @@ const AdminConsole = () => {
             t('admin.meetings.items.audit'),
           ]}
         />
-
-        <SectionCard
-          icon={<Bot size={20} />}
-          title={t('admin.ai.title')}
-          description={t('admin.ai.desc')}
-          items={[
-            t('admin.ai.items.model'),
-            t('admin.ai.items.rag'),
-            t('admin.ai.items.traces'),
-            t('admin.ai.items.guardrail'),
-          ]}
-        />
-
-        <SectionCard
-          icon={<Settings size={20} />}
-          title={t('admin.system.title')}
-          description={t('admin.system.desc')}
-          items={[
-            t('admin.system.items.cors'),
-            t('admin.system.items.email'),
-            t('admin.system.items.secrets'),
-            t('admin.system.items.maintenance'),
-          ]}
-        />
-
         <SectionCard
           icon={<Activity size={20} />}
           title={t('admin.observability.title')}
@@ -120,30 +200,135 @@ const AdminConsole = () => {
             t('admin.observability.items.security'),
           ]}
         />
+      </div>
 
-        <SectionCard
-          icon={<Database size={20} />}
-          title={t('admin.data.title')}
-          description={t('admin.data.desc')}
-          items={[
-            t('admin.data.items.schema'),
-            t('admin.data.items.migration'),
-            t('admin.data.items.backup'),
-            t('admin.data.items.tenancy'),
-          ]}
-        />
+      {/* Users */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <div className="admin-card__icon"><Users size={18} /></div>
+          <div className="admin-card__title">{t('admin.users.title')}</div>
+        </div>
+        <div className="admin-inline-form">
+          <input placeholder="Email" value={creatingUser.email} onChange={e => setCreatingUser({ ...creatingUser, email: e.target.value })} />
+          <input placeholder="Display name" value={creatingUser.display_name} onChange={e => setCreatingUser({ ...creatingUser, display_name: e.target.value })} />
+          <input placeholder="Password" type="password" value={creatingUser.password} onChange={e => setCreatingUser({ ...creatingUser, password: e.target.value })} />
+          <select value={creatingUser.role} onChange={e => setCreatingUser({ ...creatingUser, role: e.target.value as User['role'] })}>
+            {roles.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <button className="btn btn-xs" onClick={handleCreateUser}>Create</button>
+        </div>
+        <div className="admin-table">
+          <div className="admin-table__head">
+            <span>Email</span><span>Role</span><span>Status</span><span>Last login</span><span></span>
+          </div>
+          {users.map(u => (
+            <div className="admin-table__row" key={u.id}>
+              <span>{u.email}</span>
+              <span>
+                <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value as User['role'])}>
+                  {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </span>
+              <span>
+                <button className="btn btn-xs" onClick={() => handleStatusToggle(u.id, u.is_active ?? true)}>
+                  {u.is_active ?? true ? <CheckCircle2 size={14} color="#10b981" /> : <Ban size={14} color="#ef4444" />} {u.is_active ?? true ? 'Active' : 'Disabled'}
+                </button>
+              </span>
+              <span>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '--'}</span>
+              <span></span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        <SectionCard
-          icon={<AlertTriangle size={20} />}
-          title={t('admin.risk.title')}
-          description={t('admin.risk.desc')}
-          items={[
-            t('admin.risk.items.auth'),
-            t('admin.risk.items.token'),
-            t('admin.risk.items.upload'),
-            t('admin.risk.items.rag'),
-          ]}
-        />
+      {/* Documents */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <div className="admin-card__icon"><FileText size={18} /></div>
+          <div className="admin-card__title">{t('admin.docs.title')}</div>
+        </div>
+        <div className="admin-inline-form">
+          <input placeholder="Meeting ID (optional)" value={uploadMeta.meeting_id || ''} onChange={e => setUploadMeta({ ...uploadMeta, meeting_id: e.target.value || undefined })} />
+          <input placeholder="Description (optional)" value={uploadMeta.description || ''} onChange={e => setUploadMeta({ ...uploadMeta, description: e.target.value || undefined })} />
+          <input type="file" onChange={e => handleUploadFile(e.target.files?.[0])} />
+        </div>
+        <div className="admin-table">
+          <div className="admin-table__head" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 0.8fr 0.8fr' }}>
+            <span>Title</span><span>Meeting</span><span>Type</span><span>Size</span><span></span><span></span>
+          </div>
+          {docs.map(d => (
+            <div className="admin-table__row" key={String(d.id)} style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 0.8fr 0.8fr' }}>
+              <span>{d.title}</span>
+              <span>{String(d.meeting_id)}</span>
+              <span>{d.file_type}</span>
+              <span>{d.file_size ? `${(d.file_size / 1024).toFixed(0)} KB` : '--'}</span>
+              <span>
+                {d.file_url && (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <a className="btn btn-xs" href={getDocUrl(d)} target="_blank" rel="noreferrer">Open</a>
+                    <a className="btn btn-xs" href={getDocUrl(d)} download>Download</a>
+                  </div>
+                )}
+              </span>
+              <span><button className="btn btn-xs" onClick={() => handleDeleteDoc(String(d.id))}>Delete</button></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Meetings */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <div className="admin-card__icon"><FolderOpen size={18} /></div>
+          <div className="admin-card__title">{t('admin.meetings.title')}</div>
+        </div>
+        <div className="admin-table">
+          <div className="admin-table__head">
+            <span>Title</span><span>Phase</span><span>Start</span><span>End</span>
+          </div>
+          {meetings.map(m => (
+            <div className="admin-table__row" key={m.id}>
+              <span>{m.title}</span>
+              <span>
+                <select value={m.phase} onChange={e => handleUpdateMeetingPhase(m.id, e.target.value)}>
+                  {['pre', 'in', 'post'].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </span>
+              <span>{m.start_time ? new Date(m.start_time).toLocaleString() : '--'}</span>
+              <span>{m.end_time ? new Date(m.end_time).toLocaleString() : '--'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Action items */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <div className="admin-card__icon"><Activity size={18} /></div>
+          <div className="admin-card__title">Action Items</div>
+        </div>
+        <div className="admin-table">
+          <div className="admin-table__head">
+            <span>Task</span><span>Owner</span><span>Status</span><span>Deadline</span><span></span>
+          </div>
+          {actions.map(a => (
+            <div className="admin-table__row" key={a.id}>
+              <span>{a.description}</span>
+              <span>{a.owner_name || a.owner_user_id || '--'}</span>
+              <span>
+                <select value={a.status} onChange={e => handleUpdateActionStatus(a.id, e.target.value)}>
+                  {actionStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </span>
+              <span>{a.deadline ? a.deadline : '--'}</span>
+              <span>
+                <button className="btn btn-xs" onClick={() => handleDeleteAction(a.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

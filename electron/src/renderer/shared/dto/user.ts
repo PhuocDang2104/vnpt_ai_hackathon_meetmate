@@ -12,6 +12,8 @@ export interface User {
   avatar_url?: string;
   organization_id?: string;
   created_at?: string;
+  last_login_at?: string;
+  is_active?: boolean;
 }
 
 export interface UserListResponse {

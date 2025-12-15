@@ -13,6 +13,7 @@ from app.schemas.auth import UserRegisterResponse, UserRegister
 from app.schemas.document import DocumentList, Document, DocumentUpdate
 from app.schemas.meeting import Meeting, MeetingUpdate, MeetingWithParticipants
 from app.schemas.action_item import ActionItemList, ActionItemResponse, ActionItemUpdate
+from app.schemas.action_item import ActionItemCreate
 from app.services import (
     user_service,
     auth_service,
@@ -255,4 +256,12 @@ def admin_update_action_item(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action item not found")
     return updated
+
+
+@router.delete('/action-items/{item_id}', status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_action_item(item_id: str, db: Session = Depends(get_db)):
+    ok = action_item_service.delete_action_item(db, item_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action item not found")
+    return None
 

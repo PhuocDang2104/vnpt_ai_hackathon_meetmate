@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
 import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
+import { API_URL } from '../../config/env'
 
 const KnowledgeHub = () => {
   const [query, setQuery] = useState('')
@@ -204,6 +205,29 @@ const KnowledgeHub = () => {
                             <>
                               <span>•</span>
                               {doc.tags.slice(0, 2).join(', ')}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
+                          {doc.file_url && (
+                            <>
+                              <a
+                                className="btn btn-xs"
+                                href={doc.file_url.startsWith('http') ? doc.file_url : `${API_URL}${doc.file_url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Open
+                              </a>
+                              <a
+                                className="btn btn-xs"
+                                href={doc.file_url.startsWith('http') ? doc.file_url : `${API_URL}${doc.file_url}`}
+                                download
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Download
+                              </a>
                             </>
                           )}
                         </div>

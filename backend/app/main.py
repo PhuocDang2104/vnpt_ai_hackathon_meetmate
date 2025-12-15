@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.core.config import get_settings
 from app.api.v1.endpoints import (
     auth,
@@ -69,6 +71,11 @@ app.include_router(participants.router, prefix=f"{settings.api_v1_prefix}/partic
 app.include_router(minutes.router, prefix=f"{settings.api_v1_prefix}/minutes", tags=['minutes'])
 app.include_router(tools.router, prefix=f"{settings.api_v1_prefix}/tools", tags=['tools'])
 app.include_router(in_meeting_ws.router, prefix=f"{settings.api_v1_prefix}/ws", tags=['ws'])
+
+# Serve uploaded files (local)
+upload_path = (Path(__file__).parent.parent / "uploaded_files").resolve()
+upload_path.mkdir(parents=True, exist_ok=True)
+app.mount("/files", StaticFiles(directory=str(upload_path)), name="files")
 
 
 @app.get('/')

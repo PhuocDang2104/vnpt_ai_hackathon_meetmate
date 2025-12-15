@@ -39,6 +39,18 @@ export interface DocumentUploadResponse {
   message: string;
 }
 
+export const uploadFile = async (
+  file: File,
+  options?: { meeting_id?: string; description?: string; uploaded_by?: string }
+): Promise<DocumentUploadResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (options?.meeting_id) formData.append('meeting_id', options.meeting_id);
+  if (options?.description) formData.append('description', options.description);
+  if (options?.uploaded_by) formData.append('uploaded_by', options.uploaded_by);
+  return api.post<DocumentUploadResponse>(`${ENDPOINT}/upload-file`, formData);
+};
+
 const ENDPOINT = '/documents';
 
 export const documentsApi = {

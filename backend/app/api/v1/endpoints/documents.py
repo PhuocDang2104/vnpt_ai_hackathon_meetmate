@@ -2,7 +2,7 @@
 Documents API endpoints
 """
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -56,6 +56,39 @@ async def upload_document(
     Currently just stores metadata.
     """
     return await document_service.upload_document(db, data)
+
+
+@router.post("/upload-file", response_model=DocumentUploadResponse)
+async def upload_document_file(
+    meeting_id: str | None = Form(default=None),
+    uploaded_by: str | None = Form(default=None),
+    description: str | None = Form(default=None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a real file to server storage and register metadata (still mock DB).
+    """
+    meeting_uuid = None
+    uploaded_by_uuid = None
+    if meeting_id:
+        try:
+            meeting_uuid = UUID(meeting_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid meeting_id")
+    if uploaded_by:
+        try:
+            uploaded_by_uuid = UUID(uploaded_by)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploaded_by")
+
+    return await document_service.upload_document_file(
+        db=db,
+        file=file,
+        meeting_id=meeting_uuid,
+        uploaded_by=uploaded_by_uuid,
+        description=description,
+    )
 
 
 @router.put("/{document_id}", response_model=Document)
