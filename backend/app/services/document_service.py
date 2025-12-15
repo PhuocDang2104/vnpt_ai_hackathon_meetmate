@@ -110,6 +110,20 @@ async def list_documents(
     )
 
 
+async def list_all_documents(
+    db: Session,
+    meeting_id: Optional[UUID] = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> DocumentList:
+    """List all documents (mock) with optional meeting filter"""
+    docs = list(_mock_documents.values())
+    if meeting_id:
+        docs = [d for d in docs if d.meeting_id == meeting_id]
+    docs.sort(key=lambda x: x.uploaded_at, reverse=True)
+    return DocumentList(documents=docs[skip:skip + limit], total=len(docs))
+
+
 async def get_document(db: Session, document_id: UUID) -> Optional[Document]:
     """Get a single document by ID"""
     return _mock_documents.get(str(document_id))

@@ -29,6 +29,7 @@ def list_users(
             u.id::text, u.email, u.display_name, u.role,
             u.department_id::text, u.avatar_url,
             u.organization_id::text, u.created_at,
+            u.last_login_at, u.is_active,
             d.name as department_name
         FROM user_account u
         LEFT JOIN department d ON u.department_id = d.id
@@ -68,7 +69,9 @@ def list_users(
             avatar_url=row[5],
             organization_id=row[6],
             created_at=row[7],
-            department_name=row[8]
+            last_login_at=row[8],
+            is_active=row[9] if row[9] is not None else True,
+            department_name=row[10]
         ))
     
     return users, total
@@ -81,6 +84,7 @@ def get_user(db: Session, user_id: str) -> Optional[User]:
             u.id::text, u.email, u.display_name, u.role,
             u.department_id::text, u.avatar_url,
             u.organization_id::text, u.created_at,
+            u.last_login_at, u.is_active,
             d.name as department_name
         FROM user_account u
         LEFT JOIN department d ON u.department_id = d.id
@@ -102,8 +106,44 @@ def get_user(db: Session, user_id: str) -> Optional[User]:
         avatar_url=row[5],
         organization_id=row[6],
         created_at=row[7],
-        department_name=row[8]
+        last_login_at=row[8],
+        is_active=row[9] if row[9] is not None else True,
+        department_name=row[10]
     )
+
+
+def update_user_role(db: Session, user_id: str, new_role: str) -> Optional[User]:
+    """Update user role and return updated user"""
+    update_query = text("""
+        UPDATE user_account
+        SET role = :role, updated_at = now()
+        WHERE id = :user_id
+        RETURNING id::text
+    """)
+    result = db.execute(update_query, {'role': new_role, 'user_id': user_id})
+    row = result.fetchone()
+    if not row:
+        db.rollback()
+        return None
+    db.commit()
+    return get_user(db, user_id)
+
+
+def update_user_status(db: Session, user_id: str, is_active: bool) -> Optional[User]:
+    """Activate/deactivate user"""
+    update_query = text("""
+        UPDATE user_account
+        SET is_active = :is_active, updated_at = now()
+        WHERE id = :user_id
+        RETURNING id::text
+    """)
+    result = db.execute(update_query, {'is_active': is_active, 'user_id': user_id})
+    row = result.fetchone()
+    if not row:
+        db.rollback()
+        return None
+    db.commit()
+    return get_user(db, user_id)
 
 
 def list_departments(db: Session) -> Tuple[List[Department], int]:

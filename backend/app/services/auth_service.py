@@ -167,6 +167,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[dict]:
     user = get_user_by_email(db, email)
     
     if not user:
+        print(f"[AUTH] Login rejected: user not found ({email})")
         return None
 
     if not user.get('is_active', True):
@@ -177,12 +178,14 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[dict]:
     
     password_hash = user.get('password_hash')
     if not password_hash:
+        print(f"[AUTH] Login rejected: no password set for {email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Account has no password set. Please reset your password."
         )
     
     if not verify_password(password, password_hash):
+        print(f"[AUTH] Login rejected: wrong password for {email}")
         return None
     
     return user
@@ -195,7 +198,7 @@ def login(db: Session, data: UserLogin) -> Token:
     user = authenticate_user(db, data.email, data.password)
     
     if not user:
-        print(f"[AUTH] Login failed for: {data.email}")
+        print(f"[AUTH] Login failed for: {data.email} (invalid credentials)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

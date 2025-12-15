@@ -20,6 +20,8 @@ class User(UserBase):
     organization_id: Optional[str] = None
     department_name: Optional[str] = None
     created_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    is_active: Optional[bool] = True
 
     class Config:
         from_attributes = True
