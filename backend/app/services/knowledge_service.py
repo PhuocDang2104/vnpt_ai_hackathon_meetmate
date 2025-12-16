@@ -6,6 +6,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 import logging
 from pathlib import Path
+from sqlalchemy import text
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -22,12 +23,14 @@ from app.schemas.knowledge import (
     KnowledgeQueryResponse,
 )
 from app.llm.gemini_client import GeminiChat, is_gemini_available
+from app.vectorstore.pgvector_client import PgVectorClient
 from app.services.storage_client import (
     build_object_key,
     generate_presigned_get_url,
     is_storage_configured,
     upload_bytes_to_storage,
 )
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +199,28 @@ def _with_presigned_url(doc: KnowledgeDocument) -> KnowledgeDocument:
     return doc
 
 
+def _row_to_doc(row) -> KnowledgeDocument:
+    """Map DB row -> KnowledgeDocument; fill missing fields with defaults."""
+    return KnowledgeDocument(
+        id=row["id"],
+        title=row["title"],
+        description=row.get("description"),
+        document_type="document",
+        source=row.get("source") or "Uploaded",
+        file_type=row.get("file_type") or "pdf",
+        file_size=row.get("file_size"),
+        file_url=row.get("file_url"),
+        storage_key=row.get("storage_key"),
+        tags=row.get("tags") or [],
+        category=row.get("category"),
+        uploaded_by=None,
+        uploaded_by_name=None,
+        uploaded_at=row.get("created_at") or datetime.now(),
+        view_count=0,
+        last_accessed_at=row.get("updated_at"),
+    )
+
+
 async def list_documents(
     db: Session,
     skip: int = 0,
@@ -205,32 +230,78 @@ async def list_documents(
     category: Optional[str] = None,
 ) -> KnowledgeDocumentList:
     """List all knowledge documents with optional filters"""
-    docs = list(_mock_knowledge_docs.values())
-    
-    # Apply filters
-    if document_type:
-        docs = [d for d in docs if d.document_type == document_type]
-    if source:
-        docs = [d for d in docs if d.source == source]
-    if category:
-        docs = [d for d in docs if d.category == category]
-    
-    # Sort by uploaded_at desc
-    docs.sort(key=lambda x: x.uploaded_at, reverse=True)
+    try:
+        conditions = ["1=1"]
+        params = {"skip": skip, "limit": limit}
+        if source:
+            conditions.append("source = :source")
+            params["source"] = source
+        if category:
+            conditions.append("category = :category")
+            params["category"] = category
 
-    docs = [_with_presigned_url(d) for d in docs]
+        where_clause = " AND ".join(conditions)
+        rows = db.execute(
+            text(
+                f"""
+                SELECT id, title, description, source, category, tags,
+                       file_type, file_size, storage_key, file_url,
+                       created_at, updated_at
+                FROM knowledge_document
+                WHERE {where_clause}
+                ORDER BY created_at DESC NULLS LAST
+                LIMIT :limit OFFSET :skip
+                """
+            ),
+            params,
+        ).mappings().all()
 
-    return KnowledgeDocumentList(
-        documents=docs[skip:skip + limit],
-        total=len(docs),
-    )
+        total = db.execute(
+            text(f"SELECT COUNT(*) FROM knowledge_document WHERE {where_clause}"),
+            params,
+        ).scalar_one()
+
+        docs = [_with_presigned_url(_row_to_doc(r)) for r in rows]
+        return KnowledgeDocumentList(documents=docs, total=total)
+    except Exception as exc:
+        logger.warning("List documents fallback to mock: %s", exc)
+        docs = list(_mock_knowledge_docs.values())
+        if document_type:
+            docs = [d for d in docs if d.document_type == document_type]
+        if source:
+            docs = [d for d in docs if d.source == source]
+        if category:
+            docs = [d for d in docs if d.category == category]
+        docs.sort(key=lambda x: x.uploaded_at, reverse=True)
+        docs = [_with_presigned_url(d) for d in docs]
+        return KnowledgeDocumentList(
+            documents=docs[skip:skip + limit],
+            total=len(docs),
+        )
 
 
 async def get_document(db: Session, document_id: UUID) -> Optional[KnowledgeDocument]:
     """Get a single document by ID and increment view count"""
+    try:
+        row = db.execute(
+            text(
+                """
+                SELECT id, title, description, source, category, tags,
+                       file_type, file_size, storage_key, file_url,
+                       created_at, updated_at
+                FROM knowledge_document
+                WHERE id = :id
+                """
+            ),
+            {"id": str(document_id)},
+        ).mappings().first()
+        if row:
+            return _with_presigned_url(_row_to_doc(row))
+    except Exception as exc:
+        logger.warning("Get document fallback to mock: %s", exc)
+
     doc = _mock_knowledge_docs.get(str(document_id))
     if doc:
-        # Increment view count
         doc_dict = doc.model_dump()
         doc_dict["view_count"] = doc.view_count + 1
         doc_dict["last_accessed_at"] = datetime.now()
@@ -313,6 +384,30 @@ async def upload_document(
     )
 
 
+async def ingest_document(db: Session, document_id: UUID) -> Optional[dict]:
+    """
+    Ingest a document into vector store.
+    Current implementation is a stub: combines metadata text and upserts to PgVectorClient.
+    """
+    doc = _mock_knowledge_docs.get(str(document_id))
+    if not doc:
+        return None
+
+    parts = [doc.title]
+    if doc.description:
+        parts.append(doc.description)
+    if doc.tags:
+        parts.append(" ".join(doc.tags))
+    content = "\n".join(parts)
+
+    settings = get_settings()
+    client = PgVectorClient(connection=settings.database_url)
+    client.upsert([content])
+
+    logger.info("Ingested document %s into vector store (stub)", document_id)
+    return {"status": "embedded", "document_id": document_id}
+
+
 async def update_document(
     db: Session,
     document_id: UUID,
@@ -345,12 +440,50 @@ async def search_documents(
     request: KnowledgeSearchRequest,
 ) -> KnowledgeSearchResponse:
     """Search documents by query string"""
+    try:
+        conditions = ["1=1"]
+        params = {
+            "like_q": f"%{request.query}%",
+            "offset": request.offset,
+            "limit": request.limit,
+        }
+        conditions.append("(title ILIKE :like_q OR description ILIKE :like_q OR :like_q = ANY(tags))")
+        if request.source:
+            conditions.append("source = :source")
+            params["source"] = request.source
+        if request.category:
+            conditions.append("category = :category")
+            params["category"] = request.category
+
+        where_clause = " AND ".join(conditions)
+        rows = db.execute(
+            text(
+                f"""
+                SELECT id, title, description, source, category, tags,
+                       file_type, file_size, storage_key, file_url,
+                       created_at, updated_at
+                FROM knowledge_document
+                WHERE {where_clause}
+                ORDER BY created_at DESC NULLS LAST
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        ).mappings().all()
+
+        total = db.execute(
+            text(f"SELECT COUNT(*) FROM knowledge_document WHERE {where_clause}"),
+            params,
+        ).scalar_one()
+
+        docs = [_with_presigned_url(_row_to_doc(r)) for r in rows]
+        return KnowledgeSearchResponse(documents=docs, total=total, query=request.query)
+    except Exception as exc:
+        logger.warning("Search documents fallback to mock: %s", exc)
+
     docs = list(_mock_knowledge_docs.values())
-    
-    # Simple text search in title, description, tags
     query_lower = request.query.lower()
     matching_docs = []
-    
     for doc in docs:
         score = 0
         if query_lower in doc.title.lower():
@@ -361,15 +494,12 @@ async def search_documents(
             for tag in doc.tags:
                 if query_lower in tag.lower():
                     score += 3
-        
         if score > 0:
             matching_docs.append((score, doc))
-    
-    # Sort by score desc
+
     matching_docs.sort(key=lambda x: x[0], reverse=True)
     results = [doc for _, doc in matching_docs]
-    
-    # Apply additional filters
+
     if request.document_type:
         results = [d for d in results if d.document_type == request.document_type]
     if request.source:
@@ -381,7 +511,7 @@ async def search_documents(
         results = [d for d in results if d.tags and any(t.lower() in tag_set for t in d.tags)]
 
     results = [_with_presigned_url(d) for d in results]
-    
+
     return KnowledgeSearchResponse(
         documents=results[request.offset:request.offset + request.limit],
         total=len(results),

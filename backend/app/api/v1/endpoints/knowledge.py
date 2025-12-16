@@ -150,6 +150,23 @@ async def query_knowledge(
     return await knowledge_service.query_knowledge_ai(db, request)
 
 
+@router.post("/ingest/{document_id}")
+async def ingest_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger ingestion + embedding for a document (stub implementation).
+    """
+    result = await knowledge_service.ingest_document(db, document_id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return {"status": result["status"]}
+
+
 @router.get("/recent-queries")
 async def get_recent_queries(
     limit: int = 10,
