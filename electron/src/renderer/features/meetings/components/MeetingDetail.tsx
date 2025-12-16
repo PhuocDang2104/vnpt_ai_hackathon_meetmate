@@ -39,6 +39,10 @@ export const MeetingDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTabType>('pre');
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinPlatform, setJoinPlatform] = useState<'gomeet' | 'gmeet'>('gomeet');
+  const [joinLink, setJoinLink] = useState('');
+  const [streamSessionId, setStreamSessionId] = useState<string | null>(null);
   
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -65,6 +69,10 @@ export const MeetingDetail = () => {
     try {
       const data = await meetingsApi.get(meetingId);
       setMeeting(data);
+      setStreamSessionId(data.id);
+      if (data.teams_link) {
+        setJoinLink(data.teams_link);
+      }
       // Set active tab based on meeting phase
       if (data.phase === 'in') setActiveTab('in');
       else if (data.phase === 'post') setActiveTab('post');
@@ -267,11 +275,18 @@ export const MeetingDetail = () => {
                 <Trash2 size={18} />
               </button>
             )}
-            
-            {meeting.teams_link && (
-              <a href={meeting.teams_link} target="_blank" rel="noopener noreferrer" className="btn btn--secondary">
-                <Video size={16} />
-                Teams
+            <button
+              className="btn btn--secondary"
+              onClick={() => setShowJoinModal(true)}
+              title="Chọn nền tảng và link tham gia"
+            >
+              <Video size={16} />
+              Tham gia cuộc họp
+            </button>
+            {joinLink && (
+              <a href={joinLink} target="_blank" rel="noopener noreferrer" className="btn btn--ghost">
+                <LinkIcon size={16} />
+                Mở liên kết
               </a>
             )}
             
@@ -343,6 +358,9 @@ export const MeetingDetail = () => {
         {activeTab === 'in' && (
           <InMeetTab 
             meeting={meeting}
+            joinPlatform={joinPlatform}
+            joinLink={joinLink}
+            streamSessionId={streamSessionId || meeting.id}
             onRefresh={fetchMeeting}
             onEndMeeting={handleEndMeeting}
           />
@@ -525,6 +543,75 @@ export const MeetingDetail = () => {
                     Xóa cuộc họp
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Join meeting modal */}
+      {showJoinModal && (
+        <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="modal__header">
+              <h2 className="modal__title">
+                <Video size={20} />
+                Chọn nền tảng & stream ID
+              </h2>
+              <button className="btn btn--ghost btn--icon" onClick={() => setShowJoinModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal__body">
+              <div className="pill-switch">
+                <button
+                  className={`pill-switch__item ${joinPlatform === 'gomeet' ? 'pill-switch__item--active' : ''}`}
+                  onClick={() => setJoinPlatform('gomeet')}
+                >
+                  GoMeet
+                </button>
+                <button
+                  className={`pill-switch__item ${joinPlatform === 'gmeet' ? 'pill-switch__item--active' : ''}`}
+                  onClick={() => setJoinPlatform('gmeet')}
+                >
+                  Google Meet
+                </button>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label className="form-label">Link cuộc họp</label>
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="Dán link Google Meet hoặc VNPT GoMeet"
+                  value={joinLink}
+                  onChange={e => setJoinLink(e.target.value)}
+                />
+                <p className="form-hint">Link này sẽ dùng để mở tab mới và gắn vào session in-meeting.</p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Session ID cho realtime transcript</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={streamSessionId || meeting.id}
+                  onChange={e => setStreamSessionId(e.target.value)}
+                  placeholder="session_id (mặc định là meeting.id)"
+                />
+                <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
+              </div>
+            </div>
+            <div className="modal__footer">
+              <button className="btn btn--secondary" onClick={() => setShowJoinModal(false)}>
+                Đóng
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={() => setShowJoinModal(false)}
+                disabled={!streamSessionId}
+              >
+                Áp dụng
               </button>
             </div>
           </div>

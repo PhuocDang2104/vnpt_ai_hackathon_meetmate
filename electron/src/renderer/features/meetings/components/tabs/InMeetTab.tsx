@@ -27,15 +27,36 @@ import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
 
 type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
-
 interface InMeetTabProps {
   meeting: MeetingWithParticipants;
+  joinPlatform: 'gomeet' | 'gmeet';
+  joinLink: string;
+  streamSessionId: string;
   onRefresh: () => void;
   onEndMeeting: () => void;
 }
 
-export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) => {
+export const InMeetTab = ({
+  meeting,
+  joinPlatform,
+  joinLink,
+  streamSessionId,
+  onRefresh,
+  onEndMeeting,
+}: InMeetTabProps) => {
   const [isRecording, setIsRecording] = useState(meeting.phase === 'in');
+  const [wsError, setWsError] = useState<string | null>(null);
+  const [ingestStatus, setIngestStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
+  const [feedStatus, setFeedStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
+  const [lastFeedMessage, setLastFeedMessage] = useState<string | null>(null);
+  const [lastIngestAck, setLastIngestAck] = useState<string | null>(null);
+  const [wsNonce, setWsNonce] = useState(0);
+
+  const ingestRef = useRef<WebSocket | null>(null);
+  const feedRef = useRef<WebSocket | null>(null);
+  const wsBase = useMemo(() => API_URL.replace(/^http/i, 'ws').replace(/\/$/, ''), []);
+  const ingestEndpoint = useMemo(() => `${wsBase}/api/v1/ws/in-meeting/${streamSessionId}`, [wsBase, streamSessionId]);
+  const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${streamSessionId}`, [wsBase, streamSessionId]);
 
   const transcript = useMemo(
     () => transcriptChunks.filter(chunk => chunk.meetingId === meeting.id).slice(0, 8),
@@ -57,6 +78,103 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
     return scoped.length > 0 ? scoped : risks.slice(0, 2);
   }, [meeting.id]);
 
+  useEffect(() => {
+    if (!USE_API) {
+      setIngestStatus('disabled');
+      return;
+    }
+    setIngestStatus('connecting');
+    setWsError(null);
+    const socket = new WebSocket(ingestEndpoint);
+    ingestRef.current = socket;
+
+    socket.onopen = () => {
+      setIngestStatus('connected');
+      setLastIngestAck('Đã kết nối ingest WS');
+    };
+    socket.onclose = () => {
+      setIngestStatus(USE_API ? 'idle' : 'disabled');
+    };
+    socket.onerror = evt => {
+      console.error('Ingest WS error', evt);
+      setIngestStatus('error');
+      setWsError('Không kết nối được WebSocket ingest.');
+    };
+    socket.onmessage = event => {
+      const payload = typeof event.data === 'string' ? event.data : '';
+      try {
+        const data = JSON.parse(payload);
+        if (data?.event === 'ingest_ack') {
+          setLastIngestAck(`Ack seq=${data.seq}`);
+          return;
+        }
+      } catch (_e) {
+        /* ignore */
+      }
+      if (payload) setLastIngestAck(payload.slice(0, 180));
+    };
+
+    return () => {
+      socket.close();
+      ingestRef.current = null;
+    };
+  }, [ingestEndpoint, wsNonce]);
+
+  useEffect(() => {
+    if (!USE_API) {
+      setFeedStatus('disabled');
+      return;
+    }
+    setFeedStatus('connecting');
+    const socket = new WebSocket(feedEndpoint);
+    feedRef.current = socket;
+
+    socket.onopen = () => {
+      setFeedStatus('connected');
+      setLastFeedMessage('Đã kết nối frontend WS');
+    };
+    socket.onclose = () => {
+      setFeedStatus(USE_API ? 'idle' : 'disabled');
+    };
+    socket.onerror = evt => {
+      console.error('Frontend WS error', evt);
+      setFeedStatus('error');
+      setWsError('Không kết nối được WebSocket frontend.');
+    };
+    socket.onmessage = event => {
+      const preview = typeof event.data === 'string' ? event.data.slice(0, 180) : 'Đã nhận dữ liệu WS';
+      setLastFeedMessage(preview);
+    };
+
+    return () => {
+      socket.close();
+      feedRef.current = null;
+    };
+  }, [feedEndpoint, wsNonce]);
+
+  const handleSendChunk = (chunk: string) => {
+    if (!ingestRef.current || ingestStatus !== 'connected') {
+      setWsError('Ingest WS chưa sẵn sàng.');
+      return;
+    }
+    const payload = {
+      meeting_id: streamSessionId,
+      chunk,
+      full_transcript: chunk,
+      speaker: 'SPEAKER_01',
+      is_final: true,
+      source: 'ui_raw_ingest',
+    };
+    ingestRef.current.send(JSON.stringify(payload));
+    setLastIngestAck(`Đã gửi chunk ${new Date().toLocaleTimeString('vi-VN')}`);
+  };
+
+  const handleReconnect = () => {
+    ingestRef.current?.close();
+    feedRef.current?.close();
+    setWsNonce(prev => prev + 1);
+  };
+
   return (
     <div className="inmeet-tab">
       <div className="inmeet-grid">
@@ -65,6 +183,16 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
             transcript={transcript}
             isRecording={isRecording}
             meetingId={meeting.id}
+            streamSessionId={streamSessionId}
+            joinPlatform={joinPlatform}
+            joinLink={joinLink}
+            ingestStatus={ingestStatus}
+            feedStatus={feedStatus}
+            wsError={wsError}
+            lastFeedMessage={lastFeedMessage}
+            lastIngestAck={lastIngestAck}
+            onSendChunk={handleSendChunk}
+            onReconnect={handleReconnect}
           />
           <LiveRecapPanel />
         </div>
@@ -83,92 +211,38 @@ export const InMeetTab = ({ meeting, onRefresh, onEndMeeting }: InMeetTabProps) 
   );
 };
 
+interface TranscriptPanelProps {
+  transcript: typeof transcriptChunks;
+  isRecording: boolean;
+  meetingId: string;
+  streamSessionId: string;
+  joinPlatform: 'gomeet' | 'gmeet';
+  joinLink: string;
+  ingestStatus: WsStatus;
+  feedStatus: WsStatus;
+  wsError: string | null;
+  lastFeedMessage: string | null;
+  lastIngestAck: string | null;
+  onSendChunk: (text: string) => void;
+  onReconnect: () => void;
+}
+
 const LiveTranscriptPanel = ({
   transcript,
   isRecording,
   meetingId,
-}: {
-  transcript: typeof transcriptChunks;
-  isRecording: boolean;
-  meetingId: string;
-}) => {
-  const [wsStatus, setWsStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
-  const [wsError, setWsError] = useState<string | null>(null);
-  const [mockChunk, setMockChunk] = useState('');
-  const [wsAttempt, setWsAttempt] = useState(0);
-  const [lastWsMessage, setLastWsMessage] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-
-  const wsEndpoint = useMemo(() => {
-    const wsBase = API_URL.replace(/^http/i, 'ws').replace(/\/$/, '');
-    return `${wsBase}/api/v1/ws/in-meeting/${meetingId}`;
-  }, [meetingId]);
-
-  useEffect(() => {
-    if (!USE_API) {
-      setWsStatus('disabled');
-      setWsError(null);
-      return;
-    }
-
-    setWsStatus('connecting');
-    setWsError(null);
-
-    const socket = new WebSocket(wsEndpoint);
-    wsRef.current = socket;
-
-    socket.onopen = () => {
-      setWsStatus('connected');
-      setLastWsMessage('Đã kết nối In-Meeting WS');
-    };
-
-    socket.onclose = () => {
-      setWsStatus(prev => (prev === 'error' ? 'error' : USE_API ? 'idle' : 'disabled'));
-    };
-
-    socket.onerror = event => {
-      console.error('In-Meeting WS error', event);
-      setWsStatus('error');
-      setWsError('Không kết nối được WebSocket tới backend in-meeting.');
-    };
-
-    socket.onmessage = event => {
-      const payload =
-        typeof event.data === 'string' ? event.data.slice(0, 180) : 'Đã nhận dữ liệu WS';
-      setLastWsMessage(payload);
-    };
-
-    return () => {
-      socket.close();
-      wsRef.current = null;
-    };
-  }, [wsEndpoint, wsAttempt]);
-
-  const handleSendMockChunk = () => {
-    const chunk = mockChunk.trim();
-    if (!chunk) return;
-
-    if (!wsRef.current || wsStatus !== 'connected') {
-      setWsError('WebSocket chưa sẵn sàng, thử kết nối lại.');
-      return;
-    }
-
-    const payload = {
-      meeting_id: meetingId,
-      chunk,
-      full_transcript: chunk,
-      source: 'mock_ui',
-    };
-
-    wsRef.current.send(JSON.stringify(payload));
-    setMockChunk('');
-    setLastWsMessage(`Đã gửi chunk ${new Date().toLocaleTimeString('vi-VN')}`);
-  };
-
-  const handleReconnect = () => {
-    wsRef.current?.close();
-    setWsAttempt(prev => prev + 1);
-  };
+  streamSessionId,
+  joinPlatform,
+  joinLink,
+  ingestStatus,
+  feedStatus,
+  wsError,
+  lastFeedMessage,
+  lastIngestAck,
+  onSendChunk,
+  onReconnect,
+}: TranscriptPanelProps) => {
+  const [localChunk, setLocalChunk] = useState('');
 
   return (
     <div className="transcript-panel transcript-panel--glass">
@@ -197,6 +271,19 @@ const LiveTranscriptPanel = ({
                 <span className="pill pill--muted">Paused</span>
               )}
             </div>
+          </div>
+
+          <div className="transcript-connection">
+            <span className="pill pill--ghost">
+              Nền tảng: {joinPlatform === 'gomeet' ? 'VNPT GoMeet' : 'Google Meet'}
+            </span>
+            <span className="pill pill--muted">Session: {streamSessionId}</span>
+            {joinLink && (
+              <a href={joinLink} target="_blank" rel="noopener noreferrer" className="pill pill--accent">
+                <LinkIcon size={12} style={{ marginRight: 6 }} />
+                Mở link cuộc họp
+              </a>
+            )}
           </div>
 
           <div className="transcript-content transcript-content--padded">
@@ -229,54 +316,58 @@ const LiveTranscriptPanel = ({
             <div className="transcript-mock-box">
               <div className="transcript-mock-box__header">
                 <div>
-                  <div className="transcript-mock-box__title">Mock raw transcript</div>
+                  <div className="transcript-mock-box__title">Raw transcript (SmartVoice / GoMeet)</div>
                   <p className="transcript-mock-box__desc">
-                    Nhập transcript thô khi chưa có STT SmartVoice. Nội dung sẽ được đẩy qua WS tới
-                    in-meeting graph.
+                    Dán transcript thô (interim/final) để đẩy vào WS ingest. Frontend sẽ nhận sự kiện realtime từ WS frontend.
                   </p>
                 </div>
-                <span className={`ws-status ws-status--${wsStatus}`}>
-                  {wsStatus === 'connected' && 'WS: Connected'}
-                  {wsStatus === 'connecting' && 'WS: Connecting'}
-                  {wsStatus === 'idle' && 'WS: Idle'}
-                  {wsStatus === 'error' && 'WS: Error'}
-                  {wsStatus === 'disabled' && 'WS: Disabled (mock)'}
-                </span>
+                <div className="ws-status-stack">
+                  <span className={`ws-status ws-status--${ingestStatus}`}>Ingest WS: {ingestStatus}</span>
+                  <span className={`ws-status ws-status--${feedStatus}`}>Frontend WS: {feedStatus}</span>
+                </div>
               </div>
 
               <textarea
-                value={mockChunk}
-                onChange={e => setMockChunk(e.target.value)}
-                placeholder="Nhập transcript raw (ví dụ: SPEAKER_01: Tôi cập nhật tiến độ Sprint 5...)"
+                value={localChunk}
+                onChange={e => setLocalChunk(e.target.value)}
+                placeholder="Dán transcript raw (ví dụ: SPEAKER_01: Tôi cập nhật tiến độ Sprint 5...)"
                 rows={3}
               />
 
-              <div className="transcript-mock-box__actions">
-                <div className="transcript-mock-box__meta">
-                  Endpoint: {wsEndpoint}
-                  <br />
-                  Payload: {'{ meeting_id, chunk, full_transcript }'}
-                </div>
+                <div className="transcript-mock-box__actions">
+                  <div className="transcript-mock-box__meta">
+                    Session ID: {streamSessionId}
+                    <br />
+                    Ingest: {`/api/v1/ws/in-meeting/${streamSessionId}`}
+                    <br />
+                    Frontend: {`/api/v1/ws/frontend/${streamSessionId}`}
+                  </div>
                 <div className="transcript-mock-box__buttons">
                   <button
                     className="btn btn--ghost btn--sm"
-                    onClick={handleReconnect}
-                    disabled={wsStatus === 'disabled'}
+                    onClick={onReconnect}
+                    disabled={ingestStatus === 'disabled' && feedStatus === 'disabled'}
                   >
                     Kết nối lại
                   </button>
                   <button
                     className="btn btn--primary btn--sm"
-                    onClick={handleSendMockChunk}
-                    disabled={mockChunk.trim().length === 0 || wsStatus !== 'connected'}
+                    onClick={() => {
+                      const chunk = localChunk.trim();
+                      if (!chunk) return;
+                      onSendChunk(chunk);
+                      setLocalChunk('');
+                    }}
+                    disabled={localChunk.trim().length === 0 || ingestStatus !== 'connected'}
                   >
-                    Gửi transcript
+                    Gửi transcript (ingest)
                   </button>
                 </div>
               </div>
 
               {wsError && <div className="transcript-mock-box__error">{wsError}</div>}
-              {lastWsMessage && <div className="transcript-mock-box__foot">{lastWsMessage}</div>}
+              {lastIngestAck && <div className="transcript-mock-box__foot">Ingest: {lastIngestAck}</div>}
+              {lastFeedMessage && <div className="transcript-mock-box__foot">Feed: {lastFeedMessage}</div>}
             </div>
           </div>
         </div>
@@ -547,4 +638,3 @@ const ToolSuggestionsPanel = () => {
 };
 
 export default InMeetTab;
-
