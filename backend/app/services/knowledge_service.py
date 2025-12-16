@@ -5,8 +5,9 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 import logging
-import re
+from pathlib import Path
 
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.schemas.knowledge import (
@@ -21,6 +22,12 @@ from app.schemas.knowledge import (
     KnowledgeQueryResponse,
 )
 from app.llm.gemini_client import GeminiChat, is_gemini_available
+from app.services.storage_client import (
+    build_object_key,
+    generate_presigned_get_url,
+    is_storage_configured,
+    upload_bytes_to_storage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +185,17 @@ def _init_mock_knowledge_docs():
 _init_mock_knowledge_docs()
 
 
+def _with_presigned_url(doc: KnowledgeDocument) -> KnowledgeDocument:
+    """Attach a fresh presigned URL if the document is stored in S3."""
+    if doc.storage_key and is_storage_configured():
+        url = generate_presigned_get_url(doc.storage_key, expires_in=3600)
+        if url:
+            doc_dict = doc.model_dump()
+            doc_dict["file_url"] = url
+            return KnowledgeDocument(**doc_dict)
+    return doc
+
+
 async def list_documents(
     db: Session,
     skip: int = 0,
@@ -199,7 +217,9 @@ async def list_documents(
     
     # Sort by uploaded_at desc
     docs.sort(key=lambda x: x.uploaded_at, reverse=True)
-    
+
+    docs = [_with_presigned_url(d) for d in docs]
+
     return KnowledgeDocumentList(
         documents=docs[skip:skip + limit],
         total=len(docs),
@@ -216,21 +236,50 @@ async def get_document(db: Session, document_id: UUID) -> Optional[KnowledgeDocu
         doc_dict["last_accessed_at"] = datetime.now()
         updated_doc = KnowledgeDocument(**doc_dict)
         _mock_knowledge_docs[str(document_id)] = updated_doc
-        return updated_doc
+        return _with_presigned_url(updated_doc)
     return None
 
 
 async def upload_document(
     db: Session,
     data: KnowledgeDocumentCreate,
+    file: Optional[UploadFile] = None,
 ) -> KnowledgeDocumentUploadResponse:
-    """Upload a new knowledge document (mock - just stores metadata)"""
+    """Upload a new knowledge document (mock metadata, real storage if configured)"""
     doc_id = uuid4()
     
-    # Generate mock file URL
     file_ext = data.file_type.lower()
+    storage_key = None
     file_url = data.file_url or f"/mock/knowledge/{doc_id}.{file_ext}"
-    
+    file_size = data.file_size or 0
+
+    # Handle actual file upload if provided
+    if file:
+        filename = file.filename or f"{doc_id}.{file_ext}"
+        content = await file.read()
+        file_size = len(content)
+
+        if is_storage_configured():
+            try:
+                object_key = build_object_key(filename, prefix="knowledge")
+                upload_bytes_to_storage(content, object_key, content_type=file.content_type)
+                storage_key = object_key
+                # Return a presigned URL so the frontend can access the private object
+                presigned_url = generate_presigned_get_url(object_key, expires_in=3600)
+                if presigned_url:
+                    file_url = presigned_url
+            except Exception as exc:
+                logger.error("Upload to storage failed, falling back to local file: %s", exc)
+
+        # Fallback to local storage if storage not configured or failed
+        if not storage_key:
+            upload_dir = Path(__file__).parent.parent / "uploaded_files"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            stored_name = f"{doc_id}.{file_ext}"
+            stored_path = upload_dir / stored_name
+            stored_path.write_bytes(content)
+            file_url = f"/files/{stored_name}"
+
     # Get uploaded_by name (mock - would query user table in production)
     uploaded_by_name = "Current User"  # Would fetch from user table
     
@@ -241,8 +290,9 @@ async def upload_document(
         document_type=data.document_type,
         source=data.source or "Uploaded",
         file_type=data.file_type,
-        file_size=data.file_size or 1024000,  # Default 1MB
+        file_size=file_size or 1024000,  # Default 1MB
         file_url=file_url,
+        storage_key=storage_key,
         tags=data.tags or [],
         category=data.category,
         uploaded_by=data.uploaded_by,
@@ -259,7 +309,7 @@ async def upload_document(
         id=doc_id,
         title=doc.title,
         file_url=file_url,
-        message="Tài liệu đã được tải lên thành công (mock)",
+        message="Tài liệu đã được tải lên thành công",
     )
 
 
@@ -329,6 +379,8 @@ async def search_documents(
     if request.tags:
         tag_set = set(t.lower() for t in request.tags)
         results = [d for d in results if d.tags and any(t.lower() in tag_set for t in d.tags)]
+
+    results = [_with_presigned_url(d) for d in results]
     
     return KnowledgeSearchResponse(
         documents=results[request.offset:request.offset + request.limit],
@@ -411,4 +463,3 @@ Yêu cầu:
         confidence=0.70,
         citations=[],
     )
-

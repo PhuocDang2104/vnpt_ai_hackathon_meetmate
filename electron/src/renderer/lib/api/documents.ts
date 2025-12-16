@@ -13,6 +13,7 @@ export interface Document {
   file_size?: number;
   description?: string;
   file_url?: string;
+  storage_key?: string;
   uploaded_by?: string;
   uploaded_at: string;
 }
@@ -36,6 +37,7 @@ export interface DocumentUploadResponse {
   id: string;
   title: string;
   file_url: string;
+  storage_key?: string;
   message: string;
 }
 
@@ -91,4 +93,3 @@ export const documentsApi = {
 };
 
 export default documentsApi;
-

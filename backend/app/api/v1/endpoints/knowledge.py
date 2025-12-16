@@ -94,7 +94,7 @@ async def upload_document(
         uploaded_by=uploaded_by,
     )
     
-    return await knowledge_service.upload_document(db, data)
+    return await knowledge_service.upload_document(db, data, file)
 
 
 @router.put("/documents/{document_id}", response_model=KnowledgeDocument)
@@ -167,4 +167,3 @@ async def get_recent_queries(
         ],
         "total": 5,
     }
-

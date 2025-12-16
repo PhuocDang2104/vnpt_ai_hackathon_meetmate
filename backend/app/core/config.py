@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     email_from_name: str = 'MeetMate AI'
     email_enabled: bool = False  # Set to True when SMTP is configured
 
+    # Supabase Storage (S3-compatible)
+    supabase_s3_endpoint: str = ''
+    supabase_s3_region: str = ''
+    supabase_s3_bucket: str = ''
+    supabase_s3_access_key: str = ''
+    supabase_s3_secret_key: str = ''
+
     model_config = SettingsConfigDict(
         env_file=find_env_file(),
         env_file_encoding='utf-8',

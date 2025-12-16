@@ -9,7 +9,14 @@ import os
 from fastapi import UploadFile
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
+from app.services.storage_client import (
+    build_object_key,
+    generate_presigned_get_url,
+    is_storage_configured,
+    upload_bytes_to_storage,
+)
 from app.schemas.document import (
     Document,
     DocumentCreate,
@@ -98,6 +105,17 @@ def _init_mock_documents():
 _init_mock_documents()
 
 
+def _with_presigned_url(doc: Document) -> Document:
+    """Attach presigned URL if stored in S3."""
+    if getattr(doc, "storage_key", None) and is_storage_configured():
+        url = generate_presigned_get_url(doc.storage_key, expires_in=3600)
+        if url:
+            doc_dict = doc.model_dump()
+            doc_dict["file_url"] = url
+            return Document(**doc_dict)
+    return doc
+
+
 async def list_documents(
     db: Session,
     meeting_id: UUID,
@@ -110,6 +128,8 @@ async def list_documents(
         if doc.meeting_id == meeting_id
     ]
     docs.sort(key=lambda x: x.uploaded_at, reverse=True)
+
+    docs = [_with_presigned_url(d) for d in docs]
     
     return DocumentList(
         documents=docs[skip:skip + limit],
@@ -131,12 +151,16 @@ async def list_all_documents(
     if project_id:
         docs = [d for d in docs if getattr(d, "project_id", None) == project_id]
     docs.sort(key=lambda x: x.uploaded_at, reverse=True)
+    docs = [_with_presigned_url(d) for d in docs]
     return DocumentList(documents=docs[skip:skip + limit], total=len(docs))
 
 
 async def get_document(db: Session, document_id: UUID) -> Optional[Document]:
     """Get a single document by ID"""
-    return _mock_documents.get(str(document_id))
+    doc = _mock_documents.get(str(document_id))
+    if doc:
+        return _with_presigned_url(doc)
+    return None
 
 
 async def upload_document(
@@ -193,23 +217,36 @@ async def upload_document_file(
     uploaded_by: Optional[UUID] = None,
     description: Optional[str] = None,
 ) -> DocumentUploadResponse:
-    """Upload a real file to local storage and register metadata (still using in-memory registry)."""
-    storage_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
-    os.makedirs(storage_dir, exist_ok=True)
+    """Upload a real file to Supabase S3 when configured, else local."""
 
     doc_id = uuid4()
     filename = file.filename or f"{doc_id}"
     file_ext = filename.split(".")[-1] if "." in filename else "bin"
-    stored_name = f"{doc_id}.{file_ext}"
-    stored_path = os.path.join(storage_dir, stored_name)
 
-    # Stream to disk
-    with open(stored_path, "wb") as out:
-        content = await file.read()
-        out.write(content)
-
+    content = await file.read()
     file_size = len(content)
-    file_url = f"/files/{stored_name}"
+    storage_key = None
+    file_url = None
+
+    if is_storage_configured():
+        try:
+            object_key = build_object_key(filename, prefix="documents")
+            upload_bytes_to_storage(content, object_key, content_type=file.content_type)
+            storage_key = object_key
+            file_url = generate_presigned_get_url(object_key, expires_in=3600)
+        except Exception as exc:
+            logger.error("Upload to storage failed, falling back to local file: %s", exc)
+
+    if not storage_key:
+        storage_dir = os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
+        os.makedirs(storage_dir, exist_ok=True)
+        stored_name = f"{doc_id}.{file_ext}"
+        stored_path = os.path.join(storage_dir, stored_name)
+        with open(stored_path, "wb") as out:
+            out.write(content)
+        file_url = f"/files/{stored_name}"
+    else:
+        logger.info("[Upload] Stored document in Supabase Storage at key=%s", storage_key)
 
     resolved_project_id = project_id
     if meeting_id and not resolved_project_id:
@@ -227,17 +264,19 @@ async def upload_document_file(
         file_size=file_size,
         description=description,
         file_url=file_url,
+        storage_key=storage_key,
         uploaded_by=uploaded_by,
         uploaded_at=datetime.now(),
     )
     _mock_documents[str(doc_id)] = doc
 
-    logger.info(f"[Upload] Stored file {filename} as {stored_name}, size={file_size} bytes")
+    logger.info(f"[Upload] Stored file {filename}, size={file_size} bytes")
 
     return DocumentUploadResponse(
         id=doc_id,
         title=filename,
         file_url=file_url,
+        storage_key=storage_key,
         message="Tải lên thành công",
     )
 

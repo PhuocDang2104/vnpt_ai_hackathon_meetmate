@@ -16,6 +16,7 @@ class DocumentBase(BaseModel):
     project_id: Optional[UUID] = None
     visibility: Optional[str] = Field(default=None, description="project|meeting|private|share")
     tags: Optional[List[str]] = None
+    storage_key: Optional[str] = None
 
 
 class DocumentCreate(DocumentBase):
@@ -55,4 +56,5 @@ class DocumentUploadResponse(BaseModel):
     id: UUID
     title: str
     file_url: str
+    storage_key: Optional[str] = None
     message: str = "Tài liệu đã được tải lên thành công"

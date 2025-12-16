@@ -8,6 +8,7 @@ export interface Document {
   file_size?: number
   description?: string
   file_url?: string
+  storage_key?: string
   uploaded_by?: UUID
   uploaded_at: string
 }
@@ -16,4 +17,3 @@ export interface DocumentListResponse {
   documents: Document[]
   total: number
 }
-

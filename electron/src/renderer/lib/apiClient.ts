@@ -56,8 +56,9 @@ async function request<T>(
   }
   
   // Build headers with auth token
+  const isFormData = init.body instanceof FormData;
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...init.headers,
   };
   

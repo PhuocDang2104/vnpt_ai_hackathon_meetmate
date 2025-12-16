@@ -41,6 +41,7 @@ class KnowledgeDocument(KnowledgeDocumentBase):
     file_type: str
     file_size: Optional[int] = None
     file_url: Optional[str] = None
+    storage_key: Optional[str] = None
     uploaded_by: Optional[UUID] = None
     uploaded_by_name: Optional[str] = None
     uploaded_at: datetime
@@ -97,4 +98,3 @@ class KnowledgeQueryResponse(BaseModel):
     relevant_documents: List[KnowledgeDocument]
     confidence: float = 0.85
     citations: Optional[List[str]] = []
-
