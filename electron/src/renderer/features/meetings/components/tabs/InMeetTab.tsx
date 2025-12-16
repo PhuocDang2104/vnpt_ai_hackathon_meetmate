@@ -49,12 +49,19 @@ export const InMeetTab = ({
   const [ingestStatus, setIngestStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
   const [feedStatus, setFeedStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
   const [lastFeedMessage, setLastFeedMessage] = useState<string | null>(null);
-  const [lastIngestAck, setLastIngestAck] = useState<string | null>(null);
   const [wsNonce, setWsNonce] = useState(0);
+  const [wsLastError, setWsLastError] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<
+    { id: string; speaker: string; text: string; time: number; isFinal: boolean }
+  >([]);
 
   const ingestRef = useRef<WebSocket | null>(null);
   const feedRef = useRef<WebSocket | null>(null);
-  const wsBase = useMemo(() => API_URL.replace(/^http/i, 'ws').replace(/\/$/, ''), []);
+  const wsBase = useMemo(() => {
+    if (API_URL.startsWith('https://')) return API_URL.replace(/^https:/i, 'wss:').replace(/\/$/, '');
+    if (API_URL.startsWith('http://')) return API_URL.replace(/^http:/i, 'ws:').replace(/\/$/, '');
+    return API_URL.replace(/\/$/, '');
+  }, []);
   const ingestEndpoint = useMemo(() => `${wsBase}/api/v1/ws/in-meeting/${streamSessionId}`, [wsBase, streamSessionId]);
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${streamSessionId}`, [wsBase, streamSessionId]);
 
@@ -85,12 +92,12 @@ export const InMeetTab = ({
     }
     setIngestStatus('connecting');
     setWsError(null);
+    setWsLastError(null);
     const socket = new WebSocket(ingestEndpoint);
     ingestRef.current = socket;
 
     socket.onopen = () => {
       setIngestStatus('connected');
-      setLastIngestAck('Đã kết nối ingest WS');
     };
     socket.onclose = () => {
       setIngestStatus(USE_API ? 'idle' : 'disabled');
@@ -99,19 +106,10 @@ export const InMeetTab = ({
       console.error('Ingest WS error', evt);
       setIngestStatus('error');
       setWsError('Không kết nối được WebSocket ingest.');
+      setWsLastError('Ingest WS error (kiểm tra host/SSL/path).');
     };
     socket.onmessage = event => {
       const payload = typeof event.data === 'string' ? event.data : '';
-      try {
-        const data = JSON.parse(payload);
-        if (data?.event === 'ingest_ack') {
-          setLastIngestAck(`Ack seq=${data.seq}`);
-          return;
-        }
-      } catch (_e) {
-        /* ignore */
-      }
-      if (payload) setLastIngestAck(payload.slice(0, 180));
     };
 
     return () => {
@@ -126,6 +124,7 @@ export const InMeetTab = ({
       return;
     }
     setFeedStatus('connecting');
+    setWsLastError(null);
     const socket = new WebSocket(feedEndpoint);
     feedRef.current = socket;
 
@@ -140,10 +139,32 @@ export const InMeetTab = ({
       console.error('Frontend WS error', evt);
       setFeedStatus('error');
       setWsError('Không kết nối được WebSocket frontend.');
+      setWsLastError('Frontend WS error (cần backend hỗ trợ WS).');
     };
     socket.onmessage = event => {
-      const preview = typeof event.data === 'string' ? event.data.slice(0, 180) : 'Đã nhận dữ liệu WS';
-      setLastFeedMessage(preview);
+      const raw = typeof event.data === 'string' ? event.data : '';
+      setLastFeedMessage(raw.slice(0, 180));
+      try {
+        const data = JSON.parse(raw);
+        if (data?.event === 'transcript_event') {
+          const p = data.payload || {};
+          setLiveTranscript(prev => {
+            const next = [
+              ...prev,
+              {
+                id: String(data.seq || Date.now()),
+                speaker: p.speaker || 'SPEAKER_01',
+                text: p.chunk || '',
+                time: p.time_start || 0,
+                isFinal: p.is_final !== false,
+              },
+            ].slice(-40);
+            return next;
+          });
+        }
+      } catch (_e) {
+        /* ignore */
+      }
     };
 
     return () => {
@@ -151,23 +172,6 @@ export const InMeetTab = ({
       feedRef.current = null;
     };
   }, [feedEndpoint, wsNonce]);
-
-  const handleSendChunk = (chunk: string) => {
-    if (!ingestRef.current || ingestStatus !== 'connected') {
-      setWsError('Ingest WS chưa sẵn sàng.');
-      return;
-    }
-    const payload = {
-      meeting_id: streamSessionId,
-      chunk,
-      full_transcript: chunk,
-      speaker: 'SPEAKER_01',
-      is_final: true,
-      source: 'ui_raw_ingest',
-    };
-    ingestRef.current.send(JSON.stringify(payload));
-    setLastIngestAck(`Đã gửi chunk ${new Date().toLocaleTimeString('vi-VN')}`);
-  };
 
   const handleReconnect = () => {
     ingestRef.current?.close();
@@ -181,6 +185,7 @@ export const InMeetTab = ({
         <div className="inmeet-column inmeet-column--main">
           <LiveTranscriptPanel
             transcript={transcript}
+            liveTranscript={liveTranscript}
             isRecording={isRecording}
             meetingId={meeting.id}
             streamSessionId={streamSessionId}
@@ -189,9 +194,8 @@ export const InMeetTab = ({
             ingestStatus={ingestStatus}
             feedStatus={feedStatus}
             wsError={wsError}
+            wsLastError={wsLastError}
             lastFeedMessage={lastFeedMessage}
-            lastIngestAck={lastIngestAck}
-            onSendChunk={handleSendChunk}
             onReconnect={handleReconnect}
           />
           <LiveRecapPanel />
@@ -213,6 +217,7 @@ export const InMeetTab = ({
 
 interface TranscriptPanelProps {
   transcript: typeof transcriptChunks;
+  liveTranscript: { id: string; speaker: string; text: string; time: number; isFinal: boolean }[];
   isRecording: boolean;
   meetingId: string;
   streamSessionId: string;
@@ -221,14 +226,14 @@ interface TranscriptPanelProps {
   ingestStatus: WsStatus;
   feedStatus: WsStatus;
   wsError: string | null;
+  wsLastError: string | null;
   lastFeedMessage: string | null;
-  lastIngestAck: string | null;
-  onSendChunk: (text: string) => void;
   onReconnect: () => void;
 }
 
 const LiveTranscriptPanel = ({
   transcript,
+  liveTranscript,
   isRecording,
   meetingId,
   streamSessionId,
@@ -237,12 +242,26 @@ const LiveTranscriptPanel = ({
   ingestStatus,
   feedStatus,
   wsError,
+  wsLastError,
   lastFeedMessage,
-  lastIngestAck,
-  onSendChunk,
   onReconnect,
 }: TranscriptPanelProps) => {
-  const [localChunk, setLocalChunk] = useState('');
+  const transcriptItems = useMemo(() => {
+    if (liveTranscript?.length) {
+      return liveTranscript.map(t => ({
+        id: t.id,
+        speakerName: t.speaker,
+        time: t.time,
+        text: t.text,
+      }));
+    }
+    return transcript.map(chunk => ({
+      id: chunk.id,
+      speakerName: chunk.speaker.displayName,
+      time: chunk.startTime,
+      text: chunk.text,
+    }));
+  }, [liveTranscript, transcript]);
 
   return (
     <div className="transcript-panel transcript-panel--glass">
@@ -287,13 +306,13 @@ const LiveTranscriptPanel = ({
           </div>
 
           <div className="transcript-content transcript-content--padded">
-            {transcript.map(chunk => (
+            {transcriptItems.map(chunk => (
               <div key={chunk.id} className="transcript-card">
-                <div className="transcript-card__avatar">{getInitials(chunk.speaker.displayName)}</div>
+                <div className="transcript-card__avatar">{getInitials(chunk.speakerName || '?')}</div>
                 <div className="transcript-card__body">
                   <div className="transcript-card__row">
-                    <span className="transcript-card__speaker">{chunk.speaker.displayName}</span>
-                    <span className="transcript-card__time">{formatDuration(chunk.startTime)}</span>
+                    <span className="transcript-card__speaker">{chunk.speakerName}</span>
+                    <span className="transcript-card__time">{formatDuration(chunk.time || 0)}</span>
                   </div>
                   <p className="transcript-card__text">{chunk.text}</p>
                 </div>
@@ -313,61 +332,69 @@ const LiveTranscriptPanel = ({
               </div>
             )}
 
-            <div className="transcript-mock-box">
-              <div className="transcript-mock-box__header">
-                <div>
-                  <div className="transcript-mock-box__title">Raw transcript (SmartVoice / GoMeet)</div>
-                  <p className="transcript-mock-box__desc">
-                    Dán transcript thô (interim/final) để đẩy vào WS ingest. Frontend sẽ nhận sự kiện realtime từ WS frontend.
-                  </p>
-                </div>
-                <div className="ws-status-stack">
-                  <span className={`ws-status ws-status--${ingestStatus}`}>Ingest WS: {ingestStatus}</span>
-                  <span className={`ws-status ws-status--${feedStatus}`}>Frontend WS: {feedStatus}</span>
-                </div>
-              </div>
-
-              <textarea
-                value={localChunk}
-                onChange={e => setLocalChunk(e.target.value)}
-                placeholder="Dán transcript raw (ví dụ: SPEAKER_01: Tôi cập nhật tiến độ Sprint 5...)"
-                rows={3}
-              />
-
-                <div className="transcript-mock-box__actions">
-                  <div className="transcript-mock-box__meta">
-                    Session ID: {streamSessionId}
-                    <br />
-                    Ingest: {`/api/v1/ws/in-meeting/${streamSessionId}`}
-                    <br />
-                    Frontend: {`/api/v1/ws/frontend/${streamSessionId}`}
-                  </div>
-                <div className="transcript-mock-box__buttons">
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    onClick={onReconnect}
-                    disabled={ingestStatus === 'disabled' && feedStatus === 'disabled'}
+      <div className="transcript-status-bar">
+              {(() => {
+                const color = (status: WsStatus) => {
+                  if (status === 'connected') return 'var(--success)';
+                  if (status === 'connecting') return 'var(--warning)';
+                  if (status === 'error') return 'var(--error)';
+                  return 'var(--text-muted)';
+                };
+                return (
+                  <style>
+                    {`
+                    .ws-chip {
+                      background: var(--bg-subtle);
+                      border: 1px solid var(--border-subtle);
+                      color: var(--text-primary);
+                    }
+                    .ws-chip.ws-chip--connected { border-color: ${color('connected')}; color: ${color('connected')}; }
+                    .ws-chip.ws-chip--connecting { border-color: ${color('connecting')}; color: ${color('connecting')}; }
+                    .ws-chip.ws-chip--error { border-color: ${color('error')}; color: ${color('error')}; }
+                    .ws-chip.ws-chip--idle { border-color: ${color('idle')}; color: ${color('idle')}; }
+                    `}
+                  </style>
+                );
+              })()}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  padding: '10px',
+                  background: 'var(--bg-elevated)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Kết nối WS</span>
+                  <span
+                    className={`pill ws-chip ws-chip--${ingestStatus}`}
+                    style={{ padding: '6px 10px', minWidth: 120, textAlign: 'center' }}
                   >
-                    Kết nối lại
-                  </button>
-                  <button
-                    className="btn btn--primary btn--sm"
-                    onClick={() => {
-                      const chunk = localChunk.trim();
-                      if (!chunk) return;
-                      onSendChunk(chunk);
-                      setLocalChunk('');
-                    }}
-                    disabled={localChunk.trim().length === 0 || ingestStatus !== 'connected'}
+                    Ingest · {ingestStatus}
+                  </span>
+                  <span
+                    className={`pill ws-chip ws-chip--${feedStatus}`}
+                    style={{ padding: '6px 10px', minWidth: 120, textAlign: 'center' }}
                   >
-                    Gửi transcript (ingest)
-                  </button>
+                    Frontend · {feedStatus}
+                  </span>
                 </div>
+                <button
+                  className="btn btn--primary btn--sm"
+                  onClick={onReconnect}
+                  disabled={ingestStatus === 'disabled' && feedStatus === 'disabled'}
+                  style={{ minWidth: 140 }}
+                >
+                  Kết nối lại
+                </button>
               </div>
-
-              {wsError && <div className="transcript-mock-box__error">{wsError}</div>}
-              {lastIngestAck && <div className="transcript-mock-box__foot">Ingest: {lastIngestAck}</div>}
-              {lastFeedMessage && <div className="transcript-mock-box__foot">Feed: {lastFeedMessage}</div>}
+              {wsError && <div className="ws-status-error" style={{ marginTop: 8 }}>{wsError}</div>}
+              {wsLastError && <div className="ws-status-foot" style={{ marginTop: 4 }}>{wsLastError}</div>}
+              {lastFeedMessage && <div className="ws-status-foot" style={{ marginTop: 4 }}>Feed: {lastFeedMessage}</div>}
             </div>
           </div>
         </div>
