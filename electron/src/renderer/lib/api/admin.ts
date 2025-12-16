@@ -4,6 +4,7 @@ import { Document, DocumentListResponse } from '../../shared/dto/document'
 import { Meeting, MeetingUpdate, MeetingWithParticipants } from '../../shared/dto/meeting'
 import { ActionItemListResponse, ActionItemResponse, ActionItemUpdate } from '../../shared/dto/actionItem'
 import { RegisterResponse } from './auth'
+import { Project, ProjectListResponse } from '../../shared/dto/project'
 
 // Users
 export const adminListUsers = (params?: { skip?: number; limit?: number; search?: string; department_id?: string }) =>
@@ -56,4 +57,11 @@ export const adminUpdateActionItem = (itemId: string, data: ActionItemUpdate) =>
 
 export const adminDeleteActionItem = (itemId: string) =>
   api.delete<void>(`/admin/action-items/${itemId}`)
+
+// Projects
+export const adminListProjects = (params?: { skip?: number; limit?: number; search?: string; department_id?: string; organization_id?: string }) =>
+  api.get<ProjectListResponse>('/projects', params)
+
+export const adminCreateProject = (data: { name: string; code?: string; description?: string; organization_id?: string; department_id?: string }) =>
+  api.post<Project>('/projects', data)
 

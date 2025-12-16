@@ -23,7 +23,8 @@ def list_all_action_items(
     status: Optional[str] = None,
     priority: Optional[str] = None,
     owner_user_id: Optional[str] = None,
-    overdue_only: bool = False
+    overdue_only: bool = False,
+    project_id: Optional[str] = None
 ) -> ActionItemList:
     """List all action items with optional filters"""
     conditions = []
@@ -41,6 +42,9 @@ def list_all_action_items(
     if overdue_only:
         conditions.append("ai.deadline < :now AND ai.status != 'completed'")
         params['now'] = datetime.utcnow()
+    if project_id:
+        conditions.append("ai.project_id = :project_id")
+        params['project_id'] = project_id
     
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
     
@@ -184,14 +188,22 @@ def create_action_item(db: Session, data: ActionItemCreate) -> ActionItemRespons
     """Create a new action item"""
     item_id = str(uuid4())
     now = datetime.utcnow()
+    project_id = None
+
+    # inherit project_id from meeting if available
+    if data.meeting_id:
+        res = db.execute(text("SELECT project_id::text FROM meeting WHERE id = :mid"), {'mid': data.meeting_id})
+        row = res.fetchone()
+        if row:
+            project_id = row[0]
     
     query = text("""
         INSERT INTO action_item (
-            id, meeting_id, owner_user_id, description, deadline, priority, 
+            id, meeting_id, project_id, owner_user_id, description, deadline, priority, 
             status, source_text, external_task_link, created_at, updated_at
         )
         VALUES (
-            :id, :meeting_id, :owner_user_id, :description, :deadline, :priority,
+            :id, :meeting_id, :project_id, :owner_user_id, :description, :deadline, :priority,
             :status, :source_text, :external_task_link, :created_at, :updated_at
         )
         RETURNING id::text
@@ -200,6 +212,7 @@ def create_action_item(db: Session, data: ActionItemCreate) -> ActionItemRespons
     db.execute(query, {
         'id': item_id,
         'meeting_id': data.meeting_id,
+        'project_id': project_id,
         'owner_user_id': data.owner_user_id,
         'description': data.description,
         'deadline': data.deadline,

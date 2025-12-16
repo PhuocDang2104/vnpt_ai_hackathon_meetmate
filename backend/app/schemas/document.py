@@ -13,6 +13,9 @@ class DocumentBase(BaseModel):
     file_type: str = Field(description="pdf, docx, xlsx, pptx, etc.")
     file_size: Optional[int] = None
     description: Optional[str] = None
+    project_id: Optional[UUID] = None
+    visibility: Optional[str] = Field(default=None, description="project|meeting|private|share")
+    tags: Optional[List[str]] = None
 
 
 class DocumentCreate(DocumentBase):

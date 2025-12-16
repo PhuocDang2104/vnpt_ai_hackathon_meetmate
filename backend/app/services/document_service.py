@@ -30,6 +30,7 @@ def _init_mock_documents():
         {
             "id": UUID("e0000001-0000-0000-0000-000000000001"),
             "meeting_id": UUID("c0000001-0000-0000-0000-000000000001"),
+            "project_id": None,
             "title": "Core Banking Q4 2024 - Project Status Report.pdf",
             "file_type": "pdf",
             "file_size": 2048000,
@@ -41,6 +42,7 @@ def _init_mock_documents():
         {
             "id": UUID("e0000002-0000-0000-0000-000000000002"),
             "meeting_id": UUID("c0000001-0000-0000-0000-000000000001"),
+            "project_id": None,
             "title": "Budget Review - Core Banking.xlsx",
             "file_type": "xlsx",
             "file_size": 512000,
@@ -52,6 +54,7 @@ def _init_mock_documents():
         {
             "id": UUID("e0000003-0000-0000-0000-000000000003"),
             "meeting_id": UUID("c0000001-0000-0000-0000-000000000001"),
+            "project_id": None,
             "title": "Risk Assessment Matrix.pptx",
             "file_type": "pptx",
             "file_size": 1024000,
@@ -63,6 +66,7 @@ def _init_mock_documents():
         {
             "id": UUID("e0000004-0000-0000-0000-000000000004"),
             "meeting_id": UUID("c0000002-0000-0000-0000-000000000002"),
+            "project_id": None,
             "title": "Sprint 23 - User Stories.pdf",
             "file_type": "pdf",
             "file_size": 768000,
@@ -74,6 +78,7 @@ def _init_mock_documents():
         {
             "id": UUID("e0000005-0000-0000-0000-000000000005"),
             "meeting_id": UUID("c0000002-0000-0000-0000-000000000002"),
+            "project_id": None,
             "title": "Mobile App Wireframes v2.3.pdf",
             "file_type": "pdf",
             "file_size": 3072000,
@@ -115,6 +120,7 @@ async def list_documents(
 async def list_all_documents(
     db: Session,
     meeting_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> DocumentList:
@@ -122,6 +128,8 @@ async def list_all_documents(
     docs = list(_mock_documents.values())
     if meeting_id:
         docs = [d for d in docs if d.meeting_id == meeting_id]
+    if project_id:
+        docs = [d for d in docs if getattr(d, "project_id", None) == project_id]
     docs.sort(key=lambda x: x.uploaded_at, reverse=True)
     return DocumentList(documents=docs[skip:skip + limit], total=len(docs))
 
@@ -137,6 +145,17 @@ async def upload_document(
 ) -> DocumentUploadResponse:
     """Upload a new document (mock - just stores metadata)"""
     doc_id = uuid4()
+    project_id = data.project_id
+
+    # If meeting_id provided but project_id missing, inherit from meeting
+    if data.meeting_id and not project_id:
+        res = db.execute(
+            text("SELECT project_id::text FROM meeting WHERE id = :mid"),
+            {'mid': data.meeting_id}
+        )
+        row = res.fetchone()
+        if row:
+            project_id = UUID(row[0]) if row[0] else None
     
     # Generate mock file URL
     file_ext = data.file_type.lower()
@@ -145,6 +164,7 @@ async def upload_document(
     doc = Document(
         id=doc_id,
         meeting_id=data.meeting_id,
+        project_id=project_id,
         title=data.title,
         file_type=data.file_type,
         file_size=data.file_size or 1024000,  # Default 1MB
@@ -169,6 +189,7 @@ async def upload_document_file(
     db: Session,
     file: UploadFile,
     meeting_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     uploaded_by: Optional[UUID] = None,
     description: Optional[str] = None,
 ) -> DocumentUploadResponse:
@@ -190,9 +211,17 @@ async def upload_document_file(
     file_size = len(content)
     file_url = f"/files/{stored_name}"
 
+    resolved_project_id = project_id
+    if meeting_id and not resolved_project_id:
+        res = db.execute(text("SELECT project_id::text FROM meeting WHERE id = :mid"), {'mid': meeting_id})
+        row = res.fetchone()
+        if row:
+            resolved_project_id = UUID(row[0]) if row[0] else None
+
     doc = Document(
         id=doc_id,
         meeting_id=meeting_id or UUID("00000000-0000-0000-0000-000000000000"),
+        project_id=resolved_project_id,
         title=filename,
         file_type=file_ext,
         file_size=file_size,

@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.api.v1.endpoints import (
     auth,
     admin,
+    projects,
     users,
     meetings,
     documents,
@@ -54,6 +55,7 @@ app.add_middleware(
 app.include_router(health.router, prefix=f"{settings.api_v1_prefix}/health", tags=['health'])
 app.include_router(auth.router, prefix=f"{settings.api_v1_prefix}/auth", tags=['auth'])
 app.include_router(admin.router, prefix=f"{settings.api_v1_prefix}/admin", tags=['admin'])
+app.include_router(projects.router, prefix=f"{settings.api_v1_prefix}/projects", tags=['projects'])
 app.include_router(users.router, prefix=f"{settings.api_v1_prefix}/users", tags=['users'])
 app.include_router(meetings.router, prefix=f"{settings.api_v1_prefix}/meetings", tags=['meetings'])
 app.include_router(documents.router, prefix=f"{settings.api_v1_prefix}/documents", tags=['documents'])

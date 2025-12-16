@@ -9,6 +9,8 @@ import { Meeting } from '../../shared/dto/meeting'
 import { ActionItemResponse } from '../../shared/dto/actionItem'
 import { uploadFile as uploadDocumentFile } from '../../lib/api/documents'
 import { API_URL } from '../../config/env'
+import { adminListProjects, adminCreateProject } from '../../lib/api/admin'
+import { Project } from '../../shared/dto/project'
 
 const roles: User['role'][] = ['admin', 'PMO', 'chair', 'user']
 const actionStatuses = ['proposed', 'confirmed', 'in_progress', 'completed', 'cancelled']
@@ -39,6 +41,7 @@ const AdminConsole = () => {
   const [docs, setDocs] = useState<Document[]>([])
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [actions, setActions] = useState<ActionItemResponse[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [creatingUser, setCreatingUser] = useState<{ email: string; password: string; display_name: string; role: User['role'] }>({
     email: '',
@@ -48,6 +51,7 @@ const AdminConsole = () => {
   })
   const [uploading, setUploading] = useState(false)
   const [uploadMeta, setUploadMeta] = useState<{ meeting_id?: string; description?: string }>({})
+  const [creatingProject, setCreatingProject] = useState<{ name: string; code?: string; description?: string }>({ name: '' })
 
   const loadAll = async () => {
     setLoading(true)
@@ -57,11 +61,13 @@ const AdminConsole = () => {
         adminListDocuments({ limit: 50 }),
         adminListMeetings({ limit: 50 }),
         adminListActionItems({ overdue_only: false }),
+        adminListProjects({ limit: 100 }),
       ])
       setUsers(u.users)
       setDocs(d.documents)
       setMeetings(m)
       setActions(a.items)
+      setProjects((await adminListProjects({ limit: 100 })).projects)
     } finally {
       setLoading(false)
     }
@@ -75,6 +81,13 @@ const AdminConsole = () => {
 
   const handleRoleChange = async (userId: string, role: User['role']) => {
     await adminUpdateUserRole(userId, role)
+    await loadAll()
+  }
+
+  const handleCreateProject = async () => {
+    if (!creatingProject.name) return
+    await adminCreateProject(creatingProject)
+    setCreatingProject({ name: '', code: '', description: '' })
     await loadAll()
   }
 
@@ -236,6 +249,32 @@ const AdminConsole = () => {
               </span>
               <span>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '--'}</span>
               <span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Projects */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <div className="admin-card__icon"><FolderOpen size={18} /></div>
+          <div className="admin-card__title">Projects</div>
+        </div>
+        <div className="admin-inline-form">
+          <input placeholder="Name" value={creatingProject.name} onChange={e => setCreatingProject({ ...creatingProject, name: e.target.value })} />
+          <input placeholder="Code" value={creatingProject.code || ''} onChange={e => setCreatingProject({ ...creatingProject, code: e.target.value || undefined })} />
+          <input placeholder="Description" value={creatingProject.description || ''} onChange={e => setCreatingProject({ ...creatingProject, description: e.target.value || undefined })} />
+          <button className="btn btn-xs" onClick={handleCreateProject}>Create</button>
+        </div>
+        <div className="admin-table">
+          <div className="admin-table__head" style={{ gridTemplateColumns: '1.2fr 1fr 1.6fr' }}>
+            <span>Name</span><span>Code</span><span>Description</span>
+          </div>
+          {projects.map(p => (
+            <div className="admin-table__row" key={p.id} style={{ gridTemplateColumns: '1.2fr 1fr 1.6fr' }}>
+              <span>{p.name}</span>
+              <span>{p.code || '--'}</span>
+              <span>{p.description || '--'}</span>
             </div>
           ))}
         </div>

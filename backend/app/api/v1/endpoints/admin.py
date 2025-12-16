@@ -111,19 +111,27 @@ def admin_create_user(
 @router.get('/documents', response_model=DocumentList)
 async def admin_list_documents(
     meeting_id: str | None = None,
+    project_id: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
     """Admin: list all documents (mock storage)"""
     meeting_uuid = None
+    project_uuid = None
     if meeting_id:
         try:
             from uuid import UUID
             meeting_uuid = UUID(meeting_id)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid meeting_id")
-    return await document_service.list_all_documents(db, meeting_uuid, skip, limit)
+    if project_id:
+        try:
+            from uuid import UUID
+            project_uuid = UUID(project_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project_id")
+    return await document_service.list_all_documents(db, meeting_uuid, project_uuid, skip, limit)
 
 
 @router.get('/documents/{document_id}', response_model=Document)
@@ -226,6 +234,7 @@ def admin_list_action_items(
     priority: str | None = None,
     owner_user_id: str | None = None,
     overdue_only: bool = False,
+    project_id: str | None = None,
     db: Session = Depends(get_db)
 ):
     """Admin: list all action items with filters"""
@@ -235,6 +244,7 @@ def admin_list_action_items(
         priority=priority,
         owner_user_id=owner_user_id,
         overdue_only=overdue_only,
+        project_id=project_id,
     )
 
 

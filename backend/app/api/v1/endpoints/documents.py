@@ -61,6 +61,7 @@ async def upload_document(
 @router.post("/upload-file", response_model=DocumentUploadResponse)
 async def upload_document_file(
     meeting_id: str | None = Form(default=None),
+    project_id: str | None = Form(default=None),
     uploaded_by: str | None = Form(default=None),
     description: str | None = Form(default=None),
     file: UploadFile = File(...),
@@ -76,6 +77,11 @@ async def upload_document_file(
             meeting_uuid = UUID(meeting_id)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid meeting_id")
+    if project_id:
+        try:
+            project_uuid = UUID(project_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid project_id")
     if uploaded_by:
         try:
             uploaded_by_uuid = UUID(uploaded_by)
@@ -86,6 +92,7 @@ async def upload_document_file(
         db=db,
         file=file,
         meeting_id=meeting_uuid,
+        project_id=project_uuid,
         uploaded_by=uploaded_by_uuid,
         description=description,
     )
