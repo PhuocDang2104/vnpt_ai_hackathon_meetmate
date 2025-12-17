@@ -475,7 +475,7 @@ async def upload_document(
                 )
             db.commit()
     except Exception as exc:
-        logger.error("Auto-embed failed: %s", exc)
+        logger.error("Auto-embed failed: %s", exc, exc_info=True)
     
     return KnowledgeDocumentUploadResponse(
         id=doc_id,
