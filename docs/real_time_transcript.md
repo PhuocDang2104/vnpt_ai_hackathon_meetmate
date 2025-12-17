@@ -80,8 +80,13 @@ ACK:
 Chạy script: `backend/tests/test_ingest_ws.py` (chỉnh `WS_URL` và `session_id` theo môi trường).
 
 ### 3.2 Stream audio (production)
-Bạn có thể dùng bridge (GoMeet/Google Meet) hoặc chạy script mẫu: `backend/tests/test_audio_ws.py`.
+Bạn có thể dùng bridge (GoMeet/Google Meet) hoặc chạy script mẫu:
+- `backend/tests/test_audio_ws.py` (end-to-end: mở `WS /ws/frontend` để in ra `transcript_event/state`)
+- `backend/tests/test_audio_ingest_ws.py` (quick check: chỉ test `WS /ws/audio` và log `audio_start_ack`/error)
 Script đọc WAV PCM 16kHz mono và stream vào `WS /ws/audio`, đồng thời mở `WS /ws/frontend` để in ra event.
+
+Gợi ý dùng file mẫu sẵn có:
+- `backend/tests/resources/eLabs-1.wav` (mono 16-bit, 44.1kHz). Script sẽ **tự resample về 16kHz** trước khi stream.
 
 ---
 

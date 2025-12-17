@@ -42,6 +42,16 @@ class SmartVoiceResult:
     speaker: str = "SPEAKER_01"
 
 
+def is_smartvoice_configured() -> bool:
+    if not settings.smartvoice_grpc_endpoint:
+        return False
+    if settings.smartvoice_access_token:
+        return True
+    if settings.smartvoice_auth_url and settings.smartvoice_token_id and settings.smartvoice_token_key:
+        return True
+    return False
+
+
 def _duration_to_seconds(duration: Any) -> float:
     seconds = float(getattr(duration, "seconds", 0) or 0.0)
     nanos = float(getattr(duration, "nanos", 0) or 0.0)

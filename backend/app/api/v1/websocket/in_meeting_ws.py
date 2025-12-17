@@ -18,7 +18,7 @@ from app.services.in_meeting_persistence import (
 from app.services.realtime_bus import session_bus
 from app.services.realtime_ingest import ingestTranscript
 from app.services.realtime_session_store import session_store
-from app.services.smartvoice_streaming import SmartVoiceStreamingConfig, stream_recognize
+from app.services.smartvoice_streaming import SmartVoiceStreamingConfig, is_smartvoice_configured, stream_recognize
 
 router = APIRouter()
 langgraph_workers: Dict[str, asyncio.Task] = {}
@@ -142,7 +142,10 @@ async def _langgraph_consumer(session_id: str, queue: asyncio.Queue) -> None:
             if not is_final and not force:
                 continue
             state = _build_state_from_payload(session_id, payload)
-            result = agent.run_with_scheduler(state, force=force)
+            try:
+                result = agent.run_with_scheduler(state, force=force)
+            except Exception:
+                continue
             if result is None:
                 continue
             _persist_state_outputs(result)
@@ -276,6 +279,14 @@ async def audio_ingest(websocket: WebSocket, session_id: str):
         await websocket.close(code=1003)
         return
 
+    stt_param = (websocket.query_params.get("stt") or "").strip().lower()
+    if stt_param in {"0", "false", "off", "no"}:
+        stt_enabled = False
+    elif stt_param in {"1", "true", "on", "yes"}:
+        stt_enabled = True
+    else:
+        stt_enabled = is_smartvoice_configured()
+
     await _safe_send_json(
         websocket,
         send_lock,
@@ -287,22 +298,41 @@ async def audio_ingest(websocket: WebSocket, session_id: str):
                 "sample_rate_hz": expected.sample_rate_hz,
                 "channels": expected.channels,
             },
+            "stt_enabled": stt_enabled,
         },
     )
 
-    audio_queue: asyncio.Queue[Optional[bytes]] = asyncio.Queue(maxsize=50)
+    audio_queue: asyncio.Queue[Optional[bytes]] | None = None
     audio_clock = _AudioClock(sample_rate_hz=expected.sample_rate_hz, channels=expected.channels)
-    stt_cfg = SmartVoiceStreamingConfig(
-        language_code=start_msg.language_code or session.config.language_code,
-        sample_rate_hz=expected.sample_rate_hz,
-        interim_results=session.config.interim_results,
-        enable_word_time_offsets=session.config.enable_word_time_offsets,
-    )
-    stt_task = asyncio.create_task(_smartvoice_to_bus(session_id, audio_queue, stt_cfg, audio_clock, websocket, send_lock))
+    stt_task: asyncio.Task | None = None
+    if stt_enabled:
+        audio_queue = asyncio.Queue(maxsize=50)
+        stt_cfg = SmartVoiceStreamingConfig(
+            language_code=start_msg.language_code or session.config.language_code,
+            sample_rate_hz=expected.sample_rate_hz,
+            interim_results=session.config.interim_results,
+            enable_word_time_offsets=session.config.enable_word_time_offsets,
+        )
+        stt_task = asyncio.create_task(
+            _smartvoice_to_bus(session_id, audio_queue, stt_cfg, audio_clock, websocket, send_lock)
+        )
+    else:
+        try:
+            await _safe_send_json(
+                websocket,
+                send_lock,
+                {"event": "stt_disabled", "session_id": session_id, "reason": "smartvoice_not_configured_or_disabled"},
+            )
+        except Exception:
+            pass
+
+    ingest_ok_sent = False
+    received_bytes = 0
+    received_frames = 0
 
     try:
         while True:
-            if stt_task.done():
+            if stt_task is not None and stt_task.done():
                 break
             message = await websocket.receive()
             if message.get("type") == "websocket.disconnect":
@@ -310,14 +340,33 @@ async def audio_ingest(websocket: WebSocket, session_id: str):
             if message.get("bytes") is not None:
                 chunk = message["bytes"]
                 if chunk:
-                    if audio_queue.full():
-                        suggested = min(max(start_msg.frame_ms * 2, session.config.recommended_frame_ms), session.config.max_frame_ms)
+                    received_bytes += len(chunk)
+                    received_frames += 1
+                    if not ingest_ok_sent:
+                        ingest_ok_sent = True
                         await _safe_send_json(
                             websocket,
                             send_lock,
-                            {"event": "throttle", "reason": "stt_backpressure", "suggested_frame_ms": suggested},
+                            {
+                                "event": "audio_ingest_ok",
+                                "session_id": session_id,
+                                "received_bytes": received_bytes,
+                                "received_frames": received_frames,
+                            },
                         )
-                    await audio_queue.put(chunk)
+
+                    if audio_queue is not None:
+                        if audio_queue.full():
+                            suggested = min(
+                                max(start_msg.frame_ms * 2, session.config.recommended_frame_ms),
+                                session.config.max_frame_ms,
+                            )
+                            await _safe_send_json(
+                                websocket,
+                                send_lock,
+                                {"event": "throttle", "reason": "stt_backpressure", "suggested_frame_ms": suggested},
+                            )
+                        await audio_queue.put(chunk)
                     audio_clock.advance(len(chunk))
                     session_store.touch(session_id)
                 continue
@@ -332,17 +381,19 @@ async def audio_ingest(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        try:
-            audio_queue.put_nowait(None)
-        except Exception:
+        if audio_queue is not None:
             try:
-                await audio_queue.put(None)
+                audio_queue.put_nowait(None)
             except Exception:
-                pass
-        try:
-            await asyncio.wait_for(stt_task, timeout=5)
-        except Exception:
-            stt_task.cancel()
+                try:
+                    await audio_queue.put(None)
+                except Exception:
+                    pass
+        if stt_task is not None:
+            try:
+                await asyncio.wait_for(stt_task, timeout=5)
+            except Exception:
+                stt_task.cancel()
         try:
             await websocket.close()
         except Exception:

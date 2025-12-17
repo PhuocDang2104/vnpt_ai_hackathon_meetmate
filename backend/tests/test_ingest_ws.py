@@ -1,13 +1,22 @@
 import asyncio
 import inspect
 import json
+import os
 import time
 
 import websockets
 
-HOST = "vnpt-ai-hackathon-meetmate.onrender.com"
-SESSION_ID = "c0000002-0000-0000-0000-000000000002"
-WS_URL = f"wss://{HOST}/api/v1/ws/in-meeting/{SESSION_ID}"
+HTTP_BASE = os.getenv("MEETMATE_HTTP_BASE", "http://localhost:8000").rstrip("/")
+SESSION_ID = os.getenv("MEETMATE_SESSION_ID", "c0000002-0000-0000-0000-000000000002")
+
+if HTTP_BASE.startswith("https://"):
+    WS_BASE = "wss://" + HTTP_BASE[len("https://") :]
+elif HTTP_BASE.startswith("http://"):
+    WS_BASE = "ws://" + HTTP_BASE[len("http://") :]
+else:
+    WS_BASE = HTTP_BASE
+
+WS_URL = f"{WS_BASE}/api/v1/ws/in-meeting/{SESSION_ID}"
 TOKEN = None  # "Bearer xxx" nếu cần (không bắt buộc cho PoC)
 
 
