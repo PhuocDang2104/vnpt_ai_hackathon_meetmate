@@ -22,14 +22,13 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
 );
 
 -- Chunks + embeddings
--- NOTE: using 768 dims to match model nomic-ai/nomic-embed-text-v1.5.
--- If bạn dùng model khác, đổi kích thước vector tương ứng.
+-- Using 1024 dims to match jina-embeddings-v3 (text-matching). Adjust if model changes.
 CREATE TABLE IF NOT EXISTS knowledge_chunk (
     id UUID PRIMARY KEY,
     document_id UUID REFERENCES knowledge_document(id) ON DELETE CASCADE,
     chunk_index INT,
     content TEXT NOT NULL,
-    embedding VECTOR(768) NOT NULL,
+    embedding VECTOR(1024) NOT NULL,
     lang TEXT,
     section TEXT,
     page INT,

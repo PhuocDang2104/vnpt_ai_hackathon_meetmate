@@ -1,4 +1,4 @@
--- Adjust embedding column to 768 dims for model nomic-ai/nomic-embed-text-v1.5
+-- Adjust embedding column to 1024 dims for jina-embeddings-v3 (text-matching)
 DO $$
 BEGIN
     -- Drop vector index if exists
@@ -13,7 +13,7 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'knowledge_chunk' AND column_name = 'embedding'
     ) THEN
-        EXECUTE 'ALTER TABLE knowledge_chunk ALTER COLUMN embedding TYPE vector(768)';
+        EXECUTE 'ALTER TABLE knowledge_chunk ALTER COLUMN embedding TYPE vector(1024)';
     END IF;
 
     -- Recreate ivfflat index

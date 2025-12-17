@@ -11,11 +11,17 @@ import {
   Loader2,
   Plus,
   X,
+  CheckCircle,
   MessageCircle,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
 import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
 import { API_URL } from '../../config/env'
+
+type UploadToastState = {
+  status: 'pending' | 'success' | 'error'
+  message: string
+}
 
 const KnowledgeHub = () => {
   const [query, setQuery] = useState('')
@@ -26,10 +32,18 @@ const KnowledgeHub = () => {
   const [isLoadingDocs, setIsLoadingDocs] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [isChatExpanded, setIsChatExpanded] = useState(false)
+  const [uploadToast, setUploadToast] = useState<UploadToastState | null>(null)
 
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (uploadToast && uploadToast.status !== 'pending') {
+      const timer = setTimeout(() => setUploadToast(null), 2200)
+      return () => clearTimeout(timer)
+    }
+  }, [uploadToast])
 
   const loadData = async () => {
     setIsLoadingDocs(true)
@@ -310,7 +324,35 @@ const KnowledgeHub = () => {
           setShowUploadModal(false)
           loadData()
         }}
+        onUploadProgress={(state) => setUploadToast(state)}
       />
+
+      {/* Upload toast (bottom-right) */}
+      {uploadToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            padding: '12px 14px',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            borderRadius: '12px',
+            boxShadow: '0 12px 35px rgba(0,0,0,0.28)',
+            border: '1px solid var(--border-strong)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            minWidth: 260,
+            zIndex: 9999,
+          }}
+        >
+          {uploadToast.status === 'pending' && <Loader2 size={18} className="animate-spin" />}
+          {uploadToast.status === 'success' && <CheckCircle size={18} color="var(--success)" />}
+          {uploadToast.status === 'error' && <X size={18} color="var(--danger)" />}
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>{uploadToast.message}</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -320,9 +362,10 @@ interface UploadDocumentModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  onUploadProgress?: (state: UploadToastState) => void
 }
 
-const UploadDocumentModal = ({ isOpen, onClose, onSuccess }: UploadDocumentModalProps) => {
+const UploadDocumentModal = ({ isOpen, onClose, onSuccess, onUploadProgress }: UploadDocumentModalProps) => {
   const [isUploading, setIsUploading] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [formData, setFormData] = useState({
@@ -342,6 +385,10 @@ const UploadDocumentModal = ({ isOpen, onClose, onSuccess }: UploadDocumentModal
     if (!formData.title.trim()) return
 
     setIsUploading(true)
+    onUploadProgress?.({
+      status: 'pending',
+      message: 'Đang upload và vectorizing tài liệu...',
+    })
     try {
       await knowledgeApi.upload({
         ...formData,
@@ -360,10 +407,17 @@ const UploadDocumentModal = ({ isOpen, onClose, onSuccess }: UploadDocumentModal
       })
       setSelectedFile(null)
       setTagInput('')
+      onUploadProgress?.({
+        status: 'success',
+        message: 'Upload & vector hóa hoàn tất!',
+      })
       onSuccess()
     } catch (err) {
       console.error('Upload failed:', err)
-      alert('Không thể upload tài liệu. Vui lòng thử lại.')
+      onUploadProgress?.({
+        status: 'error',
+        message: 'Không thể upload/vectorize. Vui lòng thử lại.',
+      })
     } finally {
       setIsUploading(false)
     }

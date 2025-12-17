@@ -209,7 +209,7 @@ def _row_to_doc(row) -> KnowledgeDocument:
         id=row["id"],
         title=row["title"],
         description=row.get("description"),
-        document_type="document",
+        document_type=row.get("document_type") or "document",
         source=row.get("source") or "Uploaded",
         file_type=row.get("file_type") or "pdf",
         file_size=row.get("file_size"),
@@ -230,6 +230,11 @@ def _sanitize_text(text: str) -> str:
     if not text:
         return ""
     return text.replace("\x00", "").strip()
+
+
+def _format_vector(vec: list[float]) -> str:
+    """Format embedding list to Postgres vector literal."""
+    return "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
 
 
 def _extract_pdf_text(file_bytes: bytes) -> str:
@@ -412,6 +417,7 @@ async def upload_document(
     logger.info(f"[Mock] Uploaded knowledge document: {doc.title}")
 
     # Persist metadata to DB
+    doc_persisted = False
     try:
         db.execute(
             text(
@@ -449,11 +455,14 @@ async def upload_document(
             },
         )
         db.commit()
+        doc_persisted = True
     except Exception as exc:
         logger.error("Failed to persist knowledge_document to DB: %s", exc)
 
     # Auto-embed and store chunks if HF is available
     try:
+        if not doc_persisted:
+            raise RuntimeError("knowledge_document row not persisted; skip embedding to avoid FK errors")
         text_content = ""
         # If original file content is available, try decode
         try:
@@ -564,11 +573,104 @@ async def delete_document(db: Session, document_id: UUID) -> bool:
     return False
 
 
+def _build_vector_filters(request: KnowledgeSearchRequest):
+    filters = ["1=1"]
+    params = {
+        "chunk_limit": max(request.limit * 4, 20),
+    }
+    if request.source:
+        filters.append("kd.source = :source")
+        params["source"] = request.source
+    if request.category:
+        filters.append("kd.category = :category")
+        params["category"] = request.category
+    # Tags filter kept simple: intersects
+    if request.tags:
+        filters.append("kd.tags && :tags")
+        params["tags"] = request.tags
+    return " AND ".join(filters), params
+
+
+async def _vector_search_documents(
+    db: Session,
+    request: KnowledgeSearchRequest,
+) -> Optional[KnowledgeSearchResponse]:
+    """Search using pgvector; returns None on failure."""
+    if not is_jina_available():
+        return None
+    try:
+        query_vec = embed_texts([_sanitize_text(request.query)])[0]
+        vec_literal = _format_vector(query_vec)
+
+        where_clause, params = _build_vector_filters(request)
+        params.update(
+            {
+                "query_vec": vec_literal,
+                "offset": request.offset,
+            }
+        )
+
+        rows = db.execute(
+            text(
+                f"""
+                SELECT
+                    kd.id,
+                    kd.title,
+                    kd.description,
+                    kd.source,
+                    kd.category,
+                    kd.tags,
+                    kd.file_type,
+                    kd.file_size,
+                    kd.storage_key,
+                    kd.file_url,
+                    kd.created_at,
+                    kd.updated_at,
+                    kd.document_type,
+                    (kc.embedding <=> CAST(:query_vec AS vector)) AS distance
+                FROM knowledge_chunk kc
+                JOIN knowledge_document kd ON kc.document_id = kd.id
+                WHERE {where_clause}
+                ORDER BY distance ASC
+                LIMIT :chunk_limit
+                """
+            ),
+            params,
+        ).mappings().all()
+
+        if not rows:
+            return None
+
+        # Deduplicate by document, keep best distance
+        doc_best = {}
+        for r in rows:
+            doc_id = r["id"]
+            dist = r["distance"]
+            if doc_id not in doc_best or dist < doc_best[doc_id]["distance"]:
+                doc_best[doc_id] = {"row": r, "distance": dist}
+
+        ordered = sorted(doc_best.values(), key=lambda x: x["distance"])
+        ordered = ordered[request.offset : request.offset + request.limit]
+
+        docs = [_with_presigned_url(_row_to_doc(item["row"])) for item in ordered]
+        total = len(doc_best)
+        return KnowledgeSearchResponse(documents=docs, total=total, query=request.query)
+    except Exception as exc:
+        logger.error("Vector search failed, fallback to text: %s", exc, exc_info=True)
+        return None
+
+
 async def search_documents(
     db: Session,
     request: KnowledgeSearchRequest,
 ) -> KnowledgeSearchResponse:
-    """Search documents by query string"""
+    """Vector search first; fallback to simple text search."""
+    # Vector search using Jina embedding + pgvector
+    vector_result = await _vector_search_documents(db, request)
+    if vector_result:
+        return vector_result
+
+    # Fallback to text search
     try:
         conditions = ["1=1"]
         params = {
@@ -590,7 +692,7 @@ async def search_documents(
                 f"""
                 SELECT id, title, description, source, category, tags,
                        file_type, file_size, storage_key, file_url,
-                       created_at, updated_at
+                       created_at, updated_at, document_type
                 FROM knowledge_document
                 WHERE {where_clause}
                 ORDER BY created_at DESC NULLS LAST
@@ -652,73 +754,129 @@ async def query_knowledge_ai(
     db: Session,
     request: KnowledgeQueryRequest,
 ) -> KnowledgeQueryResponse:
-    """Query knowledge base using AI"""
-    
-    # Get relevant documents
-    relevant_docs = []
-    if request.include_documents:
-        search_req = KnowledgeSearchRequest(
-            query=request.query,
-            limit=request.limit,
-        )
-        search_result = await search_documents(db, search_req)
-        relevant_docs = search_result.documents[:request.limit]
-    
-    # Build context from documents
+    """RAG query using pgvector + Groq"""
+    top_k_chunks = max(request.limit * 3, 12)
+    chunks = []
+    relevant_docs: List[KnowledgeDocument] = []
+    citations: List[str] = []
+    best_score = None
+
+    if is_jina_available():
+        try:
+            query_vec = embed_texts([_sanitize_text(request.query)])[0]
+            vec_literal = _format_vector(query_vec)
+
+            where_clause, params = _build_vector_filters(
+                KnowledgeSearchRequest(
+                    query=request.query,
+                    limit=top_k_chunks,
+                    offset=0,
+                    source=None,
+                    category=None,
+                    tags=None,
+                )
+            )
+            params.update({"query_vec": vec_literal, "top_k": top_k_chunks})
+
+            rows = db.execute(
+                text(
+                    f"""
+                    SELECT
+                        kd.id,
+                        kd.title,
+                        kd.description,
+                        kd.source,
+                        kd.category,
+                        kd.tags,
+                        kd.file_type,
+                        kd.file_size,
+                        kd.storage_key,
+                        kd.file_url,
+                        kd.created_at,
+                        kd.updated_at,
+                        kd.document_type,
+                        kc.content,
+                        kc.chunk_index,
+                        (kc.embedding <=> CAST(:query_vec AS vector)) AS distance
+                    FROM knowledge_chunk kc
+                    JOIN knowledge_document kd ON kc.document_id = kd.id
+                    WHERE {where_clause}
+                    ORDER BY distance ASC
+                    LIMIT :top_k
+                    """
+                ),
+                params,
+            ).mappings().all()
+
+            # Dedup docs and collect top chunks
+            doc_best = {}
+            for r in rows:
+                doc_id = r["id"]
+                dist = r["distance"]
+                if doc_id not in doc_best or dist < doc_best[doc_id]["distance"]:
+                    doc_best[doc_id] = {"row": r, "distance": dist}
+                chunks.append(
+                    {
+                        "doc_id": doc_id,
+                        "title": r["title"],
+                        "distance": dist,
+                        "text": _sanitize_text(r["content"])[:800],
+                    }
+                )
+
+            ordered_docs = sorted(doc_best.values(), key=lambda x: x["distance"])
+            relevant_docs = [_with_presigned_url(_row_to_doc(item["row"])) for item in ordered_docs[: request.limit]]
+            citations = [d.title for d in relevant_docs]
+            best_score = ordered_docs[0]["distance"] if ordered_docs else None
+        except Exception as exc:
+            logger.error("RAG query vector path failed: %s", exc, exc_info=True)
+
+    # Build context
     context_parts = []
-    for doc in relevant_docs:
-        context_parts.append(f"Tài liệu: {doc.title}")
-        if doc.description:
-            context_parts.append(f"Mô tả: {doc.description}")
-        if doc.tags:
-            context_parts.append(f"Tags: {', '.join(doc.tags)}")
-        context_parts.append(f"Nguồn: {doc.source}")
-        context_parts.append("")
-    
-    context = "\n".join(context_parts) if context_parts else "Không có tài liệu liên quan."
-    
-    # Use AI to generate answer
+    for ch in chunks[: top_k_chunks]:
+        context_parts.append(f"[{ch['title']} | score={ch['distance']:.3f}] {ch['text']}")
+    context = "\n".join(context_parts) if context_parts else "Không có ngữ cảnh liên quan."
+
+    # Call Groq LLM
     if is_gemini_available():
         try:
-            chat = GeminiChat()
-            prompt = f"""Dựa trên knowledge base sau, trả lời câu hỏi: {request.query}
+            chat = GeminiChat(
+                system_prompt=(
+                    "Bạn là trợ lý RAG. Trả lời ngắn gọn bằng tiếng Việt. "
+                    "Chỉ dùng thông tin trong Context. Nếu thiếu thông tin, nói rõ."
+                )
+            )
+            prompt = f"""Câu hỏi: {request.query}
 
-KNOWLEDGE BASE:
+Context (top chunks):
 {context}
 
 Yêu cầu:
-- Trả lời ngắn gọn, chính xác
-- KHÔNG sử dụng markdown (không dùng **, ##)
-- KHÔNG chào hỏi
-- Nếu có thông tin trong knowledge base, trích dẫn tài liệu cụ thể
-- Nếu không có thông tin, nói rõ "Tôi không tìm thấy thông tin này trong knowledge base"
-"""
+- Trả lời ngắn gọn, không markdown.
+- Nếu dùng thông tin, nêu rõ tên tài liệu trong ngoặc [].
+- Nếu không đủ thông tin, trả lời rằng không đủ dữ liệu."""
             answer = await chat.chat(prompt)
-            
-            # Extract citations from answer
-            citations = []
-            for doc in relevant_docs:
-                if doc.title.lower() in answer.lower():
-                    citations.append(doc.title)
-            
+            confidence = 0.90 if relevant_docs else 0.60
+            if best_score is not None:
+                confidence = max(0.5, min(0.98, 1 - float(best_score)))
             return KnowledgeQueryResponse(
                 answer=answer,
                 relevant_documents=relevant_docs,
-                confidence=0.90 if relevant_docs else 0.60,
+                confidence=confidence,
                 citations=citations,
             )
-        except Exception as e:
-            logger.error(f"AI query error: {e}")
-    
+        except Exception as exc:
+            logger.error("Groq query failed: %s", exc)
+
     # Fallback response
     if relevant_docs:
-        answer = f"Dựa trên knowledge base, tôi tìm thấy {len(relevant_docs)} tài liệu liên quan: {', '.join([d.title for d in relevant_docs[:3]])}"
+        answer = f"Tìm thấy {len(relevant_docs)} tài liệu liên quan: {', '.join([d.title for d in relevant_docs[:3]])}"
     else:
-        answer = "Tôi không tìm thấy thông tin liên quan trong knowledge base."
-    
+        answer = "Không tìm thấy thông tin liên quan trong knowledge base."
+
     return KnowledgeQueryResponse(
         answer=answer,
         relevant_documents=relevant_docs,
         confidence=0.70,
-        citations=[],
+        citations=citations,
     )
