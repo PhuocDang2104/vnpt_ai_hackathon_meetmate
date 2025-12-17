@@ -24,7 +24,7 @@ from app.schemas.knowledge import (
     KnowledgeQueryResponse,
 )
 from app.llm.gemini_client import GeminiChat, is_gemini_available
-from app.llm.clients.hf_embed import embed_texts, is_hf_available
+from app.llm.clients.jina_embed import embed_texts, is_jina_available
 from app.vectorstore.pgvector_client import PgVectorClient
 from app.services.storage_client import (
     build_object_key,
@@ -450,7 +450,7 @@ async def upload_document(
             text_content = "\n".join(text_parts)
 
         chunks = _chunk_text(text_content) if text_content else []
-        if chunks and is_hf_available():
+        if chunks and is_jina_available():
             embeddings = embed_texts(chunks)
             for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
                 emb_literal = "[" + ",".join(str(x) for x in emb) + "]"
