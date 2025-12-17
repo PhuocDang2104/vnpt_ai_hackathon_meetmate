@@ -16,6 +16,8 @@ export interface KnowledgeDocument {
   file_url?: string;
   tags?: string[];
   category?: string;
+   meeting_id?: string;
+   project_id?: string;
   uploaded_by?: string;
   uploaded_by_name?: string;
   uploaded_at: string;

@@ -578,12 +578,42 @@ async def update_document(
     document_id: UUID,
     data: KnowledgeDocumentUpdate,
 ) -> Optional[KnowledgeDocument]:
-    """Update a document"""
+    """Update a document (DB first, fallback mock)"""
+    update_data = data.model_dump(exclude_unset=True)
+    # Try DB
+    try:
+        params = {"id": str(document_id)}
+        fields = []
+        for field in ["title", "description", "category", "tags", "meeting_id", "project_id"]:
+            if field in update_data and update_data[field] is not None:
+                params[field] = update_data[field]
+                fields.append(f"{field} = :{field}")
+        if fields:
+            set_clause = ", ".join(fields + ["updated_at = now()"])
+            row = db.execute(
+                text(
+                    f"""
+                    UPDATE knowledge_document
+                    SET {set_clause}
+                    WHERE id = :id
+                    RETURNING id, title, description, source, category, tags,
+                              file_type, file_size, storage_key, file_url,
+                              created_at, updated_at, NULL::text AS document_type
+                    """
+                ),
+                params,
+            ).mappings().first()
+            if row:
+                db.commit()
+                return _with_presigned_url(_row_to_doc(row))
+    except Exception as exc:
+        logger.warning("DB update_document failed, fallback to mock: %s", exc)
+
+    # Fallback mock
     doc = _mock_knowledge_docs.get(str(document_id))
     if not doc:
         return None
     
-    update_data = data.model_dump(exclude_unset=True)
     doc_dict = doc.model_dump()
     doc_dict.update(update_data)
     

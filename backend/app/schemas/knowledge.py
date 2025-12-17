@@ -35,6 +35,8 @@ class KnowledgeDocumentUpdate(BaseModel):
     description: Optional[str] = None
     tags: Optional[List[str]] = None
     category: Optional[str] = None
+    meeting_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
 
 
 class KnowledgeDocument(KnowledgeDocumentBase):

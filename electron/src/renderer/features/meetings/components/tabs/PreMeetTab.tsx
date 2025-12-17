@@ -1016,10 +1016,14 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+  const [showSelect, setShowSelect] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadNotification, setUploadNotification] = useState<{ type: 'info' | 'warning' | 'success'; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [availableDocs, setAvailableDocs] = useState<KnowledgeDocument[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadDocuments();
@@ -1030,6 +1034,9 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
     try {
       const result = await knowledgeApi.list({ limit: 20, meeting_id: meetingId });
       setDocuments(result.documents);
+      // preload available docs for selection
+      const allDocs = await knowledgeApi.list({ limit: 50 });
+      setAvailableDocs(allDocs.documents);
     } catch (err) {
       console.error('Failed to load documents:', err);
     } finally {
@@ -1147,6 +1154,14 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
         >
           {showUpload ? <X size={14} /> : <Upload size={14} />}
         </button>
+        <button 
+          className="btn btn--ghost btn--sm" 
+          onClick={() => setShowSelect(true)}
+          title="Chọn tài liệu có sẵn"
+          style={{ marginLeft: 8 }}
+        >
+          <Search size={14} />
+        </button>
       </div>
 
       {/* Upload Notification */}
@@ -1251,6 +1266,72 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
           </div>
         )}
       </div>
+
+      {/* Select existing document modal */}
+      {showSelect && (
+        <div className="upload-modal-overlay" onClick={() => setShowSelect(false)}>
+          <div className="upload-modal" onClick={e => e.stopPropagation()}>
+            <div className="upload-modal__header">
+              <div className="upload-modal__header-content">
+                <div className="upload-modal__icon">
+                  <Search size={20} />
+                </div>
+                <div>
+                  <h2 className="upload-modal__title">Chọn tài liệu có sẵn</h2>
+                  <p className="upload-modal__subtitle">Thêm tài liệu đã có trong hệ thống vào cuộc họp</p>
+                </div>
+              </div>
+              <button className="upload-modal__close" onClick={() => setShowSelect(false)} type="button">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="upload-modal__body">
+              <input
+                type="text"
+                className="upload-field__input"
+                placeholder="Tìm kiếm theo tên..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+              <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {availableDocs
+                  .filter(d => d.title.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map((doc) => (
+                    <div key={doc.id} className="tool-card tool-card--compact" style={{ justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <FileText size={14} />
+                        <div>
+                          <div className="tool-card__title">{doc.title}</div>
+                          <div className="tool-card__detail" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {doc.source} • {doc.file_type?.toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn--primary btn--sm"
+                        disabled={isSelecting}
+                        onClick={async () => {
+                          setIsSelecting(true);
+                          try {
+                            await knowledgeApi.update(doc.id, { meeting_id: meetingId });
+                            setShowSelect(false);
+                            loadDocuments();
+                          } catch (err) {
+                            console.error('Attach doc failed', err);
+                          } finally {
+                            setIsSelecting(false);
+                          }
+                        }}
+                      >
+                        {isSelecting ? <Loader2 size={14} className="animate-spin" /> : 'Thêm vào cuộc họp'}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

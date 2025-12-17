@@ -14,11 +14,9 @@ import {
   Globe,
 } from 'lucide-react'
 import { currentUser } from '../../store/mockData'
+import { getStoredUser } from '../../lib/api/auth'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { languageNames, languageFlags, type Language } from '../../i18n'
-
-// Settings storage key
-const SETTINGS_KEY = 'meetmate_settings'
 
 interface UserSettings {
   displayName: string
@@ -55,9 +53,17 @@ const defaultSettings: UserSettings = {
 }
 
 const Settings = () => {
-  const [settings, setSettings] = useState<UserSettings>(defaultSettings)
+  const activeUser = getStoredUser() || currentUser
+  const SETTINGS_KEY = `meetmate_settings_${activeUser.id}`
+
+  const [settings, setSettings] = useState<UserSettings>({
+    ...defaultSettings,
+    displayName: activeUser.displayName,
+    department: activeUser.department,
+  })
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
   const { language, setLanguage, t } = useLanguage()
 
   // Load settings from localStorage
@@ -82,6 +88,7 @@ const Settings = () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       setSaveMessage('Đã lưu thành công!')
       setTimeout(() => setSaveMessage(null), 3000)
+      setIsEditingProfile(false)
     } catch (err) {
       console.error('Failed to save settings:', err)
       setSaveMessage('Lỗi khi lưu. Vui lòng thử lại.')
@@ -135,7 +142,7 @@ const Settings = () => {
           <button 
             className="btn btn--primary" 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !isEditingProfile}
           >
             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             Lưu thay đổi
@@ -151,6 +158,13 @@ const Settings = () => {
               <User size={18} className="card__title-icon" />
               Thông tin cá nhân
             </h3>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setIsEditingProfile((v) => !v)}
+              type="button"
+            >
+              {isEditingProfile ? 'Khóa chỉnh sửa' : 'Chỉnh sửa'}
+            </button>
           </div>
           <div className="card__body">
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', marginBottom: 'var(--space-lg)' }}>
@@ -166,13 +180,19 @@ const Settings = () => {
                 fontWeight: 700,
                 color: 'var(--bg-base)'
               }}>
-                {settings.displayName.split(' ').slice(-1)[0][0]}
+                {(settings.displayName || activeUser.displayName || '?')
+                  .trim()
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(-1)[0]
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
               <div>
                 <div style={{ fontSize: '16px', fontWeight: 600 }}>{settings.displayName}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{currentUser.email}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{activeUser.email}</div>
                 <span className="badge badge--accent" style={{ marginTop: 'var(--space-xs)' }}>
-                  {currentUser.role}
+                  {activeUser.role}
                 </span>
               </div>
             </div>
@@ -186,6 +206,7 @@ const Settings = () => {
                   type="text" 
                   value={settings.displayName}
                   onChange={e => setSettings(prev => ({ ...prev, displayName: e.target.value }))}
+                  disabled={!isEditingProfile}
                   style={{
                     width: '100%',
                     padding: 'var(--space-sm) var(--space-md)',
@@ -203,7 +224,7 @@ const Settings = () => {
                 </label>
                 <input 
                   type="email" 
-                  defaultValue={currentUser.email}
+                  defaultValue={activeUser.email}
                   disabled
                   style={{
                     width: '100%',
@@ -224,6 +245,7 @@ const Settings = () => {
                   type="text" 
                   value={settings.department}
                   onChange={e => setSettings(prev => ({ ...prev, department: e.target.value }))}
+                  disabled={!isEditingProfile}
                   style={{
                     width: '100%',
                     padding: 'var(--space-sm) var(--space-md)',
