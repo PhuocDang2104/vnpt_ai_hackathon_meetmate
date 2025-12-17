@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import logging
 from pathlib import Path
 from sqlalchemy import text
+import json
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ from app.schemas.knowledge import (
     KnowledgeQueryResponse,
 )
 from app.llm.gemini_client import GeminiChat, is_gemini_available
+from app.llm.clients.hf_embed import embed_texts, is_hf_available
 from app.vectorstore.pgvector_client import PgVectorClient
 from app.services.storage_client import (
     build_object_key,
@@ -219,6 +221,19 @@ def _row_to_doc(row) -> KnowledgeDocument:
         view_count=0,
         last_accessed_at=row.get("updated_at"),
     )
+def _chunk_text(text: str, max_len: int = 1200, overlap: int = 200) -> list[str]:
+    """Greedy chunk by characters with overlap."""
+    chunks = []
+    start = 0
+    n = len(text)
+    while start < n:
+        end = min(n, start + max_len)
+        chunk = text[start:end]
+        chunks.append(chunk)
+        if end == n:
+            break
+        start = end - overlap
+    return [c.strip() for c in chunks if c.strip()]
 
 
 async def list_documents(
@@ -416,6 +431,51 @@ async def upload_document(
         db.commit()
     except Exception as exc:
         logger.error("Failed to persist knowledge_document to DB: %s", exc)
+
+    # Auto-embed and store chunks if HF is available
+    try:
+        text_content = ""
+        # If original file content is available, try decode
+        try:
+            if file and "content" in locals() and content:
+                text_content = content.decode("utf-8", errors="ignore")
+        except Exception:
+            text_content = ""
+
+        if not text_content:
+            # Fallback: use description/title
+            text_parts = [doc.title]
+            if doc.description:
+                text_parts.append(doc.description)
+            text_content = "\n".join(text_parts)
+
+        chunks = _chunk_text(text_content) if text_content else []
+        if chunks and is_hf_available():
+            embeddings = embed_texts(chunks)
+            for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+                emb_literal = "[" + ",".join(str(x) for x in emb) + "]"
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO knowledge_chunk (
+                            id, document_id, chunk_index, content, embedding, created_at
+                        )
+                        VALUES (
+                            :id, :document_id, :chunk_index, :content, :embedding::vector, now()
+                        )
+                        """
+                    ),
+                    {
+                        "id": str(uuid4()),
+                        "document_id": str(doc_id),
+                        "chunk_index": idx,
+                        "content": chunk,
+                        "embedding": emb_literal,
+                    },
+                )
+            db.commit()
+    except Exception as exc:
+        logger.error("Auto-embed failed: %s", exc)
     
     return KnowledgeDocumentUploadResponse(
         id=doc_id,
