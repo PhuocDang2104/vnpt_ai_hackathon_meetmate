@@ -30,11 +30,13 @@ async def list_documents(
     document_type: Optional[str] = None,
     source: Optional[str] = None,
     category: Optional[str] = None,
+    meeting_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
 ):
     """List all knowledge documents with optional filters"""
     return await knowledge_service.list_documents(
-        db, skip, limit, document_type, source, category
+        db, skip, limit, document_type, source, category, meeting_id, project_id
     )
 
 
@@ -63,6 +65,8 @@ async def upload_document(
     category: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
     uploaded_by: Optional[UUID] = Form(None),
+    meeting_id: Optional[UUID] = Form(None),
+    project_id: Optional[UUID] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -92,6 +96,8 @@ async def upload_document(
         category=category,
         tags=tag_list,
         uploaded_by=uploaded_by,
+        meeting_id=meeting_id,
+        project_id=project_id,
     )
     
     return await knowledge_service.upload_document(db, data, file)

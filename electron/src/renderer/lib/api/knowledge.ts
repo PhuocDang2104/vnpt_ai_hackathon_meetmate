@@ -39,6 +39,8 @@ export interface KnowledgeDocumentCreate {
   tags?: string[];
   uploaded_by?: string;
   file_url?: string;
+  meeting_id?: string;
+  project_id?: string;
 }
 
 export interface KnowledgeSearchRequest {
@@ -47,6 +49,8 @@ export interface KnowledgeSearchRequest {
   source?: string;
   category?: string;
   tags?: string[];
+  meeting_id?: string;
+  project_id?: string;
   limit?: number;
   offset?: number;
 }
@@ -62,6 +66,8 @@ export interface KnowledgeQueryRequest {
   include_documents?: boolean;
   include_meetings?: boolean;
   limit?: number;
+  meeting_id?: string;
+  project_id?: string;
 }
 
 export interface KnowledgeQueryResponse {
@@ -88,6 +94,8 @@ export const knowledgeApi = {
     document_type?: string;
     source?: string;
     category?: string;
+    meeting_id?: string;
+    project_id?: string;
   }): Promise<KnowledgeDocumentList> => {
     return api.get<KnowledgeDocumentList>(`${ENDPOINT}/documents`, params);
   },
@@ -114,6 +122,8 @@ export const knowledgeApi = {
     if (data.category) formData.append('category', data.category);
     if (data.tags && data.tags.length > 0) formData.append('tags', data.tags.join(','));
     if (data.uploaded_by) formData.append('uploaded_by', data.uploaded_by);
+    if (data.meeting_id) formData.append('meeting_id', data.meeting_id);
+    if (data.project_id) formData.append('project_id', data.project_id);
     if (file) formData.append('file', file);
 
     // Use fetch directly for FormData
@@ -173,4 +183,3 @@ export const knowledgeApi = {
 };
 
 export default knowledgeApi;
-

@@ -22,6 +22,8 @@ class KnowledgeDocumentCreate(KnowledgeDocumentBase):
     file_type: str = Field(description="pdf, docx, xlsx, pptx, etc.")
     file_size: Optional[int] = None
     uploaded_by: Optional[UUID] = None
+    meeting_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
     # For mock: we won't actually store file, just metadata
     file_url: Optional[str] = None
     content_text: Optional[str] = None  # Extracted text for search
@@ -73,6 +75,8 @@ class KnowledgeSearchRequest(BaseModel):
     source: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
+    meeting_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
     limit: int = 20
     offset: int = 0
 
@@ -90,6 +94,8 @@ class KnowledgeQueryRequest(BaseModel):
     include_documents: bool = True
     include_meetings: bool = True
     limit: int = 5
+    meeting_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
 
 
 class KnowledgeQueryResponse(BaseModel):

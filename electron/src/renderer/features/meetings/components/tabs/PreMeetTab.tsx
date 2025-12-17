@@ -31,9 +31,9 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
-import { aiApi } from '../../../../lib/api/ai';
+import { knowledgeApi } from '../../../../lib/api/knowledge';
 import { agendaApi, type AgendaItem, type AgendaItemCreate } from '../../../../lib/api/agenda';
-import { documentsApi, type Document } from '../../../../lib/api/documents';
+import { knowledgeApi, type KnowledgeDocument } from '../../../../lib/api/knowledge';
 
 interface PreMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -1014,7 +1014,7 @@ const ParticipantsPanel = ({ meeting, onRefresh }: { meeting: MeetingWithPartici
 // DOCUMENTS PANEL - With drag & drop upload
 // ============================================
 const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -1029,7 +1029,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
   const loadDocuments = async () => {
     setIsLoading(true);
     try {
-      const result = await documentsApi.listByMeeting(meetingId);
+      const result = await knowledgeApi.list({ limit: 20, meeting_id: meetingId });
       setDocuments(result.documents);
     } catch (err) {
       console.error('Failed to load documents:', err);
@@ -1065,7 +1065,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
     handleFiles(files);
   };
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
     // Validate file types
@@ -1082,18 +1082,38 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
     }
 
     setUploadedFiles(validFiles);
-    
-    // Show notification that upload is pending
-    setUploadNotification({
-      type: 'info',
-      message: `Đã chọn ${validFiles.length} tài liệu. Hệ thống hiện chưa nhận được tài liệu từ người dùng. Tính năng upload đang được phát triển.`
-    });
 
-    // Auto-clear after 5 seconds
-    setTimeout(() => {
-      setUploadNotification(null);
-      setUploadedFiles([]);
-    }, 5000);
+    try {
+      for (const file of validFiles) {
+        await knowledgeApi.upload(
+          {
+            title: file.name.replace(/\.[^/.]+$/, ''),
+            document_type: 'document',
+            source: 'Meeting',
+            file_type: (file.name.split('.').pop() || 'pdf'),
+            file_size: file.size,
+            meeting_id: meetingId,
+          },
+          file
+        );
+      }
+      setUploadNotification({
+        type: 'success',
+        message: `Đã upload ${validFiles.length} tài liệu và vector hóa.`,
+      });
+      loadDocuments();
+    } catch (err) {
+      console.error('Upload knowledge doc failed:', err);
+      setUploadNotification({
+        type: 'warning',
+        message: 'Upload thất bại, thử lại sau.',
+      });
+    } finally {
+      setTimeout(() => {
+        setUploadNotification(null);
+        setUploadedFiles([]);
+      }, 4000);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -1280,11 +1300,15 @@ const AIAssistantPanel = ({ meetingId }: { meetingId: string }) => {
     setIsLoading(true);
 
     try {
-      const result = await aiApi.sendMessage(messageText, meetingId);
+      const result = await knowledgeApi.query({
+        query: messageText,
+        limit: 5,
+        meeting_id: meetingId,
+      });
       const aiMessage: ChatMessage = {
         id: `msg-${Date.now()}-ai`,
         role: 'ai',
-        content: result.message,
+        content: result.answer,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);

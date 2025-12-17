@@ -284,6 +284,8 @@ async def list_documents(
     document_type: Optional[str] = None,
     source: Optional[str] = None,
     category: Optional[str] = None,
+    meeting_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
 ) -> KnowledgeDocumentList:
     """List all knowledge documents with optional filters"""
     try:
@@ -295,6 +297,12 @@ async def list_documents(
         if category:
             conditions.append("category = :category")
             params["category"] = category
+        if meeting_id:
+            conditions.append("meeting_id = :meeting_id")
+            params["meeting_id"] = str(meeting_id)
+        if project_id:
+            conditions.append("project_id = :project_id")
+            params["project_id"] = str(project_id)
 
         where_clause = " AND ".join(conditions)
         rows = db.execute(
@@ -465,8 +473,8 @@ async def upload_document(
                 "storage_key": doc.storage_key,
                 "file_url": doc.file_url,
                 "org_id": None,
-                "project_id": None,
-                "meeting_id": None,
+                "project_id": str(data.project_id) if data.project_id else None,
+                "meeting_id": str(data.meeting_id) if data.meeting_id else None,
                 "visibility": None,
             },
         )
@@ -511,10 +519,11 @@ async def upload_document(
                     text(
                         """
                         INSERT INTO knowledge_chunk (
-                            id, document_id, chunk_index, content, embedding, created_at
+                            id, document_id, chunk_index, content, embedding, scope_meeting, scope_project, created_at
                         )
                         VALUES (
-                            :id, :document_id, :chunk_index, :content, CAST(:embedding AS vector), now()
+                            :id, :document_id, :chunk_index, :content, CAST(:embedding AS vector),
+                            :scope_meeting, :scope_project, now()
                         )
                         """
                     ),
@@ -524,6 +533,8 @@ async def upload_document(
                         "chunk_index": idx,
                         "content": chunk,
                         "embedding": emb_literal,
+                        "scope_meeting": str(data.meeting_id) if getattr(data, "meeting_id", None) else None,
+                        "scope_project": str(data.project_id) if getattr(data, "project_id", None) else None,
                     },
                 )
             db.commit()
@@ -604,6 +615,12 @@ def _build_vector_filters(request: KnowledgeSearchRequest):
     if request.tags:
         filters.append("kd.tags && :tags")
         params["tags"] = request.tags
+    if getattr(request, "meeting_id", None):
+        filters.append("COALESCE(kd.meeting_id, kc.scope_meeting) = :meeting_id")
+        params["meeting_id"] = str(request.meeting_id)
+    if getattr(request, "project_id", None):
+        filters.append("COALESCE(kd.project_id, kc.scope_project) = :project_id")
+        params["project_id"] = str(request.project_id)
     return " AND ".join(filters), params
 
 
@@ -701,6 +718,12 @@ async def search_documents(
         if request.category:
             conditions.append("category = :category")
             params["category"] = request.category
+        if request.meeting_id:
+            conditions.append("meeting_id = :meeting_id")
+            params["meeting_id"] = str(request.meeting_id)
+        if request.project_id:
+            conditions.append("project_id = :project_id")
+            params["project_id"] = str(request.project_id)
 
         where_clause = " AND ".join(conditions)
         rows = db.execute(
@@ -801,6 +824,8 @@ async def query_knowledge_ai(
                     source=None,
                     category=None,
                     tags=None,
+                    meeting_id=request.meeting_id,
+                    project_id=request.project_id,
                 )
             )
             params.update({"query_vec": vec_literal, "top_k": top_k_chunks})
@@ -866,10 +891,33 @@ async def query_knowledge_ai(
 
     # If no context at all, avoid repeating 'Không đủ dữ liệu', give gentle ask for clarification
     if not context_parts:
+        # Try giving a gentle, generic answer using Groq (no RAG context)
+        if is_gemini_available():
+            try:
+                chat = GeminiChat(
+                    system_prompt=(
+                        "Bạn là trợ lý thân thiện. Trả lời ngắn gọn, tiếng Việt. "
+                        "Không bịa quá đà; nếu không chắc, hãy nói rõ."
+                    )
+                )
+                prompt = f"""Câu hỏi: {request.query}
+Hiện chưa tìm thấy tài liệu phù hợp trong hệ thống.
+Hãy:
+- Nói rõ chưa có tài liệu khớp và đề nghị người dùng mô tả thêm.
+- Sau đó đưa ra gợi ý chung (mang tính kiến thức nền, có thể không chính xác tuyệt đối)."""
+                answer = await chat.chat(prompt)
+                return KnowledgeQueryResponse(
+                    answer=answer,
+                    relevant_documents=[],
+                    confidence=0.35,
+                    citations=[],
+                )
+            except Exception as exc:
+                logger.error("Groq generic fallback failed: %s", exc)
         return KnowledgeQueryResponse(
-            answer="Mình chưa tìm thấy tài liệu liên quan. Bạn mô tả rõ hơn chủ đề hoặc tên tài liệu nhé?",
+            answer="Mình chưa thấy tài liệu liên quan. Bạn mô tả rõ hơn chủ đề/tên tài liệu nhé? Nếu cần, mình có thể gợi ý chung.",
             relevant_documents=[],
-            confidence=0.4,
+            confidence=0.3,
             citations=[],
         )
 
