@@ -38,8 +38,6 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
             payload["dimensions"] = int(JINA_EMBED_DIM)
         except ValueError:
             pass
-    # ensure encoding format float for pgvector
-    payload["encoding_format"] = "float"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {JINA_API_KEY}",
