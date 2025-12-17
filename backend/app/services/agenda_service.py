@@ -31,11 +31,7 @@ _mock_agendas: dict[str, AgendaItem] = {}
 settings = get_settings()
 
 # Groq availability
-try:
-    GROQ_AVAILABLE = bool(settings.groq_api_key)
-except Exception as e:
-    logger.warning(f"Groq not available: {e}")
-    GROQ_AVAILABLE = False
+GROQ_AVAILABLE = bool(getattr(settings, "groq_api_key", ""))
 
 
 def _init_mock_agendas():
@@ -261,14 +257,14 @@ async def generate_agenda_ai(
     db: Session,
     request: AgendaGenerateRequest,
 ) -> AgendaGenerateResponse:
-    """Generate agenda using Gemini AI"""
+    """Generate agenda using Groq LLM"""
     
-    if not GEMINI_AVAILABLE:
-        logger.warning("Gemini not available, returning mock agenda")
+    if not GROQ_AVAILABLE:
+        logger.warning("Groq not available, returning mock agenda")
         return _generate_mock_agenda(request)
     
     try:
-        model = genai.GenerativeModel(settings.gemini_model)
+        client = Groq(api_key=settings.groq_api_key)
         
         # Build prompt
         prompt = f"""Bạn là AI assistant chuyên tạo agenda cho cuộc họp doanh nghiệp.
@@ -303,8 +299,16 @@ Trả về JSON theo format:
 
 Chỉ trả về JSON, không có text khác."""
 
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
+        resp = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {"role": "system", "content": "Bạn là trợ lý PMO, trả lời tiếng Việt, không markdown."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=settings.ai_temperature,
+            max_tokens=settings.ai_max_tokens,
+        )
+        response_text = resp.choices[0].message.content.strip()
         
         # Clean up response - remove markdown code blocks if present
         if response_text.startswith("```"):
@@ -344,7 +348,7 @@ Chỉ trả về JSON, không có text khác."""
         )
         
     except Exception as e:
-        logger.error(f"Gemini error: {e}")
+        logger.error(f"Groq error: {e}")
         return _generate_mock_agenda(request)
 
 
