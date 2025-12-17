@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from sqlalchemy import text
 import json
+import io
+import pdfplumber
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -228,6 +230,17 @@ def _sanitize_text(text: str) -> str:
     if not text:
         return ""
     return text.replace("\x00", "").strip()
+
+
+def _extract_pdf_text(file_bytes: bytes) -> str:
+    """Extract text from PDF bytes using pdfplumber."""
+    try:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            pages = [p.extract_text() or "" for p in pdf.pages]
+        return "\n".join(pages)
+    except Exception as exc:
+        logger.error("PDF extract failed: %s", exc)
+        return ""
 def _chunk_text(text: str, max_len: int = 1200, overlap: int = 200) -> list[str]:
     """Greedy chunk by characters with overlap."""
     chunks = []
@@ -445,7 +458,11 @@ async def upload_document(
         # If original file content is available, try decode
         try:
             if file and "content" in locals() and content:
-                text_content = _sanitize_text(content.decode("utf-8", errors="ignore"))
+                # If PDF, extract text via pdfplumber
+                if file_ext == "pdf":
+                    text_content = _sanitize_text(_extract_pdf_text(content))
+                else:
+                    text_content = _sanitize_text(content.decode("utf-8", errors="ignore"))
         except Exception:
             text_content = ""
 
@@ -459,6 +476,9 @@ async def upload_document(
         chunks = _chunk_text(text_content) if text_content else []
         if chunks and is_jina_available():
             chunks = [_sanitize_text(c) for c in chunks if _sanitize_text(c)]
+            # skip if still empty
+            if not chunks:
+                raise ValueError("No valid text chunks to embed (maybe binary/pdf without extraction)")
             embeddings = embed_texts(chunks)
             for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
                 emb_literal = "[" + ",".join(str(x) for x in emb) + "]"
@@ -469,7 +489,7 @@ async def upload_document(
                             id, document_id, chunk_index, content, embedding, created_at
                         )
                         VALUES (
-                            :id, :document_id, :chunk_index, :content, :embedding::vector, now()
+                            :id, :document_id, :chunk_index, :content, CAST(:embedding AS vector), now()
                         )
                         """
                     ),
