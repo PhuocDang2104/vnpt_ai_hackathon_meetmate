@@ -23,8 +23,11 @@ logger = logging.getLogger(__name__)
 def _slugify_filename(name: str) -> str:
     """Make a safe-ish filename segment."""
     name = name.strip().lower()
-    name = re.sub(r'[^a-z0-9\\-_.]+', '-', name)
-    name = re.sub(r'-{2,}', '-', name).strip('-')
+    # Replace any char not alnum, dot, dash, underscore with hyphen
+    name = re.sub(r'[^a-z0-9._-]+', '-', name)
+    # Collapse multiple hyphens
+    name = re.sub(r'-{2,}', '-', name)
+    name = name.strip('-_.')
     return name or "file"
 
 
