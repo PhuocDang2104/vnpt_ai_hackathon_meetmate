@@ -1,6 +1,7 @@
 from . import (
     auth,
     users,
+    sessions,
     meetings,
     documents,
     agenda,
@@ -22,6 +23,7 @@ from . import (
 __all__ = [
     'auth',
     'users',
+    'sessions',
     'meetings',
     'documents',
     'agenda',

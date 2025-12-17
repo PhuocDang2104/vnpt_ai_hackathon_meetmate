@@ -27,7 +27,13 @@ class SessionEventBus:
         subscribers.discard(queue)
         if not subscribers:
             self.subscribers.pop(session_id, None)
-            self.seq_counter.pop(session_id, None)
+            # Keep seq_counter to preserve monotonic ordering even if all clients disconnect.
+            # A session can be explicitly cleaned up by calling `clear_session()`.
+
+    def clear_session(self, session_id: str) -> None:
+        """Remove all subscribers and reset seq counter for a session (explicit cleanup)."""
+        self.subscribers.pop(session_id, None)
+        self.seq_counter.pop(session_id, None)
 
     def _next_seq(self, session_id: str) -> int:
         self.seq_counter[session_id] = self.seq_counter.get(session_id, 0) + 1

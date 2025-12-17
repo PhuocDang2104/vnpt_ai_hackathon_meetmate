@@ -1,36 +1,47 @@
 import asyncio
+import json
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.core.realtime_security import verify_audio_ingest_token
 from app.db.session import SessionLocal
 from app.llm.agents.in_meeting_agent import InMeetingAgent
 from app.llm.graphs.state import MeetingState
 from app.models.meeting import Meeting
+from app.schemas.realtime import AudioStartMessage
 from app.services.in_meeting_persistence import (
-    persist_transcript,
     persist_topic_segment,
     persist_adr,
     persist_tool_suggestions,
 )
-from app.services.session_event_bus import SessionEventBus
+from app.services.realtime_bus import session_bus
+from app.services.realtime_ingest import ingestTranscript
+from app.services.realtime_session_store import session_store
+from app.services.smartvoice_streaming import SmartVoiceStreamingConfig, stream_recognize
 
 router = APIRouter()
-session_bus = SessionEventBus()
 langgraph_workers: Dict[str, asyncio.Task] = {}
-transcript_buffers: Dict[str, str] = {}
-state_versions: Dict[str, int] = {}
 project_cache: Dict[str, Optional[str]] = {}
 
 
-def _update_transcript_buffer(session_id: str, text: str, max_chars: int = 4000) -> str:
-    if not text:
-        return transcript_buffers.get(session_id, "")
-    combined = f"{transcript_buffers.get(session_id, '')}\n{text}".strip()
-    if len(combined) > max_chars:
-        combined = combined[-max_chars:]
-    transcript_buffers[session_id] = combined
-    return combined
+class _AudioClock:
+    def __init__(self, sample_rate_hz: int, channels: int, bytes_per_sample: int = 2) -> None:
+        self.sample_rate_hz = sample_rate_hz
+        self.channels = channels
+        self.bytes_per_sample = bytes_per_sample
+        self.total_samples = 0
+
+    def advance(self, byte_len: int) -> None:
+        if byte_len <= 0 or self.sample_rate_hz <= 0 or self.channels <= 0:
+            return
+        samples = byte_len // (self.bytes_per_sample * self.channels)
+        self.total_samples += max(0, int(samples))
+
+    def now_s(self) -> float:
+        if self.sample_rate_hz <= 0:
+            return 0.0
+        return float(self.total_samples) / float(self.sample_rate_hz)
 
 
 def _resolve_project_id(meeting_id: Optional[str]) -> Optional[str]:
@@ -73,6 +84,8 @@ def _persist_state_outputs(result: Dict[str, Any]) -> None:
 def _build_state_from_payload(session_id: str, payload: Dict[str, Any]) -> MeetingState:
     meeting_id = payload.get("meeting_id") or session_id
     project_id = payload.get("project_id") or _resolve_project_id(meeting_id)
+    sess = session_store.get(session_id)
+    transcript_window = payload.get("transcript_window") or (sess.transcript_buffer if sess else "")
     seg = {
         "text": payload.get("chunk") or payload.get("text") or "",
         "time_start": payload.get("time_start", 0.0),
@@ -89,8 +102,8 @@ def _build_state_from_payload(session_id: str, payload: Dict[str, Any]) -> Meeti
         "project_id": project_id,
         "sla": "realtime",
         "vnpt_segment": seg,
-        "transcript_window": payload.get("transcript_window") or seg["text"],
-        "full_transcript": payload.get("full_transcript") or transcript_buffers.get(session_id, ""),
+        "transcript_window": transcript_window or seg["text"],
+        "full_transcript": transcript_window or "",
         "last_user_question": payload.get("question"),
         "actions": payload.get("actions", []),
         "decisions": payload.get("decisions", []),
@@ -101,12 +114,12 @@ def _build_state_from_payload(session_id: str, payload: Dict[str, Any]) -> Meeti
 
 
 async def _publish_state_event(session_id: str, state: Dict[str, Any]) -> None:
-    state_versions[session_id] = state_versions.get(session_id, 0) + 1
+    version = session_store.next_state_version(session_id)
     await session_bus.publish(
         session_id,
         {
             "event": "state",
-            "version": state_versions[session_id],
+            "version": version,
             "payload": state,
         },
     )
@@ -123,8 +136,13 @@ async def _langgraph_consumer(session_id: str, queue: asyncio.Queue) -> None:
             if event.get("event") != "transcript_event":
                 continue
             payload = event.get("payload") or {}
+            is_final = payload.get("is_final", True)
+            force = bool(payload.get("question"))
+            # For ADR/recap extraction, prefer running on FINAL chunks; allow question-triggered tick.
+            if not is_final and not force:
+                continue
             state = _build_state_from_payload(session_id, payload)
-            result = agent.run_with_scheduler(state, force=bool(payload.get("question")))
+            result = agent.run_with_scheduler(state, force=force)
             if result is None:
                 continue
             _persist_state_outputs(result)
@@ -134,8 +152,6 @@ async def _langgraph_consumer(session_id: str, queue: asyncio.Queue) -> None:
     finally:
         session_bus.unsubscribe(session_id, queue)
         langgraph_workers.pop(session_id, None)
-        transcript_buffers.pop(session_id, None)
-        state_versions.pop(session_id, None)
 
 
 def _ensure_langgraph_worker(session_id: str) -> None:
@@ -146,10 +162,198 @@ def _ensure_langgraph_worker(session_id: str) -> None:
     langgraph_workers[session_id] = asyncio.create_task(_langgraph_consumer(session_id, queue))
 
 
+async def _safe_send_json(websocket: WebSocket, lock: asyncio.Lock, payload: Dict[str, Any]) -> None:
+    async with lock:
+        await websocket.send_json(payload)
+
+
+async def _smartvoice_to_bus(
+    session_id: str,
+    audio_queue: "asyncio.Queue[Optional[bytes]]",
+    cfg: SmartVoiceStreamingConfig,
+    audio_clock: _AudioClock,
+    websocket: WebSocket,
+    send_lock: asyncio.Lock,
+) -> None:
+    last_end = 0.0
+    try:
+        async for res in stream_recognize(audio_queue, cfg):
+            time_end = res.time_end if res.time_end is not None else audio_clock.now_s()
+            time_start = res.time_start if res.time_start is not None else last_end
+            if time_end < time_start:
+                time_end = time_start
+            last_end = time_end
+
+            transcript_payload: Dict[str, Any] = {
+                "meeting_id": session_id,
+                "chunk": res.text,
+                "speaker": res.speaker or "SPEAKER_01",
+                "time_start": float(time_start),
+                "time_end": float(time_end),
+                "is_final": bool(res.is_final),
+                "confidence": float(res.confidence),
+                "lang": res.lang or "vi",
+                "question": False,
+            }
+            try:
+                await ingestTranscript(session_id, transcript_payload, source="smartvoice_stt")
+            except Exception:
+                pass
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        try:
+            await _safe_send_json(
+                websocket,
+                send_lock,
+                {
+                    "event": "error",
+                    "session_id": session_id,
+                    "message": f"smartvoice_error: {exc}",
+                },
+            )
+        except Exception:
+            pass
+
+
+@router.websocket("/audio/{session_id}")
+async def audio_ingest(websocket: WebSocket, session_id: str):
+    token = websocket.query_params.get("token")
+    if not token or not verify_audio_ingest_token(token, expected_session_id=session_id):
+        await websocket.close(code=1008)
+        return
+
+    session = session_store.get(session_id)
+    if not session:
+        await websocket.accept()
+        await websocket.send_json(
+            {
+                "event": "error",
+                "session_id": session_id,
+                "message": "Session not found. Create it via POST /api/v1/sessions first.",
+            }
+        )
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    await websocket.send_json({"event": "connected", "channel": "audio", "session_id": session_id})
+    send_lock = asyncio.Lock()
+    _ensure_langgraph_worker(session_id)
+
+    try:
+        raw = await websocket.receive_text()
+        start_msg = AudioStartMessage.model_validate(json.loads(raw))
+    except Exception as exc:
+        await _safe_send_json(
+            websocket,
+            send_lock,
+            {"event": "error", "session_id": session_id, "message": f"invalid_start: {exc}"},
+        )
+        await websocket.close(code=1003)
+        return
+
+    expected = session.config.expected_audio
+    if (
+        start_msg.audio.codec != expected.codec
+        or start_msg.audio.sample_rate_hz != expected.sample_rate_hz
+        or start_msg.audio.channels != expected.channels
+    ):
+        await _safe_send_json(
+            websocket,
+            send_lock,
+            {
+                "event": "error",
+                "session_id": session_id,
+                "message": "audio_format_mismatch",
+                "expected_audio": {
+                    "codec": expected.codec,
+                    "sample_rate_hz": expected.sample_rate_hz,
+                    "channels": expected.channels,
+                },
+            },
+        )
+        await websocket.close(code=1003)
+        return
+
+    await _safe_send_json(
+        websocket,
+        send_lock,
+        {
+            "event": "audio_start_ack",
+            "session_id": session_id,
+            "accepted_audio": {
+                "codec": expected.codec,
+                "sample_rate_hz": expected.sample_rate_hz,
+                "channels": expected.channels,
+            },
+        },
+    )
+
+    audio_queue: asyncio.Queue[Optional[bytes]] = asyncio.Queue(maxsize=50)
+    audio_clock = _AudioClock(sample_rate_hz=expected.sample_rate_hz, channels=expected.channels)
+    stt_cfg = SmartVoiceStreamingConfig(
+        language_code=start_msg.language_code or session.config.language_code,
+        sample_rate_hz=expected.sample_rate_hz,
+        interim_results=session.config.interim_results,
+        enable_word_time_offsets=session.config.enable_word_time_offsets,
+    )
+    stt_task = asyncio.create_task(_smartvoice_to_bus(session_id, audio_queue, stt_cfg, audio_clock, websocket, send_lock))
+
+    try:
+        while True:
+            if stt_task.done():
+                break
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            if message.get("bytes") is not None:
+                chunk = message["bytes"]
+                if chunk:
+                    if audio_queue.full():
+                        suggested = min(max(start_msg.frame_ms * 2, session.config.recommended_frame_ms), session.config.max_frame_ms)
+                        await _safe_send_json(
+                            websocket,
+                            send_lock,
+                            {"event": "throttle", "reason": "stt_backpressure", "suggested_frame_ms": suggested},
+                        )
+                    await audio_queue.put(chunk)
+                    audio_clock.advance(len(chunk))
+                    session_store.touch(session_id)
+                continue
+
+            if message.get("text") is not None:
+                try:
+                    obj = json.loads(message["text"])
+                    if obj.get("type") == "stop":
+                        break
+                except Exception:
+                    pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        try:
+            audio_queue.put_nowait(None)
+        except Exception:
+            try:
+                await audio_queue.put(None)
+            except Exception:
+                pass
+        try:
+            await asyncio.wait_for(stt_task, timeout=5)
+        except Exception:
+            stt_task.cancel()
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
 @router.websocket("/in-meeting/{session_id}")
 async def in_meeting_ingest(websocket: WebSocket, session_id: str):
     await websocket.accept()
     await websocket.send_json({"event": "connected", "channel": "ingest", "session_id": session_id})
+    session_store.ensure(session_id)
     _ensure_langgraph_worker(session_id)
     try:
         while True:
@@ -173,48 +377,12 @@ async def in_meeting_ingest(websocket: WebSocket, session_id: str):
                 "confidence": payload.get("confidence", 1.0),
                 "lang": payload.get("lang", "vi"),
                 "question": payload.get("question"),
-                "project_id": payload.get("project_id"),
-                "confidence_source": payload.get("confidence_source"),
             }
-            transcript_payload["transcript_window"] = _update_transcript_buffer(session_id, chunk_text)
-            transcript_payload["full_transcript"] = transcript_payload["transcript_window"]
-
-            project_id = transcript_payload.get("project_id") or _resolve_project_id(meeting_id)
-            if project_id:
-                transcript_payload["project_id"] = project_id
-
-            if chunk_text:
-                try:
-                    db = SessionLocal()
-                    persist_transcript(
-                        db,
-                        meeting_id,
-                        {
-                            "speaker": transcript_payload["speaker"],
-                            "text": chunk_text,
-                            "time_start": transcript_payload["time_start"],
-                            "time_end": transcript_payload["time_end"],
-                            "is_final": transcript_payload["is_final"],
-                            "lang": transcript_payload["lang"],
-                            "confidence": transcript_payload["confidence"],
-                        },
-                    )
-                except Exception:
-                    pass
-                finally:
-                    try:
-                        db.close()
-                    except Exception:
-                        pass
-
-            envelope = await session_bus.publish(
-                session_id,
-                {
-                    "event": "transcript_event",
-                    "payload": transcript_payload,
-                },
-            )
-            await websocket.send_json({"event": "ingest_ack", "session_id": session_id, "seq": envelope.get("seq")})
+            try:
+                seq = await ingestTranscript(session_id, transcript_payload, source="transcript_test_ws")
+                await websocket.send_json({"event": "ingest_ack", "session_id": session_id, "seq": seq})
+            except Exception as exc:
+                await websocket.send_json({"event": "error", "session_id": session_id, "message": str(exc)})
             _ensure_langgraph_worker(session_id)
     finally:
         try:
@@ -234,7 +402,17 @@ async def in_meeting_frontend(websocket: WebSocket, session_id: str):
                 event = await queue.get()
             except asyncio.CancelledError:
                 break
-            await websocket.send_json(event)
+            if event.get("event") == "transcript_event":
+                # Keep frontend contract minimal; strip internal-only fields.
+                payload = dict(event.get("payload") or {})
+                payload.pop("transcript_window", None)
+                payload.pop("source", None)
+                payload.pop("question", None)
+                cleaned = dict(event)
+                cleaned["payload"] = payload
+                await websocket.send_json(cleaned)
+            else:
+                await websocket.send_json(event)
     except WebSocketDisconnect:
         pass
     finally:

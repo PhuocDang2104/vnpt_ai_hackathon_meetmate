@@ -25,6 +25,8 @@ import {
 } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
+import { sessionsApi } from '../../../../lib/api/sessions';
+import type { SessionCreateResponse } from '../../../../lib/api/sessions';
 
 type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
 interface InMeetTabProps {
@@ -32,6 +34,7 @@ interface InMeetTabProps {
   joinPlatform: 'gomeet' | 'gmeet';
   joinLink: string;
   streamSessionId: string;
+  realtimeSession?: SessionCreateResponse | null;
   onRefresh: () => void;
   onEndMeeting: () => void;
 }
@@ -41,6 +44,7 @@ export const InMeetTab = ({
   joinPlatform,
   joinLink,
   streamSessionId,
+  realtimeSession,
   onRefresh,
   onEndMeeting,
 }: InMeetTabProps) => {
@@ -49,10 +53,21 @@ export const InMeetTab = ({
   const [ingestStatus, setIngestStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
   const [feedStatus, setFeedStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
   const [lastFeedMessage, setLastFeedMessage] = useState<string | null>(null);
+  const [lastStateMessage, setLastStateMessage] = useState<string | null>(null);
+  const [enableTestIngest, setEnableTestIngest] = useState(false);
+  const [testChunk, setTestChunk] = useState('');
+  const [testSpeaker, setTestSpeaker] = useState('SPEAKER_01');
+  const [testIsFinal, setTestIsFinal] = useState(true);
+  const [testQuestion, setTestQuestion] = useState(false);
+  const testClockRef = useRef(0);
+  const [lastIngestAck, setLastIngestAck] = useState<number | null>(null);
+  const [audioIngestToken, setAudioIngestToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
   const [wsNonce, setWsNonce] = useState(0);
   const [wsLastError, setWsLastError] = useState<string | null>(null);
   const [liveTranscript, setLiveTranscript] = useState<
-    { id: string; speaker: string; text: string; time: number; isFinal: boolean }
+    { id: string; speaker: string; text: string; time: number; isFinal: boolean }[]
   >([]);
 
   const ingestRef = useRef<WebSocket | null>(null);
@@ -64,6 +79,11 @@ export const InMeetTab = ({
   }, []);
   const ingestEndpoint = useMemo(() => `${wsBase}/api/v1/ws/in-meeting/${streamSessionId}`, [wsBase, streamSessionId]);
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${streamSessionId}`, [wsBase, streamSessionId]);
+  const audioEndpoint = useMemo(() => `${wsBase}/api/v1/ws/audio/${streamSessionId}`, [wsBase, streamSessionId]);
+
+  const audioWsUrl = realtimeSession?.audio_ws_url || audioEndpoint;
+  const frontendWsUrl = realtimeSession?.frontend_ws_url || feedEndpoint;
+  const transcriptTestWsUrl = realtimeSession?.transcript_test_ws_url || ingestEndpoint;
 
   const transcript = useMemo(
     () => transcriptChunks.filter(chunk => chunk.meetingId === meeting.id).slice(0, 8),
@@ -90,6 +110,13 @@ export const InMeetTab = ({
       setIngestStatus('disabled');
       return;
     }
+    if (!enableTestIngest) {
+      ingestRef.current?.close();
+      ingestRef.current = null;
+      setIngestStatus('idle');
+      return;
+    }
+
     setIngestStatus('connecting');
     setWsError(null);
     setWsLastError(null);
@@ -100,23 +127,31 @@ export const InMeetTab = ({
       setIngestStatus('connected');
     };
     socket.onclose = () => {
-      setIngestStatus(USE_API ? 'idle' : 'disabled');
+      setIngestStatus(enableTestIngest ? 'idle' : 'disabled');
     };
     socket.onerror = evt => {
       console.error('Ingest WS error', evt);
       setIngestStatus('error');
-      setWsError('Không kết nối được WebSocket ingest.');
-      setWsLastError('Ingest WS error (kiểm tra host/SSL/path).');
+      setWsError('Không kết nối được WebSocket test ingest.');
+      setWsLastError('Test ingest WS error (kiểm tra host/SSL/path).');
     };
     socket.onmessage = event => {
-      const payload = typeof event.data === 'string' ? event.data : '';
+      const raw = typeof event.data === 'string' ? event.data : '';
+      try {
+        const data = JSON.parse(raw);
+        if (data?.event === 'ingest_ack') {
+          setLastIngestAck(data.seq || null);
+        }
+      } catch (_e) {
+        /* ignore */
+      }
     };
 
     return () => {
       socket.close();
       ingestRef.current = null;
     };
-  }, [ingestEndpoint, wsNonce]);
+  }, [ingestEndpoint, wsNonce, enableTestIngest]);
 
   useEffect(() => {
     if (!USE_API) {
@@ -162,6 +197,9 @@ export const InMeetTab = ({
             return next;
           });
         }
+        if (data?.event === 'state') {
+          setLastStateMessage(raw.slice(0, 240));
+        }
       } catch (_e) {
         /* ignore */
       }
@@ -177,6 +215,51 @@ export const InMeetTab = ({
     ingestRef.current?.close();
     feedRef.current?.close();
     setWsNonce(prev => prev + 1);
+  };
+
+  const handleFetchAudioToken = async () => {
+    if (!USE_API) return;
+    setIsTokenLoading(true);
+    setTokenError(null);
+    try {
+      const res = await sessionsApi.registerSource(streamSessionId);
+      setAudioIngestToken(res.audio_ingest_token);
+    } catch (err) {
+      console.error('Failed to register source:', err);
+      setTokenError('Không lấy được audio_ingest_token. Kiểm tra backend /api/v1/sessions/{id}/sources.');
+    } finally {
+      setIsTokenLoading(false);
+    }
+  };
+
+  const handleSendTestChunk = () => {
+    if (!USE_API) return;
+    const ws = ingestRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      setWsError('Test ingest WS chưa kết nối. Bật "Test ingest" và thử lại.');
+      return;
+    }
+    const chunk = testChunk.trim();
+    if (!chunk) return;
+
+    const timeStart = testClockRef.current;
+    const timeEnd = timeStart + Math.max(0.4, Math.min(5, chunk.length / 18));
+    testClockRef.current = timeEnd;
+
+    ws.send(
+      JSON.stringify({
+        meeting_id: streamSessionId,
+        chunk,
+        speaker: testSpeaker || 'SPEAKER_01',
+        time_start: timeStart,
+        time_end: timeEnd,
+        is_final: testIsFinal,
+        confidence: 0.99,
+        lang: 'vi',
+        question: testQuestion,
+      }),
+    );
+    setTestChunk('');
   };
 
   return (
@@ -196,6 +279,26 @@ export const InMeetTab = ({
             wsError={wsError}
             wsLastError={wsLastError}
             lastFeedMessage={lastFeedMessage}
+            lastStateMessage={lastStateMessage}
+            audioWsUrl={audioWsUrl}
+            frontendWsUrl={frontendWsUrl}
+            transcriptTestWsUrl={transcriptTestWsUrl}
+            audioIngestToken={audioIngestToken}
+            tokenError={tokenError}
+            isTokenLoading={isTokenLoading}
+            onFetchAudioToken={handleFetchAudioToken}
+            enableTestIngest={enableTestIngest}
+            onToggleTestIngest={setEnableTestIngest}
+            testChunk={testChunk}
+            onChangeTestChunk={setTestChunk}
+            testSpeaker={testSpeaker}
+            onChangeTestSpeaker={setTestSpeaker}
+            testIsFinal={testIsFinal}
+            onToggleTestIsFinal={setTestIsFinal}
+            testQuestion={testQuestion}
+            onToggleTestQuestion={setTestQuestion}
+            lastIngestAck={lastIngestAck}
+            onSendTestChunk={handleSendTestChunk}
             onReconnect={handleReconnect}
           />
           <LiveRecapPanel />
@@ -228,6 +331,26 @@ interface TranscriptPanelProps {
   wsError: string | null;
   wsLastError: string | null;
   lastFeedMessage: string | null;
+  lastStateMessage: string | null;
+  audioWsUrl: string;
+  frontendWsUrl: string;
+  transcriptTestWsUrl: string;
+  audioIngestToken: string | null;
+  tokenError: string | null;
+  isTokenLoading: boolean;
+  onFetchAudioToken: () => void;
+  enableTestIngest: boolean;
+  onToggleTestIngest: (v: boolean) => void;
+  testChunk: string;
+  onChangeTestChunk: (v: string) => void;
+  testSpeaker: string;
+  onChangeTestSpeaker: (v: string) => void;
+  testIsFinal: boolean;
+  onToggleTestIsFinal: (v: boolean) => void;
+  testQuestion: boolean;
+  onToggleTestQuestion: (v: boolean) => void;
+  lastIngestAck: number | null;
+  onSendTestChunk: () => void;
   onReconnect: () => void;
 }
 
@@ -244,18 +367,39 @@ const LiveTranscriptPanel = ({
   wsError,
   wsLastError,
   lastFeedMessage,
+  lastStateMessage,
+  audioWsUrl,
+  frontendWsUrl,
+  transcriptTestWsUrl,
+  audioIngestToken,
+  tokenError,
+  isTokenLoading,
+  onFetchAudioToken,
+  enableTestIngest,
+  onToggleTestIngest,
+  testChunk,
+  onChangeTestChunk,
+  testSpeaker,
+  onChangeTestSpeaker,
+  testIsFinal,
+  onToggleTestIsFinal,
+  testQuestion,
+  onToggleTestQuestion,
+  lastIngestAck,
+  onSendTestChunk,
   onReconnect,
 }: TranscriptPanelProps) => {
-  const transcriptItems = useMemo(() => {
+  const displayItems = useMemo(() => {
+    const maxItems = 50;
     if (liveTranscript?.length) {
-      return liveTranscript.map(t => ({
+      return liveTranscript.slice(-maxItems).map(t => ({
         id: t.id,
         speakerName: t.speaker,
         time: t.time,
         text: t.text,
       }));
     }
-    return transcript.map(chunk => ({
+    return transcript.slice(-maxItems).map(chunk => ({
       id: chunk.id,
       speakerName: chunk.speaker.displayName,
       time: chunk.startTime,
@@ -306,33 +450,63 @@ const LiveTranscriptPanel = ({
           </div>
 
           <div className="transcript-content transcript-content--padded">
-            {transcriptItems.map(chunk => (
-              <div key={chunk.id} className="transcript-card">
-                <div className="transcript-card__avatar">{getInitials(chunk.speakerName || '?')}</div>
-                <div className="transcript-card__body">
-                  <div className="transcript-card__row">
-                    <span className="transcript-card__speaker">{chunk.speakerName}</span>
-                    <span className="transcript-card__time">{formatDuration(chunk.time || 0)}</span>
+            <div
+              className="transcript-card transcript-card--live"
+              style={{ minHeight: 220, maxHeight: 360, display: 'flex', flexDirection: 'column' }}
+            >
+              <div className="transcript-card__body">
+                <div className="transcript-card__row" style={{ alignItems: 'center', gap: 8 }}>
+                  <div className="pill pill--live pill--solid">
+                    <span className="live-dot"></span>
+                    SmartVoice API ...
                   </div>
-                  <p className="transcript-card__text">{chunk.text}</p>
+                  <span className="pill pill--ghost">Realtime transcript</span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    overflowY: 'auto',
+                    paddingRight: 4,
+                    maxHeight: 260,
+                  }}
+                >
+                  {displayItems.length === 0 && (
+                    <div className="transcript-card__hint">Chưa có đoạn thoại nào.</div>
+                  )}
+                  {displayItems.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'var(--bg-subtle)',
+                        border: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 4,
+                          color: 'var(--text-muted)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <span>{item.speakerName}</span>
+                        <span>{formatDuration(item.time || 0)}</span>
+                      </div>
+                      <div style={{ fontSize: 16, lineHeight: 1.4 }}>{item.text}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-            {isRecording && (
-              <div className="transcript-card transcript-card--typing">
-                <div className="transcript-card__avatar">?</div>
-                <div className="transcript-card__body">
-                  <div className="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                  <p className="transcript-card__hint">Đang nhận partial từ SmartVoice...</p>
-                </div>
-              </div>
-            )}
+            </div>
 
-      <div className="transcript-status-bar">
+          <div className="transcript-status-bar">
               {(() => {
                 const color = (status: WsStatus) => {
                   if (status === 'connected') return 'var(--success)';
@@ -374,7 +548,7 @@ const LiveTranscriptPanel = ({
                     className={`pill ws-chip ws-chip--${ingestStatus}`}
                     style={{ padding: '6px 10px', minWidth: 120, textAlign: 'center' }}
                   >
-                    Ingest · {ingestStatus}
+                    Test ingest · {ingestStatus}
                   </span>
                   <span
                     className={`pill ws-chip ws-chip--${feedStatus}`}
@@ -395,6 +569,80 @@ const LiveTranscriptPanel = ({
               {wsError && <div className="ws-status-error" style={{ marginTop: 8 }}>{wsError}</div>}
               {wsLastError && <div className="ws-status-foot" style={{ marginTop: 4 }}>{wsLastError}</div>}
               {lastFeedMessage && <div className="ws-status-foot" style={{ marginTop: 4 }}>Feed: {lastFeedMessage}</div>}
+              {lastStateMessage && <div className="ws-status-foot" style={{ marginTop: 4 }}>State: {lastStateMessage}</div>}
+            </div>
+
+            <div
+              className="transcript-card transcript-card--live"
+              style={{
+                marginTop: 12,
+                padding: 12,
+                background: 'var(--bg-elevated)',
+                borderRadius: 10,
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span className="pill pill--ghost">WS audio: {audioWsUrl}</span>
+                <span className="pill pill--ghost">WS frontend: {frontendWsUrl}</span>
+                <span className="pill pill--ghost">WS test ingest: {transcriptTestWsUrl}</span>
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button className="btn btn--ghost btn--sm" onClick={onFetchAudioToken} disabled={isTokenLoading}>
+                  {isTokenLoading ? 'Đang lấy token...' : 'Lấy audio_ingest_token'}
+                </button>
+                {audioIngestToken && (
+                  <span className="pill pill--accent" style={{ maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    token: {audioIngestToken}
+                  </span>
+                )}
+                {tokenError && <span className="pill pill--error">{tokenError}</span>}
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <label className="pill pill--ghost" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={enableTestIngest}
+                    onChange={e => onToggleTestIngest(e.target.checked)}
+                  />
+                  Bật test ingest
+                </label>
+                {lastIngestAck != null && <span className="pill pill--muted">ACK seq: {lastIngestAck}</span>}
+              </div>
+
+              {enableTestIngest && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      className="form-input"
+                      style={{ flex: 1, minWidth: 180 }}
+                      value={testSpeaker}
+                      onChange={e => onChangeTestSpeaker(e.target.value)}
+                      placeholder="speaker (SPEAKER_01)"
+                    />
+                    <label className="pill pill--ghost" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={testIsFinal} onChange={e => onToggleTestIsFinal(e.target.checked)} />
+                      is_final
+                    </label>
+                    <label className="pill pill--ghost" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={testQuestion} onChange={e => onToggleTestQuestion(e.target.checked)} />
+                      question
+                    </label>
+                  </div>
+                  <textarea
+                    className="form-input"
+                    value={testChunk}
+                    onChange={e => onChangeTestChunk(e.target.value)}
+                    placeholder="Nhập transcript test..."
+                    rows={3}
+                  />
+                  <button className="btn btn--primary btn--sm" onClick={onSendTestChunk} disabled={!testChunk.trim()}>
+                    Gửi transcript (test ingest)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -492,8 +740,8 @@ const LiveRecapPanel = () => {
 
 const AdrPanel = ({
   actions,
-  decisions,
-  risks,
+  decisions: decisionItems,
+  risks: riskItems,
 }: {
   actions: typeof actionItems;
   decisions: typeof decisions;
@@ -516,14 +764,14 @@ const AdrPanel = ({
           onClick={() => setActiveTab('decisions')}
         >
           <FileText size={14} />
-          Decisions ({decisions.length})
+          Decisions ({decisionItems.length})
         </button>
         <button
           className={`detected-tab ${activeTab === 'risks' ? 'detected-tab--active' : ''}`}
           onClick={() => setActiveTab('risks')}
         >
           <AlertTriangle size={14} />
-          Risks ({risks.length})
+          Risks ({riskItems.length})
         </button>
       </div>
 
@@ -561,8 +809,8 @@ const AdrPanel = ({
         )}
 
         {activeTab === 'decisions' && (
-          decisions.length > 0 ? (
-            decisions.map(item => (
+          decisionItems.length > 0 ? (
+            decisionItems.map(item => (
               <div key={item.id} className="detected-item detected-item--decision">
                 <div className="detected-item__content">
                   <div className="detected-item__text">{item.description}</div>
@@ -579,8 +827,8 @@ const AdrPanel = ({
         )}
 
         {activeTab === 'risks' && (
-          risks.length > 0 ? (
-            risks.map(item => (
+          riskItems.length > 0 ? (
+            riskItems.map(item => (
               <div
                 key={item.id}
                 className={`detected-item detected-item--risk detected-item--${item.severity}`}

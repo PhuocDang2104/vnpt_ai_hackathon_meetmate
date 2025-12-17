@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     openai_api_key: str = ''
     gemini_api_key: str = ''  # legacy
     groq_api_key: str = ''
+
+    # VNPT SmartVoice (streaming STT) - configured via env at deploy time
+    smartvoice_grpc_endpoint: str = ''  # host:port (e.g. smartvoice.example.com:443)
+    smartvoice_access_token: str = ''  # Bearer token (preferred if you already have one)
+    smartvoice_token_id: str = ''
+    smartvoice_token_key: str = ''
+    smartvoice_auth_url: str = ''  # optional: exchange token_id/token_key for access_token
+    smartvoice_model: str = 'fast_streaming'
     
     # AI Model settings
     groq_model: str = 'llama-3.3-70b-versatile'

@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     admin,
     projects,
     users,
+    sessions,
     meetings,
     documents,
     agenda,
@@ -57,6 +58,7 @@ app.include_router(auth.router, prefix=f"{settings.api_v1_prefix}/auth", tags=['
 app.include_router(admin.router, prefix=f"{settings.api_v1_prefix}/admin", tags=['admin'])
 app.include_router(projects.router, prefix=f"{settings.api_v1_prefix}/projects", tags=['projects'])
 app.include_router(users.router, prefix=f"{settings.api_v1_prefix}/users", tags=['users'])
+app.include_router(sessions.router, prefix=f"{settings.api_v1_prefix}/sessions", tags=['sessions'])
 app.include_router(meetings.router, prefix=f"{settings.api_v1_prefix}/meetings", tags=['meetings'])
 app.include_router(documents.router, prefix=f"{settings.api_v1_prefix}/documents", tags=['documents'])
 app.include_router(agenda.router, prefix=f"{settings.api_v1_prefix}/agenda", tags=['agenda'])

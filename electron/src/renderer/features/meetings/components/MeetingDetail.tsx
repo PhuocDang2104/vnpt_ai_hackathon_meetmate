@@ -21,8 +21,11 @@ import {
   Save,
 } from 'lucide-react';
 import { meetingsApi } from '../../../lib/api/meetings';
+import { sessionsApi } from '../../../lib/api/sessions';
+import type { SessionCreateResponse } from '../../../lib/api/sessions';
 import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
+import { USE_API } from '../../../config/env';
 
 // Tab Components
 import { PreMeetTab } from './tabs/PreMeetTab';
@@ -43,6 +46,9 @@ export const MeetingDetail = () => {
   const [joinPlatform, setJoinPlatform] = useState<'gomeet' | 'gmeet'>('gomeet');
   const [joinLink, setJoinLink] = useState('');
   const [streamSessionId, setStreamSessionId] = useState<string | null>(null);
+  const [realtimeSession, setRealtimeSession] = useState<SessionCreateResponse | null>(null);
+  const [sessionInitError, setSessionInitError] = useState<string | null>(null);
+  const [isInitSessionLoading, setIsInitSessionLoading] = useState(false);
   
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -108,6 +114,38 @@ export const MeetingDetail = () => {
       fetchMeeting();
     } catch (err) {
       console.error('Failed to end meeting:', err);
+    }
+  };
+
+  const handleInitRealtimeSession = async () => {
+    if (!USE_API) {
+      setShowJoinModal(false);
+      return;
+    }
+    const desiredSessionId = streamSessionId || meeting?.id;
+    if (!desiredSessionId) return;
+
+    setIsInitSessionLoading(true);
+    setSessionInitError(null);
+    try {
+      const res = await sessionsApi.create({
+        session_id: desiredSessionId,
+        language_code: 'vi-VN',
+        target_sample_rate_hz: 16000,
+        audio_encoding: 'PCM_S16LE',
+        channels: 1,
+        realtime: true,
+        interim_results: true,
+        enable_word_time_offsets: true,
+      });
+      setStreamSessionId(res.session_id);
+      setRealtimeSession(res);
+      setShowJoinModal(false);
+    } catch (err) {
+      console.error('Failed to init realtime session:', err);
+      setSessionInitError('Không thể khởi tạo realtime session. Kiểm tra backend /api/v1/sessions.');
+    } finally {
+      setIsInitSessionLoading(false);
     }
   };
 
@@ -222,11 +260,11 @@ export const MeetingDetail = () => {
           </button>
           <div className="meeting-detail-v2__header-info">
             <div className="meeting-detail-v2__header-badges">
-              <span className={`badge badge--${(meeting.phase === 'in' || isLiveByTime) ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
-                {(meeting.phase === 'in' || isLiveByTime) && <span className="live-dot"></span>}
-                {isLiveByTime && meeting.phase === 'pre' ? 'LIVE' : MEETING_PHASE_LABELS[meeting.phase]}
+                <span className={`badge badge--${(meeting.phase === 'in' || isLiveByTime) ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
+                  {(meeting.phase === 'in' || isLiveByTime) && <span className="live-dot"></span>}
+                {isLiveByTime && meeting.phase === 'pre' ? 'LIVE' : (MEETING_PHASE_LABELS[meeting.phase as keyof typeof MEETING_PHASE_LABELS] || meeting.phase)}
               </span>
-              <span className="badge badge--neutral">{MEETING_TYPE_LABELS[meeting.meeting_type]}</span>
+              <span className="badge badge--neutral">{MEETING_TYPE_LABELS[meeting.meeting_type as keyof typeof MEETING_TYPE_LABELS] || meeting.meeting_type}</span>
             </div>
             <h1 className="meeting-detail-v2__title">{meeting.title}</h1>
           </div>
@@ -361,6 +399,7 @@ export const MeetingDetail = () => {
             joinPlatform={joinPlatform}
             joinLink={joinLink}
             streamSessionId={streamSessionId || meeting.id}
+            realtimeSession={realtimeSession}
             onRefresh={fetchMeeting}
             onEndMeeting={handleEndMeeting}
           />
@@ -601,6 +640,12 @@ export const MeetingDetail = () => {
                 />
                 <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
               </div>
+
+              {sessionInitError && (
+                <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
+                  {sessionInitError}
+                </div>
+              )}
             </div>
             <div className="modal__footer">
               <button className="btn btn--secondary" onClick={() => setShowJoinModal(false)}>
@@ -608,10 +653,10 @@ export const MeetingDetail = () => {
               </button>
               <button
                 className="btn btn--primary"
-                onClick={() => setShowJoinModal(false)}
+                onClick={handleInitRealtimeSession}
                 disabled={!streamSessionId}
               >
-                Áp dụng
+                {isInitSessionLoading ? 'Đang khởi tạo...' : 'Áp dụng'}
               </button>
             </div>
           </div>

@@ -1,8 +1,15 @@
-import asyncio, json, time, uuid, inspect
+import asyncio
+import inspect
+import json
+import time
+
 import websockets
 
-WS_URL = "wss://vnpt-ai-hackathon-meetmate.onrender.com/api/v1/ws/in-meeting/c0000002-0000-0000-0000-000000000002"
-TOKEN = None  # "Bearer xxx" nếu cần
+HOST = "vnpt-ai-hackathon-meetmate.onrender.com"
+SESSION_ID = "c0000002-0000-0000-0000-000000000002"
+WS_URL = f"wss://{HOST}/api/v1/ws/in-meeting/{SESSION_ID}"
+TOKEN = None  # "Bearer xxx" nếu cần (không bắt buộc cho PoC)
+
 
 async def run():
     headers = {}
@@ -28,45 +35,50 @@ async def run():
     async with websockets.connect(WS_URL, **connect_kwargs) as ws:
         print("✅ Connected:", WS_URL)
 
-        segment_id = f"seg_{uuid.uuid4().hex[:8]}"
+        # Server sends a "connected" envelope first
+        try:
+            hello = await asyncio.wait_for(ws.recv(), timeout=3)
+            print("⬅️ recv:", hello)
+        except asyncio.TimeoutError:
+            pass
+
         msg1 = {
-            "type": "transcript_chunk",
-            "seq": 1,
-            "meeting_id": "weekly-002",
-            "segment_id": segment_id,
-            "speaker": "spk_0",
-            "time_start": 0 ,
-            "time_end": 1500,
+            "meeting_id": SESSION_ID,
             "chunk": "xin chào anh chị, hôm nay mình",
+            "speaker": "SPEAKER_01",
+            "time_start": 0.0,
+            "time_end": 1.5,
             "is_final": False,
             "confidence": 0.82,
-            "lang": "vi-VN",
-            "question": False
+            "lang": "vi",
+            "question": False,
         }
         await ws.send(json.dumps(msg1, ensure_ascii=False))
         print("➡️ sent:", msg1)
 
-        try:
-            resp = await asyncio.wait_for(ws.recv(), timeout=5)
-            print("⬅️ recv:", resp)
-        except asyncio.TimeoutError:
-            print("⚠️ No response within 5s (server có thể không auto-ack).")
+        resp1 = await asyncio.wait_for(ws.recv(), timeout=5)
+        print("⬅️ recv:", resp1)
 
         msg2 = dict(msg1)
-        msg2["seq"] = 2
-        msg2["time_end"] = 3200
-        msg2["chunk"] = "xin chào anh chị, hôm nay mình họp về ngân sách quý này."
+        msg2["time_start"] = 1.5
+        msg2["time_end"] = 3.2
+        msg2["chunk"] = "đi qua checklist realtime integration"
         msg2["is_final"] = True
         await ws.send(json.dumps(msg2, ensure_ascii=False))
         print("➡️ sent:", msg2)
 
+        resp2 = await asyncio.wait_for(ws.recv(), timeout=5)
+        print("⬅️ recv:", resp2)
+
+        # Keep listening (ACK/error) for a short time
         start = time.time()
-        while time.time() - start < 10:
+        while time.time() - start < 5:
             try:
-                resp = await asyncio.wait_for(ws.recv(), timeout=2)
+                resp = await asyncio.wait_for(ws.recv(), timeout=1)
                 print("⬅️ recv:", resp)
             except asyncio.TimeoutError:
                 pass
+
 
 if __name__ == "__main__":
     asyncio.run(run())

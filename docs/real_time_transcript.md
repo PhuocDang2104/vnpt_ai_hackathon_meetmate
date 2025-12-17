@@ -1,47 +1,94 @@
-# Realtime transcript ingestion (Google Meet / VNPT GoMeet)
+# Realtime transcript (In-meeting) — cách tích hợp & cách test
 
-This note explains how to stream realtime transcript into MeetMate during an active meeting and how the UI maps to the backend WebSockets.
+Tài liệu này hướng dẫn **test nhanh** pipeline realtime của MeetMate theo spec:
+- Production: **Raw audio ingress** → **SmartVoice STT** → **bus** → **frontend**
+- Dev/Test: **bơm transcript** vào `WS /ws/in-meeting` để test UI/bus/LangGraph mà không cần audio/STT
 
-## User flow in UI (app/meetings/{id}/detail, tab 2. Trong họp)
-1. Click **“Tham gia cuộc họp”** (header). Choose platform (GoMeet / Google Meet), paste the meeting link, and set the **Session ID** (default = `meeting.id`). This Session ID is used by both WS endpoints.
-2. The page shows:
-   - Platform badge + “Mở link cuộc họp” (opens the pasted link in a new tab).
-   - Session ID + two WS endpoints:
-     - Ingest: `/api/v1/ws/in-meeting/{session_id}`
-     - Frontend feed: `/api/v1/ws/frontend/{session_id}`
-3. Paste interim/final transcript text into **Raw transcript (SmartVoice / GoMeet)** and press **Gửi transcript (ingest)**.
-   - The ingest WS receives your chunk and publishes it to the session bus.
-   - The frontend WS emits `transcript_event` and `state` updates for the UI.
+Chi tiết flow xem thêm: `docs/in_meeting_flow.md`.
 
-## WS endpoints and payloads
-- Ingest (GoMeet/SmartVoice → backend): `wss://<host>/api/v1/ws/in-meeting/{session_id}`
-  ```json
-  {
-    "meeting_id": "<session_id>",
-    "chunk": "Speaker text ...",
-    "speaker": "SPEAKER_01",
-    "time_start": 12.3,
-    "time_end": 15.8,
-    "is_final": true,
-    "confidence": 0.9,
-    "lang": "vi"
-  }
-  ```
-  Backend responds with `{"event":"ingest_ack","seq":<n>}` and publishes `transcript_event`.
+---
 
-- Frontend (subscribe): `wss://<host>/api/v1/ws/frontend/{session_id}`
-  - Receives `transcript_event` (for caption) and `state` (recap/ADR/QA/tools) as described in `docs/in_meeting_flow.md`.
+## 1) UI flow (Electron) — tab “Trong họp”
+1. Mở `Meeting detail` → tab **Trong họp** → bấm **Tham gia cuộc họp**.
+2. Nhập link (GoMeet/Google Meet) và giữ **Session ID = meeting.id** (khuyến nghị để persist transcript vào DB theo meeting).
+3. Bấm **Áp dụng**:
+   - UI gọi `POST /api/v1/sessions` để khởi tạo realtime session.
+   - UI tự kết nối `WS /api/v1/ws/frontend/{session_id}` để nhận realtime feed.
+4. (Tuỳ chọn) Bấm **Lấy audio_ingest_token** để phát token cho Bridge đẩy audio vào `WS /ws/audio`.
+5. (Tuỳ chọn) Bật **test ingest** và bơm transcript test để kiểm UI/bus/LangGraph ngay trong app.
 
-## SmartVoice STT → ingest mapping
-- Use SmartVoice `StreamingRecognize` (PCM 16-bit mono, 16 kHz recommended).
-- Map each interim/final response to ingest payload:
-  - `chunk`: transcript string.
-  - `is_final`: from SmartVoice `is_final`.
-  - `confidence`: SmartVoice confidence.
-  - `time_start/time_end`: word offsets or running clock.
-  - `speaker`: `SPEAKER_01` if diarization not available.
+---
 
-## Tips
-- Keep Session ID stable per meeting; it scopes the bus and both WS channels.
-- Use small chunks (200–1000 ms) for low latency; SmartVoice docs allow 3–10 s max.
-- If WS disconnects, use **Kết nối lại**; both ingest and frontend WS will reconnect with the current Session ID.
+## 2) Các endpoint chính
+
+### 2.1 REST: tạo session
+`POST /api/v1/sessions`
+
+Gợi ý request (dùng `session_id = meeting.id`):
+```json
+{
+  "session_id": "<meeting.id>",
+  "language_code": "vi-VN",
+  "target_sample_rate_hz": 16000,
+  "audio_encoding": "PCM_S16LE",
+  "channels": 1,
+  "realtime": true,
+  "interim_results": true,
+  "enable_word_time_offsets": true
+}
+```
+
+### 2.2 REST: lấy audio_ingest_token cho Bridge
+`POST /api/v1/sessions/{session_id}/sources`
+
+### 2.3 WS: frontend nhận realtime (1 WS duy nhất)
+`wss://<host>/api/v1/ws/frontend/{session_id}`
+- Nhận `transcript_event` + `state` (payload theo `docs/in_meeting_flow.md`).
+
+### 2.4 WS: transcript test ingest (dev/test)
+`wss://<host>/api/v1/ws/in-meeting/{session_id}`
+
+Payload:
+```json
+{
+  "meeting_id": "<session_id>",
+  "chunk": "Đây là transcript test do tôi tự bơm.",
+  "speaker": "SPEAKER_01",
+  "time_start": 0.0,
+  "time_end": 2.5,
+  "is_final": true,
+  "confidence": 0.99,
+  "lang": "vi",
+  "question": false
+}
+```
+
+ACK:
+```json
+{ "event": "ingest_ack", "seq": 101 }
+```
+
+### 2.5 WS: raw audio ingest (production)
+`wss://<host>/api/v1/ws/audio/{session_id}?token={audio_ingest_token}`
+- Gửi `start` JSON, sau đó stream **binary PCM frames** (S16LE mono 16kHz).
+
+---
+
+## 3) Test nhanh bằng script (không cần UI)
+
+### 3.1 Bơm transcript (dev/test)
+Chạy script: `backend/tests/test_ingest_ws.py` (chỉnh `WS_URL` và `session_id` theo môi trường).
+
+### 3.2 Stream audio (production)
+Bạn có thể dùng bridge (GoMeet/Google Meet) hoặc chạy script mẫu: `backend/tests/test_audio_ws.py`.
+Script đọc WAV PCM 16kHz mono và stream vào `WS /ws/audio`, đồng thời mở `WS /ws/frontend` để in ra event.
+
+---
+
+## 4) SmartVoice credentials (env placeholders)
+Backend chừa sẵn biến môi trường (xem `backend/env.example.txt`):
+- `SMARTVOICE_GRPC_ENDPOINT`
+- `SMARTVOICE_ACCESS_TOKEN` (ưu tiên)
+- hoặc `SMARTVOICE_AUTH_URL` + `SMARTVOICE_TOKEN_ID` + `SMARTVOICE_TOKEN_KEY`
+
+Khi bạn cung cấp key trong env, backend sẽ dùng SmartVoice để tạo transcript realtime từ audio ingress.
