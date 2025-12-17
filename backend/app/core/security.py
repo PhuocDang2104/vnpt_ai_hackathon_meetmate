@@ -24,6 +24,7 @@ ALGORITHM = "HS256"
 # Shorter TTL for access token; refresh covers longer lived sessions
 ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 60 minutes
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+SUPABASE_AUD = settings.supabase_jwt_aud or "authenticated"
 
 
 # ============================================
@@ -90,21 +91,45 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
+def decode_supabase_token(token: str) -> Optional[dict]:
+    """Decode Supabase JWT using supabase_jwt_secret if configured."""
+    if not settings.supabase_jwt_secret:
+        return None
+    try:
+        payload = jwt.decode(
+            token,
+            settings.supabase_jwt_secret,
+            algorithms=[ALGORITHM],
+            audience=SUPABASE_AUD,
+        )
+        return payload
+    except JWTError:
+        return None
+
+
 def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
     """Verify token is valid and of correct type"""
-    payload = decode_token(token)
+    # Prefer Supabase token if configured, else fall back to local secret
+    payload = decode_supabase_token(token) or decode_token(token)
     
     if not payload:
         return None
     
-    if payload.get("type") != token_type:
+    # Local token has "type", Supabase token may not
+    if payload.get("type") and payload.get("type") != token_type:
         return None
     
-    # Check expiration
+    # Check expiration (both tokens)
     exp = payload.get("exp")
     if exp and datetime.utcfromtimestamp(exp) < datetime.utcnow():
         return None
     
+    # Normalize role
+    if "role" not in payload and payload.get("app_metadata", {}).get("role"):
+        payload["role"] = payload["app_metadata"]["role"]
+    if "role" not in payload and payload.get("role") is None:
+        payload["role"] = payload.get("aud") or "user"
+
     return payload
 
 

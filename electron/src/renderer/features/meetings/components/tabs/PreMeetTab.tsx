@@ -31,7 +31,6 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
-import { knowledgeApi } from '../../../../lib/api/knowledge';
 import { agendaApi, type AgendaItem, type AgendaItemCreate } from '../../../../lib/api/agenda';
 import { knowledgeApi, type KnowledgeDocument } from '../../../../lib/api/knowledge';
 
