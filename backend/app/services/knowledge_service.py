@@ -375,6 +375,47 @@ async def upload_document(
     
     _mock_knowledge_docs[str(doc_id)] = doc
     logger.info(f"[Mock] Uploaded knowledge document: {doc.title}")
+
+    # Persist metadata to DB
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO knowledge_document (
+                    id, title, description, source, category, tags,
+                    file_type, file_size, storage_key, file_url,
+                    org_id, project_id, meeting_id, visibility,
+                    created_at, updated_at
+                )
+                VALUES (
+                    :id, :title, :description, :source, :category, :tags,
+                    :file_type, :file_size, :storage_key, :file_url,
+                    :org_id, :project_id, :meeting_id, :visibility,
+                    now(), now()
+                )
+                ON CONFLICT (id) DO NOTHING
+                """
+            ),
+            {
+                "id": str(doc_id),
+                "title": doc.title,
+                "description": doc.description,
+                "source": doc.source,
+                "category": doc.category,
+                "tags": doc.tags,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+                "storage_key": doc.storage_key,
+                "file_url": doc.file_url,
+                "org_id": None,
+                "project_id": None,
+                "meeting_id": None,
+                "visibility": None,
+            },
+        )
+        db.commit()
+    except Exception as exc:
+        logger.error("Failed to persist knowledge_document to DB: %s", exc)
     
     return KnowledgeDocumentUploadResponse(
         id=doc_id,
