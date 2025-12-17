@@ -15,7 +15,7 @@ Mục tiêu: Frontend chỉ cần mở **1 WebSocket** để nhận:
 1) **Tạo session**
    - `POST /api/v1/sessions` → trả `session_id`, `audio_ws_url`, `frontend_ws_url`, `transcript_test_ws_url`.
 2) **Bridge đăng ký nguồn & lấy token**
-   - `POST /api/v1/sessions/{session_id}/sources` → nhận `audio_ingest_token` (JWT) để đẩy audio vào MeetMate.
+   - `POST /api/v1/sessions/{session_id}/sources?platform=vnpt_gomeet` → nhận `source_id` + `audio_ingest_token` (JWT) để đẩy audio vào MeetMate.
 3) **Raw audio ingress vào MeetMate**
    - Bridge mở `WS /api/v1/ws/audio/{session_id}?token=...`
    - Gửi `start` (JSON) → sau đó stream **binary PCM frames** (PCM S16LE, mono, 16kHz).
@@ -34,6 +34,33 @@ Mục tiêu: Frontend chỉ cần mở **1 WebSocket** để nhận:
    - Consumer B: LangGraph worker → chạy graph theo scheduler và publish `state` vào bus
 7) **Frontend nhận realtime**
    - Frontend mở `WS /api/v1/ws/frontend/{session_id}` và nhận `transcript_event` + `state`.
+
+#### 1.1.1 Ai “kích hoạt session” và ai chủ động stream audio?
+Trong spec này, **MeetMate không gọi ngược sang GoMeet** để “bảo GoMeet bắt đầu stream”.
+
+Thành phần chủ động stream audio luôn là **GoMeet Bridge** (bot/service) - nó join phòng GoMeet, lấy audio track và **đẩy audio sang MeetMate** qua `WS /api/v1/ws/audio/...`.
+
+Có 2 cách để GoMeet Bridge nhận được `session_id` + `audio_ws_url` + `audio_ingest_token`:
+1) **Bridge pull (khuyến nghị nếu GoMeet Bridge đứng độc lập)**:
+   - Bridge tự gọi:
+     - `POST /api/v1/sessions` (có thể set `session_id = meeting.id` nếu muốn gắn vào DB meeting)
+     - `POST /api/v1/sessions/{session_id}/sources` để lấy `audio_ingest_token`
+   - Sau đó Bridge mở `WS /api/v1/ws/audio/{session_id}?token=...`, gửi `start`, chờ `audio_start_ack` rồi stream PCM frames.
+2) **MeetMate push (nếu GoMeet có “control API” để bật bot)**:
+   - MeetMate (UI hoặc backend orchestrator) gọi 2 REST endpoints của MeetMate để tạo session + token.
+   - Sau đó MeetMate **gọi control API của GoMeet Bridge** (do phía GoMeet cung cấp) để truyền vào:
+     - `session_id`
+     - `audio_ws_url`
+     - `audio_ingest_token`
+     - `language_code`, `frame_ms`, `audio format` (PCM_S16LE mono 16kHz)
+     - `platform_meeting_ref` + GoMeet join token (thuộc hệ GoMeet)
+   - GoMeet Bridge nhận config và bắt đầu stream sang MeetMate.
+
+Tham khảo spec chi tiết để gửi GoMeet team: `docs/gomeet_control_api_spec.md`.
+
+Điểm “handshake” để Bridge biết session sẵn sàng:
+- Sau khi Bridge connect WS và gửi `start`, MeetMate trả `audio_start_ack` (accept start + format).
+- Sau khi Bridge gửi frame audio đầu tiên, backend sẽ trả thêm event `audio_ingest_ok` (xác nhận API đã nhận được audio frame).
 
 ### 1.2. Dev/Test (bơm transcript tuỳ chọn)
 Không cần audio/STT:
@@ -78,12 +105,14 @@ Response:
 ```
 
 ### 2.2 REST — Bridge đăng ký nguồn & lấy token
-`POST /api/v1/sessions/{session_id}/sources`
+`POST /api/v1/sessions/{session_id}/sources?platform=vnpt_gomeet`
 
 Response:
 ```json
 {
   "session_id": "sess_or_uuid",
+  "source_id": "src_..._uuid",
+  "platform": "vnpt_gomeet",
   "audio_ingest_token": "<jwt_scope_audio_session>",
   "token_ttl_seconds": 1800
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.realtime_security import create_audio_ingest_token
@@ -59,7 +61,7 @@ async def create_session(payload: SessionCreateRequest, request: Request) -> Ses
 
 
 @router.post("/{session_id}/sources", response_model=SourceRegisterResponse)
-async def register_source(session_id: str) -> SourceRegisterResponse:
+async def register_source(session_id: str, platform: str | None = None) -> SourceRegisterResponse:
     session = session_store.get(session_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -68,6 +70,8 @@ async def register_source(session_id: str) -> SourceRegisterResponse:
     token = create_audio_ingest_token(session_id=session_id, ttl_seconds=token_ttl_seconds)
     return SourceRegisterResponse(
         session_id=session_id,
+        source_id=str(uuid.uuid4()),
+        platform=platform.strip() if platform else None,
         audio_ingest_token=token,
         token_ttl_seconds=token_ttl_seconds,
     )

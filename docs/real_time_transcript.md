@@ -39,7 +39,9 @@ Gợi ý request (dùng `session_id = meeting.id`):
 ```
 
 ### 2.2 REST: lấy audio_ingest_token cho Bridge
-`POST /api/v1/sessions/{session_id}/sources`
+`POST /api/v1/sessions/{session_id}/sources?platform=vnpt_gomeet`
+
+Nếu bạn tích hợp GoMeet theo mô hình “MeetMate push” (MeetMate gọi GoMeet control API để bật bridge), xem thêm: `docs/gomeet_control_api_spec.md`.
 
 ### 2.3 WS: frontend nhận realtime (1 WS duy nhất)
 `wss://<host>/api/v1/ws/frontend/{session_id}`
@@ -76,6 +78,18 @@ ACK:
 
 ## 3) Test nhanh bằng script (không cần UI)
 
+### 3.0 Kiểm tra backend đã deploy đúng phiên bản (Render)
+Nếu bạn test vào Render mà bị `404 /api/v1/sessions` thì gần như chắc chắn backend trên Render **chưa được redeploy** với code realtime mới.
+
+Cách check nhanh:
+- Mở `https://<host>/openapi.json` và tìm path `/api/v1/sessions`
+- Hoặc chạy (PowerShell):
+```powershell
+python -c "import requests; o=requests.get('https://<host>/openapi.json', timeout=20).json(); print('/api/v1/sessions' in (o.get('paths') or {}))"
+```
+
+Nếu in ra `False` → cần redeploy backend mới (root directory đúng là `vnpt_ai_hackathon/backend`) rồi mới test được `WS /api/v1/ws/audio/...`.
+
 ### 3.1 Bơm transcript (dev/test)
 Chạy script: `backend/tests/test_ingest_ws.py` (chỉnh `WS_URL` và `session_id` theo môi trường).
 
@@ -87,6 +101,17 @@ Script đọc WAV PCM 16kHz mono và stream vào `WS /ws/audio`, đồng thời 
 
 Gợi ý dùng file mẫu sẵn có:
 - `backend/tests/resources/eLabs-1.wav` (mono 16-bit, 44.1kHz). Script sẽ **tự resample về 16kHz** trước khi stream.
+
+Ví dụ chạy nhanh để chỉ test “API có hứng audio hay chưa” (không cần SmartVoice):
+```powershell
+cd vnpt_ai_hackathon/backend/tests
+$env:MEETMATE_HTTP_BASE = "https://<host>"
+python .\\test_audio_ingest_ws.py
+```
+
+Kỳ vọng log:
+- Có `audio_start_ack` → backend accept start + format
+- Có `audio_ingest_ok` → backend confirm đã nhận được ít nhất 1 frame audio
 
 ---
 

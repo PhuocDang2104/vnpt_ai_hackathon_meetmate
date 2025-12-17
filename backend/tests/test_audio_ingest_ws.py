@@ -6,7 +6,9 @@ import uuid
 import wave
 import warnings
 
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="audioop")
+# Python 3.11+ emits DeprecationWarning for `audioop` with stacklevel=2, so the
+# warning is attributed to this script (module=__main__). Filter by message.
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*audioop.*")
 
 import audioop
 import httpx
@@ -16,9 +18,9 @@ import websockets
 Test WS raw audio ingress (MeetMate).
 
 What this script verifies:
-✅ WS connects and server returns `audio_start_ack` (API accepted audio start + format)
-✅ Audio frames are streamed without WS disconnect
-⚠️ If SmartVoice is not configured/working, server may emit `smartvoice_error` and close the WS.
+- [OK] WS connects and server returns `audio_start_ack` (API accepted audio start + format)
+- [OK] Audio frames are streamed without WS disconnect
+- [WARN] If SmartVoice is not configured/working, server may emit `smartvoice_error` and close the WS.
 
 Default WAV path is the one you provided:
   C:\\Users\\ADMIN\\Desktop\\vnpt_meetmate\\vnpt_ai_hackathon\\backend\\tests\\resources\\eLabs-1.wav
@@ -55,6 +57,32 @@ def _ws_base_from_http(http_base: str) -> str:
     if http_base.startswith("ws://") or http_base.startswith("wss://"):
         return http_base
     return "ws://" + http_base
+
+
+async def _print_openapi_debug() -> None:
+    url = f"{HTTP_BASE}/openapi.json"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                print(f"[INFO] openapi.json not available ({resp.status_code}): {url}")
+                return
+            data = resp.json()
+            paths = sorted((data.get("paths") or {}).keys())
+            session_like = [p for p in paths if "session" in p.lower()]
+            ws_like = [p for p in paths if "ws" in p.lower()]
+            print("[INFO] OpenAPI quick check:")
+            print("  - has /api/v1/sessions:", "/api/v1/sessions" in paths)
+            if session_like:
+                print("  - session-like paths (first 10):")
+                for p in session_like[:10]:
+                    print("    ", p)
+            if ws_like:
+                print("  - ws-like paths (first 10):")
+                for p in ws_like[:10]:
+                    print("    ", p)
+    except Exception as exc:
+        print(f"[INFO] Failed to fetch OpenAPI for debug: {exc}")
 
 
 async def _create_session() -> dict:
@@ -121,23 +149,31 @@ async def main() -> int:
     print("WAV_PATH:", WAV_PATH)
 
     if not os.path.exists(WAV_PATH):
-        print(f"❌ WAV file not found: {WAV_PATH}")
+        print(f"[ERR] WAV file not found: {WAV_PATH}")
         return 1
 
     # 1) Create session
     try:
         sess = await _create_session()
-        print("✅ Session created:", sess.get("session_id"))
+        print("[OK] Session created:", sess.get("session_id"))
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            print(f"[ERR] Backend {HTTP_BASE} does not expose realtime endpoint `POST /api/v1/sessions` (404).")
+            print("      It looks like your Render deployment is outdated; redeploy the backend before testing WS audio ingest.")
+            await _print_openapi_debug()
+        else:
+            print("[ERR] Failed to create session:", exc)
+        return 1
     except Exception as exc:
-        print("❌ Failed to create session:", exc)
+        print("[ERR] Failed to create session:", exc)
         return 1
 
-    # 2) Register source → token
+    # 2) Register source -> token
     try:
         token = await _register_source_token()
-        print("✅ Got audio_ingest_token (len={} chars)".format(len(token)))
+        print("[OK] Got audio_ingest_token (len={} chars)".format(len(token)))
     except Exception as exc:
-        print("❌ Failed to register source token:", exc)
+        print("[ERR] Failed to register source token:", exc)
         return 1
 
     ws_base = _ws_base_from_http(HTTP_BASE).rstrip("/")
@@ -158,12 +194,12 @@ async def main() -> int:
             close_timeout=5,
             max_size=16 * 1024 * 1024,
         ) as ws:
-            print("✅ WS connected:", audio_ws_url)
+            print("[OK] WS connected:", audio_ws_url)
 
             # Consume optional connected message
             try:
                 hello = await asyncio.wait_for(ws.recv(), timeout=2)
-                print("⬅️", hello)
+                print("<-", hello)
             except asyncio.TimeoutError:
                 pass
 
@@ -183,10 +219,10 @@ async def main() -> int:
             try:
                 msg = await asyncio.wait_for(ws.recv(), timeout=ACK_TIMEOUT_SEC)
             except asyncio.TimeoutError:
-                print("❌ No audio_start_ack within timeout ({}s).".format(ACK_TIMEOUT_SEC))
+                print("[ERR] No audio_start_ack within timeout ({}s).".format(ACK_TIMEOUT_SEC))
                 return 1
 
-            print("⬅️", msg)
+            print("<-", msg)
             if isinstance(msg, str):
                 try:
                     data = json.loads(msg)
@@ -196,13 +232,13 @@ async def main() -> int:
                     ack_ok = True
                     if data.get("stt_enabled") is False:
                         stt_disabled_notice = True
-                    print("✅ audio_start_ack -> API đã accept start + format audio.")
+                    print("[OK] audio_start_ack -> API accepted start + audio format.")
                 elif data.get("event") == "error":
-                    print("❌ API trả error ngay sau start:", data)
+                    print("[ERR] API returned error right after start:", data)
                     return 1
 
             if not ack_ok:
-                print("❌ Không nhận được audio_start_ack hợp lệ.")
+                print("[ERR] Did not receive a valid audio_start_ack.")
                 return 1
 
             async def recv_events():
@@ -225,16 +261,16 @@ async def main() -> int:
                     if event == "audio_ingest_ok":
                         if not ingest_ok.is_set():
                             ingest_ok.set()
-                            print("✅ audio_ingest_ok:", data)
+                            print("[OK] audio_ingest_ok:", data)
                     elif event == "stt_disabled":
                         stt_disabled_notice = True
-                        print("ℹ️ stt_disabled:", data)
+                        print("[INFO] stt_disabled:", data)
                     elif event == "throttle":
                         throttle_events += 1
-                        print("⚠️ throttle:", data)
+                        print("[WARN] throttle:", data)
                     elif event == "error":
                         server_error = data
-                        print("❌ server error:", data)
+                        print("[ERR] server error:", data)
                         ingest_ok.set()
                         return
 
@@ -266,11 +302,11 @@ async def main() -> int:
                     try:
                         await asyncio.wait_for(ingest_ok.wait(), timeout=INGEST_OK_TIMEOUT_SEC)
                     except asyncio.TimeoutError:
-                        print("❌ Không nhận được audio_ingest_ok (server chưa confirm nhận frame).")
+                        print("[ERR] Did not receive audio_ingest_ok (server did not confirm first frame).")
                         recv_task.cancel()
                         return 1
                 if sent % 10 == 0:
-                    print(f"➡️ sent frames: {sent}/{total_frames}")
+                    print(f"-> sent frames: {sent}/{total_frames}")
                 await asyncio.sleep(FRAME_MS / 1000)
 
             # Signal stop (optional)
@@ -283,17 +319,17 @@ async def main() -> int:
             recv_task.cancel()
 
             if server_error:
-                print("❌ FAIL: server reported error while streaming.")
+                print("[ERR] FAIL: server reported error while streaming.")
                 return 1
 
-            print(f"✅ OK: streamed {sent} frames, throttle_events={throttle_events}.")
+            print(f"[OK] OK: streamed {sent} frames, throttle_events={throttle_events}.")
             if stt_disabled_notice:
-                print("ℹ️ Note: STT đang tắt (đúng mục tiêu test ingest-only).")
-            print("✅ Kết luận: API đã hứng audio (audio_start_ack + audio_ingest_ok).")
+                print("[INFO] Note: STT is disabled (ingest-only test).")
+            print("[OK] Conclusion: API received audio (audio_start_ack + audio_ingest_ok).")
             return 0
 
     except Exception as exc:
-        print("❌ WS connection/streaming error:", exc)
+        print("[ERR] WS connection/streaming error:", exc)
         return 1
 
 

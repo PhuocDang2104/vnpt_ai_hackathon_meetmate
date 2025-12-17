@@ -38,6 +38,8 @@ class SessionCreateResponse(BaseModel):
 
 class SourceRegisterResponse(BaseModel):
     session_id: str
+    source_id: str | None = None
+    platform: str | None = None
     audio_ingest_token: str
     token_ttl_seconds: int = 1800
 
