@@ -9,6 +9,7 @@ import json
 import re
 
 from sqlalchemy.orm import Session
+from groq import Groq
 
 from app.schemas.agenda import (
     AgendaItem,
@@ -29,14 +30,12 @@ _mock_agendas: dict[str, AgendaItem] = {}
 # Get settings
 settings = get_settings()
 
-# Try to import Gemini
+# Groq availability
 try:
-    import google.generativeai as genai
-    genai.configure(api_key=settings.gemini_api_key)
-    GEMINI_AVAILABLE = bool(settings.gemini_api_key)
+    GROQ_AVAILABLE = bool(settings.groq_api_key)
 except Exception as e:
-    logger.warning(f"Gemini not available: {e}")
-    GEMINI_AVAILABLE = False
+    logger.warning(f"Groq not available: {e}")
+    GROQ_AVAILABLE = False
 
 
 def _init_mock_agendas():
@@ -399,4 +398,3 @@ def _generate_mock_agenda(request: AgendaGenerateRequest) -> AgendaGenerateRespo
         ai_notes="Đây là agenda mẫu được tạo tự động. Bạn có thể chỉnh sửa theo nhu cầu.",
         is_saved=False,
     )
-

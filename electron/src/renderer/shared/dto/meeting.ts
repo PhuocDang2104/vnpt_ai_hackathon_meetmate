@@ -79,6 +79,11 @@ export interface MeetingWithParticipants extends Meeting {
   organizer?: Participant;
 }
 
+export interface MeetingListResponse {
+  meetings: Meeting[];
+  total: number;
+}
+
 export interface MeetingCreate {
   title: string;
   description?: string;

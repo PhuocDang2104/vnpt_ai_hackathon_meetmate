@@ -1,6 +1,6 @@
 """
 AI Chat HTTP Endpoints
-Handles synchronous chat requests with Gemini AI
+Handles synchronous chat requests with Groq LLM (replaces Gemini)
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -53,43 +53,43 @@ def get_ai_status():
     settings = get_settings()
     
     return {
-        'gemini_available': is_gemini_available(),
+        'groq_available': is_gemini_available(),
         'status': 'ready' if is_gemini_available() else 'mock_mode',
-        'model': settings.gemini_model,
-        'api_key_set': bool(settings.gemini_api_key and len(settings.gemini_api_key) > 10),
-        'api_key_preview': settings.gemini_api_key[:8] + '...' if settings.gemini_api_key else None
+        'model': getattr(settings, 'groq_model', None),
+        'api_key_set': bool(getattr(settings, 'groq_api_key', '') and len(getattr(settings, 'groq_api_key', '')) > 10),
+        'api_key_preview': (getattr(settings, 'groq_api_key', '')[:8] + '...') if getattr(settings, 'groq_api_key', '') else None
     }
 
 
 @router.get('/test')
-async def test_gemini():
-    """Test Gemini API directly"""
+async def test_groq():
+    """Test Groq API directly"""
     from app.core.config import get_settings
-    import google.generativeai as genai
+    from groq import Groq
     
     settings = get_settings()
     
-    if not settings.gemini_api_key:
+    if not settings.groq_api_key:
         return {'error': 'No API key configured', 'key': None}
     
     try:
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        response = model.generate_content(
-            "Say hello in Vietnamese",
-            generation_config=genai.types.GenerationConfig(max_output_tokens=50)
+        client = Groq(api_key=settings.groq_api_key)
+        resp = client.chat.completions.create(
+            messages=[{"role": "user", "content": "Say hello in Vietnamese"}],
+            model=settings.groq_model,
+            max_tokens=30
         )
         return {
             'success': True,
-            'response': response.text,
-            'model': settings.gemini_model
+            'response': resp.choices[0].message.content,
+            'model': settings.groq_model
         }
     except Exception as e:
         return {
             'success': False,
             'error': str(e),
-            'model': settings.gemini_model,
-            'api_key_preview': settings.gemini_api_key[:8] + '...' if settings.gemini_api_key else None
+            'model': settings.groq_model,
+            'api_key_preview': settings.groq_api_key[:8] + '...' if settings.groq_api_key else None
         }
 
 

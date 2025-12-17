@@ -36,6 +36,7 @@ export const en = {
     knowledge: 'Knowledge Hub',
     settings: 'Settings',
     adminConsole: 'Admin Console',
+    projects: 'Projects',
     help: 'Help',
     notifications: 'Notifications',
     profile: 'Profile',
@@ -318,4 +319,3 @@ export const en = {
     },
   },
 };
-

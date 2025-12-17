@@ -29,11 +29,11 @@ class Settings(BaseSettings):
     
     # AI API Keys - Set via environment variable in production
     openai_api_key: str = ''
-    gemini_api_key: str = ''
+    gemini_api_key: str = ''  # legacy
+    groq_api_key: str = ''
     
     # AI Model settings
-    # Valid models: gemini-2.5-flash-lite, gemini-1.5-flash, gemini-1.5-pro
-    gemini_model: str = 'gemini-2.5-flash-lite'
+    groq_model: str = 'llama-3.3-70b-versatile'
     ai_temperature: float = 0.7
     ai_max_tokens: int = 2048
     

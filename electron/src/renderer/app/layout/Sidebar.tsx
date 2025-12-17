@@ -3,12 +3,12 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
-  Radio,
   BookOpen,
   CheckSquare,
   Settings,
   Bot,
   LogOut,
+  FolderOpen,
 } from 'lucide-react'
 import { currentUser, getInitials, actionItems } from '../../store/mockData'
 import { logout, getStoredUser } from '../../lib/api/auth'
@@ -34,7 +34,7 @@ const Sidebar = () => {
     { path: '/app', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/app/calendar', labelKey: 'nav.calendar', icon: <Calendar size={20} /> },
     { path: '/app/meetings', labelKey: 'nav.meetings', icon: <Users size={20} /> },
-    { path: '/app/live', labelKey: 'dashboard.liveMeeting', icon: <Radio size={20} /> },
+    { path: '/app/projects', labelKey: 'nav.projects', icon: <FolderOpen size={20} /> },
   ]
 
   const toolsNavItems: NavItem[] = [
