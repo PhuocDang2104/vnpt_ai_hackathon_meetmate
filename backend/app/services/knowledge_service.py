@@ -221,6 +221,13 @@ def _row_to_doc(row) -> KnowledgeDocument:
         view_count=0,
         last_accessed_at=row.get("updated_at"),
     )
+
+
+def _sanitize_text(text: str) -> str:
+    """Remove NUL and trim."""
+    if not text:
+        return ""
+    return text.replace("\x00", "").strip()
 def _chunk_text(text: str, max_len: int = 1200, overlap: int = 200) -> list[str]:
     """Greedy chunk by characters with overlap."""
     chunks = []
@@ -438,7 +445,7 @@ async def upload_document(
         # If original file content is available, try decode
         try:
             if file and "content" in locals() and content:
-                text_content = content.decode("utf-8", errors="ignore")
+                text_content = _sanitize_text(content.decode("utf-8", errors="ignore"))
         except Exception:
             text_content = ""
 
@@ -447,10 +454,11 @@ async def upload_document(
             text_parts = [doc.title]
             if doc.description:
                 text_parts.append(doc.description)
-            text_content = "\n".join(text_parts)
+            text_content = _sanitize_text("\n".join(text_parts))
 
         chunks = _chunk_text(text_content) if text_content else []
         if chunks and is_jina_available():
+            chunks = [_sanitize_text(c) for c in chunks if _sanitize_text(c)]
             embeddings = embed_texts(chunks)
             for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
                 emb_literal = "[" + ",".join(str(x) for x in emb) + "]"
