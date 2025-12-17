@@ -10,6 +10,7 @@ from sqlalchemy import text
 import json
 import io
 import pdfplumber
+import re
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -230,6 +231,21 @@ def _sanitize_text(text: str) -> str:
     if not text:
         return ""
     return text.replace("\x00", "").strip()
+
+
+def _is_smalltalk_or_noise(query: str) -> bool:
+    """Heuristic: greetings or too-short queries => handle without RAG."""
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    # Very short or only punctuation
+    if len(q) <= 2 or re.fullmatch(r"[.?/!]+", q):
+        return True
+    smalltalk_keywords = [
+        "hi", "hello", "helo", "hey", "chào", "xin chào", "alo",
+        "cái gì", "gì vậy", "gì đây", "ai đó", "bot ơi", "hello?", "test", "ping",
+    ]
+    return any(q == kw or q.startswith(kw + " ") for kw in smalltalk_keywords)
 
 
 def _format_vector(vec: list[float]) -> str:
@@ -756,6 +772,16 @@ async def query_knowledge_ai(
     request: KnowledgeQueryRequest,
 ) -> KnowledgeQueryResponse:
     """RAG query using pgvector + Groq"""
+    # Smalltalk/noise handling
+    if _is_smalltalk_or_noise(request.query):
+        answer = "Xin chào! Bạn muốn hỏi gì về tài liệu/policy? Hãy mô tả rõ hơn nhé."
+        return KnowledgeQueryResponse(
+            answer=answer,
+            relevant_documents=[],
+            confidence=0.5,
+            citations=[],
+        )
+
     top_k_chunks = max(request.limit * 3, 12)
     chunks = []
     relevant_docs: List[KnowledgeDocument] = []
@@ -837,6 +863,15 @@ async def query_knowledge_ai(
     for ch in chunks[: top_k_chunks]:
         context_parts.append(f"[{ch['title']} | score={ch['distance']:.3f}] {ch['text']}")
     context = "\n".join(context_parts) if context_parts else "Không có ngữ cảnh liên quan."
+
+    # If no context at all, avoid repeating 'Không đủ dữ liệu', give gentle ask for clarification
+    if not context_parts:
+        return KnowledgeQueryResponse(
+            answer="Mình chưa tìm thấy tài liệu liên quan. Bạn mô tả rõ hơn chủ đề hoặc tên tài liệu nhé?",
+            relevant_documents=[],
+            confidence=0.4,
+            citations=[],
+        )
 
     # Call Groq LLM
     if is_gemini_available():
