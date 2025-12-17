@@ -144,27 +144,52 @@ const Projects = () => {
               </button>
             </div>
             <div className="modal__body">
-              <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <input
-                  className="input input--lg"
-                  placeholder="Tên dự án *"
-                  value={form.name}
-                  onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                />
-                <input
-                  className="input input--lg"
-                  placeholder="Mã dự án (tuỳ chọn)"
-                  value={form.code}
-                  onChange={e => setForm(prev => ({ ...prev, code: e.target.value }))}
-                />
-                <textarea
-                  className="input input--lg"
-                  placeholder="Mô tả (tuỳ chọn)"
-                  value={form.description}
-                  onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  rows={3}
-                  style={{ gridColumn: 'span 2' }}
-                />
+              <div className="form-grid" style={{ gridTemplateColumns: '1fr', gap: 16 }}>
+                <label className="form-field">
+                  <span className="form-field__label">Tên dự án *</span>
+                  <input
+                    className="input input--lg"
+                    placeholder="VD: LPB - Digital Onboarding"
+                    value={form.name}
+                    onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                    style={{ width: '100%' }}
+                  />
+                </label>
+
+                <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <label className="form-field">
+                    <span className="form-field__label">Mã dự án (tuỳ chọn)</span>
+                    <input
+                      className="input input--lg"
+                      placeholder="VD: PROJ-001"
+                      value={form.code}
+                      onChange={e => setForm(prev => ({ ...prev, code: e.target.value }))}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="form-field__label">Phạm vi / Stakeholder (tuỳ chọn)</span>
+                    <input
+                      className="input input--lg"
+                      placeholder="VD: PMO, Tech, Biz; Org/Dept liên quan"
+                      value={form.description}
+                      onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+
+                <label className="form-field">
+                  <span className="form-field__label">Mô tả chi tiết (tuỳ chọn)</span>
+                  <textarea
+                    className="input input--lg"
+                    placeholder="Mục tiêu, phạm vi, mốc quan trọng, stakeholder chính..."
+                    value={form.description}
+                    onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    style={{ width: '100%' }}
+                  />
+                </label>
               </div>
             </div>
             <div className="modal__footer">

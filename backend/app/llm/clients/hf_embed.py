@@ -12,8 +12,14 @@ from app.core.config import get_settings
 settings = get_settings()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_EMBED_MODEL = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-HF_URL = f"https://api-inference.huggingface.co/models/{HF_EMBED_MODEL}"
+HF_EMBED_MODEL = os.getenv("HF_EMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
+# Use router.huggingface.co per latest requirement (api-inference.huggingface.co returns 410)
+HF_API_BASE = os.getenv("HF_API_BASE", "https://router.huggingface.co/hf-inference")
+HF_PIPELINE = os.getenv("HF_PIPELINE")  # ví dụ: sentence-similarity
+if HF_PIPELINE:
+    HF_URL = f"{HF_API_BASE}/models/{HF_EMBED_MODEL}/pipeline/{HF_PIPELINE}"
+else:
+    HF_URL = f"{HF_API_BASE}/models/{HF_EMBED_MODEL}"
 
 
 def is_hf_available() -> bool:

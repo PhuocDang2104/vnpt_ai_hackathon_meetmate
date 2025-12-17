@@ -5,7 +5,7 @@ Usage:
     DATABASE_URL="postgresql://..." python ingest_local.py --file /path/to/doc.txt --title "My Doc"
 
 Notes:
-- Uses Alibaba-NLP/gte-small (384 dims). Make sure DB column knowledge_chunk.embedding is vector(384).
+- Uses nomic-ai/nomic-embed-text-v1.5 (768 dims). Make sure DB column knowledge_chunk.embedding is vector(768).
 - Simple chunking by paragraphs with max_len characters; adjust as needed.
 """
 
@@ -58,7 +58,7 @@ def main():
 
     print(f"Chunks: {len(chunks)}")
 
-    model = SentenceTransformer("Alibaba-NLP/gte-small")
+    model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
     embeddings = model.encode(chunks, normalize_embeddings=True).tolist()
 
     doc_id = uuid.uuid4()
