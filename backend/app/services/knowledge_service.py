@@ -626,7 +626,7 @@ async def _vector_search_documents(
                     kd.file_url,
                     kd.created_at,
                     kd.updated_at,
-                    kd.document_type,
+                    NULL::text AS document_type,
                     (kc.embedding <=> CAST(:query_vec AS vector)) AS distance
                 FROM knowledge_chunk kc
                 JOIN knowledge_document kd ON kc.document_id = kd.id
@@ -692,7 +692,8 @@ async def search_documents(
                 f"""
                 SELECT id, title, description, source, category, tags,
                        file_type, file_size, storage_key, file_url,
-                       created_at, updated_at, document_type
+                       created_at, updated_at,
+                       NULL::text AS document_type
                 FROM knowledge_document
                 WHERE {where_clause}
                 ORDER BY created_at DESC NULLS LAST
@@ -789,17 +790,17 @@ async def query_knowledge_ai(
                         kd.category,
                         kd.tags,
                         kd.file_type,
-                        kd.file_size,
-                        kd.storage_key,
-                        kd.file_url,
-                        kd.created_at,
-                        kd.updated_at,
-                        kd.document_type,
-                        kc.content,
-                        kc.chunk_index,
-                        (kc.embedding <=> CAST(:query_vec AS vector)) AS distance
-                    FROM knowledge_chunk kc
-                    JOIN knowledge_document kd ON kc.document_id = kd.id
+                    kd.file_size,
+                    kd.storage_key,
+                    kd.file_url,
+                    kd.created_at,
+                    kd.updated_at,
+                    NULL::text AS document_type,
+                    kc.content,
+                    kc.chunk_index,
+                    (kc.embedding <=> CAST(:query_vec AS vector)) AS distance
+                FROM knowledge_chunk kc
+                JOIN knowledge_document kd ON kc.document_id = kd.id
                     WHERE {where_clause}
                     ORDER BY distance ASC
                     LIMIT :top_k
