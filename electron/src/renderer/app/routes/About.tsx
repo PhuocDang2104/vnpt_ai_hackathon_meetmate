@@ -67,7 +67,7 @@ const About = () => {
         
         <div className="about-grid about-grid--2">
           <div className="about-card about-card--problem">
-            <h3>😫 Vấn đề hiện tại</h3>
+            <h3>Vấn đề hiện tại</h3>
             <ul>
               <li>Chuẩn bị họp mất nhiều thời gian</li>
               <li>Ghi chép thủ công, dễ bỏ sót thông tin</li>
@@ -78,7 +78,7 @@ const About = () => {
           </div>
           
           <div className="about-card about-card--solution">
-            <h3>✨ Giải pháp MeetMate</h3>
+            <h3>✨Giải pháp MeetMate</h3>
             <ul>
               <li>AI tự động đề xuất agenda & tài liệu</li>
               <li>Real-time transcription & ghi chép</li>
@@ -295,7 +295,15 @@ const About = () => {
             <div className="about-team-avatar">
               <Users size={32} />
             </div>
-            <h4>Team Member 1</h4>
+            <h4>Đặng Như Phước</h4>
+            <p>Leader</p>
+          </div>
+          
+          <div className="about-team-member">
+            <div className="about-team-avatar">
+              <Users size={32} />
+            </div>
+            <h4>Thái Hoài An</h4>
             <p>Role / Position</p>
           </div>
           
@@ -303,7 +311,7 @@ const About = () => {
             <div className="about-team-avatar">
               <Users size={32} />
             </div>
-            <h4>Team Member 2</h4>
+            <h4>Trương Minh Đạt</h4>
             <p>Role / Position</p>
           </div>
           
@@ -311,15 +319,7 @@ const About = () => {
             <div className="about-team-avatar">
               <Users size={32} />
             </div>
-            <h4>Team Member 3</h4>
-            <p>Role / Position</p>
-          </div>
-          
-          <div className="about-team-member">
-            <div className="about-team-avatar">
-              <Users size={32} />
-            </div>
-            <h4>Team Member 4</h4>
+            <h4>Hoàng Minh Quân</h4>
             <p>Role / Position</p>
           </div>
         </div>
