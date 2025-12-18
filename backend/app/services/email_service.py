@@ -112,10 +112,10 @@ def send_meeting_minutes_email(
 
 Biên bản cuộc họp "{meeting_title}" đã được hoàn thành.
 
-📅 Thời gian: {meeting_date} - {meeting_time}
-📍 Địa điểm: {meeting_location}
+Thời gian: {meeting_date} - {meeting_time}
+Địa điểm: {meeting_location}
 
-📋 TÓM TẮT:
+TÓM TẮT:
 {executive_summary}
 
 ---
@@ -144,14 +144,14 @@ Vui lòng không trả lời email này.
 <body>
     <div class="container">
         <div class="header">
-            <h1>📋 Biên bản cuộc họp</h1>
+            <h1>Biên bản cuộc họp</h1>
             <p style="margin: 5px 0 0; opacity: 0.9;">{meeting_title}</p>
         </div>
         <div class="content">
             <div class="meta">
-                <div class="meta-item">📅 {meeting_date}</div>
-                <div class="meta-item">🕐 {meeting_time}</div>
-                <div class="meta-item">📍 {meeting_location}</div>
+                <div class="meta-item">{meeting_date}</div>
+                <div class="meta-item">{meeting_time}</div>
+                <div class="meta-item">{meeting_location}</div>
             </div>
             <div class="summary">
                 <h3>Tóm tắt cuộc họp</h3>
