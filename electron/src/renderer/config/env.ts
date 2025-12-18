@@ -20,3 +20,7 @@ export const USE_API = true;
 
 // Debug mode
 export const DEBUG = !IS_PRODUCTION;
+
+// Supabase Auth (điền giá trị thật qua env Vite khi build)
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';

@@ -3,9 +3,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Building2, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
 import { register } from '../../../lib/api/auth';
-import { listDepartments, Department } from '../../../lib/api/users';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -14,25 +13,10 @@ export const Register: React.FC = () => {
     password: '',
     confirmPassword: '',
     display_name: '',
-    department_id: ''
   });
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    loadDepartments();
-  }, []);
-
-  const loadDepartments = async () => {
-    try {
-      const result = await listDepartments();
-      setDepartments(result.departments);
-    } catch (err) {
-      console.error('Failed to load departments:', err);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -64,7 +48,6 @@ export const Register: React.FC = () => {
         email: formData.email,
         password: formData.password,
         display_name: formData.display_name,
-        department_id: formData.department_id || undefined
       });
 
       setSuccess(result.message);
@@ -136,26 +119,6 @@ export const Register: React.FC = () => {
                 onChange={handleChange}
                 required
               />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="department_id">Phòng ban (tùy chọn)</label>
-            <div className="input-with-icon">
-              <Building2 size={18} />
-              <select
-                id="department_id"
-                name="department_id"
-                value={formData.department_id}
-                onChange={handleChange}
-              >
-                <option value="">-- Chọn phòng ban --</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -407,4 +370,3 @@ export const Register: React.FC = () => {
 };
 
 export default Register;
-
