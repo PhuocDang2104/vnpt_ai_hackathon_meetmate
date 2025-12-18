@@ -13,6 +13,8 @@ const projectsApi = {
   get: (projectId: string) => api.get<Project>(`${base}/${projectId}`),
 
   listMembers: (projectId: string) => api.get<ProjectMemberList>(`${base}/${projectId}/members`),
+  addMember: (projectId: string, user_id: string, role: string = 'member') =>
+    api.post(`${base}/${projectId}/members?user_id=${encodeURIComponent(user_id)}&role=${encodeURIComponent(role)}`),
 
   listDocuments: (projectId: string) => api.get<DocumentListResponse>(`${base}/${projectId}/documents`),
 

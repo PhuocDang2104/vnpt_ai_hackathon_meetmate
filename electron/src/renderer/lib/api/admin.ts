@@ -60,8 +60,7 @@ export const adminDeleteActionItem = (itemId: string) =>
 
 // Projects
 export const adminListProjects = (params?: { skip?: number; limit?: number; search?: string; department_id?: string; organization_id?: string }) =>
-  api.get<ProjectListResponse>('/projects', params)
+  api.get<ProjectListResponse>('/projects/', params)
 
 export const adminCreateProject = (data: { name: string; code?: string; description?: string; organization_id?: string; department_id?: string }) =>
-  api.post<Project>('/projects', data)
-
+  api.post<Project>('/projects/', data)
