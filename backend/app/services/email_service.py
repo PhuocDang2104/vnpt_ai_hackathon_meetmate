@@ -5,7 +5,7 @@ import smtplib
 import logging
 from email.message import EmailMessage
 from email.headerregistry import Address
-from email.policy import SMTP
+from email.policy import SMTPUTF8
 from email.header import Header
 from typing import Optional, List
 from app.core.config import get_settings
@@ -52,7 +52,7 @@ def send_email(
         }
     
     try:
-        msg = EmailMessage(policy=SMTP)
+        msg = EmailMessage(policy=SMTPUTF8)
         from_name = _clean(settings.email_from_name) or settings.smtp_user
         from_email = _clean(settings.smtp_user)
 

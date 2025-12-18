@@ -17,6 +17,7 @@ import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 import { Login, Register } from '../routes/Auth'
 import Landing from '../routes/Landing'
 import AdminConsole from '../routes/AdminConsole'
+import ProtectedRoute from './ProtectedRoute'
 
 const router = createHashRouter([
   // Public routes
@@ -27,7 +28,11 @@ const router = createHashRouter([
   // App routes (with shell) - Protected
   {
     path: '/app',
-    element: <AppShell />,
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'dashboard', element: <Dashboard /> },

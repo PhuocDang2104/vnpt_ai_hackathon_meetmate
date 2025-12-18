@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
 import { register } from '../../../lib/api/auth';
+import api from '../../../lib/apiClient';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -49,6 +50,16 @@ export const Register: React.FC = () => {
         password: formData.password,
         display_name: formData.display_name,
       });
+
+      // Gửi email welcome (best effort)
+      try {
+        await api.post('/auth/welcome', {
+          email: formData.email,
+          display_name: formData.display_name,
+        }, { skipAuth: true });
+      } catch (err) {
+        console.warn('Welcome email failed (ignored):', err);
+      }
 
       setSuccess(result.message);
       

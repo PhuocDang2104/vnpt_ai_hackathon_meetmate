@@ -4,6 +4,7 @@ Authentication API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -12,6 +13,7 @@ from app.schemas.auth import (
 )
 from app.services import auth_service
 from app.core.security import get_current_user, get_current_user_id
+from app.services.email_service import send_email, is_email_enabled
 
 router = APIRouter()
 
@@ -180,3 +182,39 @@ def verify_token(current_user: dict = Depends(get_current_user)):
         "email": current_user.get("email"),
         "role": current_user.get("role")
     }
+
+
+class WelcomeRequest(BaseModel):
+    email: str
+    display_name: str = "Bạn"
+
+
+@router.post('/welcome')
+def send_welcome_email(payload: WelcomeRequest):
+    """
+    Send welcome email manually (for Supabase signup flows).
+    """
+    if not is_email_enabled():
+        raise HTTPException(status_code=500, detail="Email not configured")
+    subject = "Chào mừng bạn đến MeetMate"
+    body_text = (
+        f"Xin chào {payload.display_name},\n\n"
+        "Tài khoản của bạn đã được tạo thành công.\n"
+        "Hãy đăng nhập để trải nghiệm MeetMate.\n\n"
+        "Trân trọng,\nMeetMate"
+    )
+    body_html = f"""
+    <p>Xin chào <b>{payload.display_name}</b>,</p>
+    <p>Tài khoản của bạn đã được tạo thành công.</p>
+    <p>Hãy đăng nhập để trải nghiệm MeetMate.</p>
+    <p>Trân trọng,<br/>MeetMate</p>
+    """
+    res = send_email(
+        to_emails=[payload.email],
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=res.get("error", "Send failed"))
+    return {"message": "Welcome email sent"}

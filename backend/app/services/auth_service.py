@@ -17,6 +17,7 @@ from app.core.security import (
     create_access_token, create_refresh_token,
     verify_token, ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from app.services.email_service import send_email, is_email_enabled
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[dict]:
@@ -152,6 +153,32 @@ def register_user(db: Session, data: UserRegister) -> UserRegisterResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create user: {str(e)}"
         )
+
+    # Send welcome email (best effort)
+    if is_email_enabled():
+        try:
+            subject = "Chào mừng bạn đến MeetMate"
+            body_text = (
+                f"Xin chào {data.display_name},\n\n"
+                "Tài khoản của bạn đã được tạo thành công.\n"
+                "Hãy đăng nhập để trải nghiệm MeetMate.\n\n"
+                "Trân trọng,\nMeetMate"
+            )
+            body_html = f"""
+            <p>Xin chào <b>{data.display_name}</b>,</p>
+            <p>Tài khoản của bạn đã được tạo thành công.</p>
+            <p>Hãy đăng nhập để trải nghiệm MeetMate.</p>
+            <p>Trân trọng,<br/>MeetMate</p>
+            """
+            send_email(
+                to_emails=[data.email],
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+            )
+        except Exception as exc:
+            # Không chặn đăng ký vì lỗi email
+            print(f"[AUTH] Welcome email failed for {data.email}: {exc}")
     
     return UserRegisterResponse(
         id=user_id,
