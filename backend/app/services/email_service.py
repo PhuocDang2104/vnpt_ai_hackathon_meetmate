@@ -64,6 +64,7 @@ def send_email(
         msg['To'] = ', '.join(to_emails)
         msg['Subject'] = str(Header(subject, 'utf-8'))
         msg['Message-ID'] = make_msgid()
+        msg.set_charset('utf-8')
         
         # Add text body
         msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
@@ -74,12 +75,13 @@ def send_email(
         
         # Add attachment if provided
         if attachment_content and attachment_filename:
+            safe_filename = str(Header(attachment_filename, 'utf-8'))
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(attachment_content)
             encoders.encode_base64(part)
             part.add_header(
                 'Content-Disposition',
-                f'attachment; filename="{attachment_filename}"'
+                f'attachment; filename="{safe_filename}"'
             )
             msg.attach(part)
         
