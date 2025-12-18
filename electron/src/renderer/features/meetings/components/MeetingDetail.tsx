@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { meetingsApi } from '../../../lib/api/meetings';
 import { sessionsApi } from '../../../lib/api/sessions';
-import type { SessionCreateResponse } from '../../../lib/api/sessions';
 import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { USE_API } from '../../../config/env';
@@ -46,7 +45,6 @@ export const MeetingDetail = () => {
   const [joinPlatform, setJoinPlatform] = useState<'gomeet' | 'gmeet'>('gomeet');
   const [joinLink, setJoinLink] = useState('');
   const [streamSessionId, setStreamSessionId] = useState<string | null>(null);
-  const [realtimeSession, setRealtimeSession] = useState<SessionCreateResponse | null>(null);
   const [sessionInitError, setSessionInitError] = useState<string | null>(null);
   const [isInitSessionLoading, setIsInitSessionLoading] = useState(false);
   
@@ -139,7 +137,6 @@ export const MeetingDetail = () => {
         enable_word_time_offsets: true,
       });
       setStreamSessionId(res.session_id);
-      setRealtimeSession(res);
       setShowJoinModal(false);
     } catch (err) {
       console.error('Failed to init realtime session:', err);
@@ -399,7 +396,6 @@ export const MeetingDetail = () => {
             joinPlatform={joinPlatform}
             joinLink={joinLink}
             streamSessionId={streamSessionId || meeting.id}
-            realtimeSession={realtimeSession}
             onRefresh={fetchMeeting}
             onEndMeeting={handleEndMeeting}
           />
