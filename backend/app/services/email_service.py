@@ -9,6 +9,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 from email.utils import formataddr, make_msgid
 from email.header import Header
+from email.policy import SMTPUTF8
 from typing import Optional, List
 from app.core.config import get_settings
 
@@ -68,7 +69,7 @@ def send_email(
     
     try:
         # Create message (UTF-8 safe headers)
-        msg = MIMEMultipart('alternative')
+        msg = MIMEMultipart('alternative', policy=SMTPUTF8)
         from_name = _clean(settings.email_from_name) or settings.smtp_user
         from_email = _clean(settings.smtp_user)
         msg['From'] = formataddr((str(Header(from_name, 'utf-8')), from_email))
@@ -99,7 +100,7 @@ def send_email(
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             server.starttls()
             server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_user, to_emails, msg.as_string())
+            server.sendmail(settings.smtp_user, to_emails, msg.as_bytes(policy=SMTPUTF8))
         
         logger.info(f"Email sent successfully to {len(to_emails)} recipients")
         return {
