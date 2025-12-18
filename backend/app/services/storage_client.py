@@ -118,3 +118,19 @@ def generate_presigned_get_url(object_key: str, expires_in: int = 3600) -> Optio
     except (BotoCoreError, ClientError) as exc:
         logger.error("Failed to generate presigned URL: %s", exc)
         return None
+
+
+def delete_object(object_key: str) -> bool:
+    """Delete an object from storage bucket. Returns True on success/skip."""
+    if not is_storage_configured():
+        return False
+    client = _get_s3_client()
+    if not client:
+        return False
+    settings = get_settings()
+    try:
+        client.delete_object(Bucket=settings.supabase_s3_bucket, Key=object_key)
+        return True
+    except (BotoCoreError, ClientError) as exc:
+        logger.error("Failed to delete object %s: %s", object_key, exc)
+        return False

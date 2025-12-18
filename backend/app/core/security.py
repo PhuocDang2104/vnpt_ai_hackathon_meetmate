@@ -8,8 +8,10 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.core.config import get_settings
+from app.db.session import get_db
 
 settings = get_settings()
 
@@ -170,6 +172,74 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 def get_current_user_id(current_user: dict = Depends(get_current_user)) -> str:
     """Get current user ID from token"""
     return current_user.get("sub")
+
+
+def get_current_profile(
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+):
+    """
+    Verify Supabase/local JWT and return profile info from profiles or user_account.
+    Returns dict with id, email, display_name, role.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    if not token:
+        raise credentials_exception
+
+    payload = verify_token(token)
+    if not payload:
+        raise credentials_exception
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise credentials_exception
+
+    # Try profiles first
+    row = None
+    try:
+        row = db.execute(
+            text(
+                "SELECT id::text, email, display_name, role "
+                "FROM profiles WHERE id = :id"
+            ),
+            {"id": user_id},
+        ).mappings().first()
+    except Exception:
+        row = None
+
+    # Fallback to legacy user_account
+    if not row:
+        try:
+            row = db.execute(
+                text(
+                    "SELECT id::text, email, display_name, role "
+                    "FROM user_account WHERE id = :id"
+                ),
+                {"id": user_id},
+            ).mappings().first()
+        except Exception:
+            row = None
+
+    profile = {
+        "id": user_id,
+        "email": payload.get("email"),
+        "display_name": payload.get("name") or payload.get("user_metadata", {}).get("full_name"),
+        "role": payload.get("role") or payload.get("app_metadata", {}).get("role") or "user",
+    }
+
+    if row:
+        profile.update({
+            "email": row.get("email") or profile["email"],
+            "display_name": row.get("display_name") or profile["display_name"],
+            "role": row.get("role") or profile["role"],
+        })
+
+    return profile
 
 
 def require_role(allowed_roles: list[str]):

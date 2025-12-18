@@ -13,6 +13,7 @@ import {
   X,
   CheckCircle,
   MessageCircle,
+  Trash2,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
 import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
@@ -86,6 +87,18 @@ const KnowledgeHub = () => {
   }
 
   const displayDocs = searchResults.length > 0 ? searchResults : suggestedDocs
+
+  const handleDelete = async (docId: string) => {
+    const ok = window.confirm('Bạn có chắc muốn xóa tài liệu này?');
+    if (!ok) return;
+    try {
+      await knowledgeApi.delete(docId);
+      await loadData();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('Xóa tài liệu thất bại. Vui lòng thử lại.');
+    }
+  };
 
   return (
     <div>
@@ -246,7 +259,19 @@ const KnowledgeHub = () => {
                           )}
                         </div>
                       </div>
-                      <ExternalLink size={14} style={{ color: 'var(--text-muted)' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ExternalLink size={14} style={{ color: 'var(--text-muted)' }} />
+                        <button
+                          className="btn btn--ghost btn--icon btn--sm"
+                          title="Xóa"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(doc.id);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

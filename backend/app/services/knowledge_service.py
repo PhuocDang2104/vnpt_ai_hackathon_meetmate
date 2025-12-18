@@ -34,6 +34,7 @@ from app.services.storage_client import (
     generate_presigned_get_url,
     is_storage_configured,
     upload_bytes_to_storage,
+    delete_object,
 )
 from app.core.config import get_settings
 
@@ -623,11 +624,57 @@ async def update_document(
 
 
 async def delete_document(db: Session, document_id: UUID) -> bool:
-    """Delete a document"""
+    """Delete a document: DB metadata, chunks, and stored file."""
+    deleted = False
+    # Fetch storage key and file_url for cleanup
+    storage_key = None
+    file_url = None
+    try:
+        row = db.execute(
+            text("SELECT storage_key, file_url FROM knowledge_document WHERE id = :id"),
+            {"id": str(document_id)},
+        ).mappings().first()
+        if row:
+            storage_key = row.get("storage_key")
+            file_url = row.get("file_url")
+    except Exception as exc:
+        logger.warning("Failed to fetch document before delete: %s", exc)
+
+    try:
+        # Delete chunks
+        db.execute(
+            text("DELETE FROM knowledge_chunk WHERE document_id = :id"),
+            {"id": str(document_id)},
+        )
+        # Delete document
+        result = db.execute(
+            text("DELETE FROM knowledge_document WHERE id = :id"),
+            {"id": str(document_id)},
+        )
+        db.commit()
+        deleted = result.rowcount > 0
+    except Exception as exc:
+        logger.error("Failed to delete document %s: %s", document_id, exc, exc_info=True)
+        db.rollback()
+        deleted = False
+
+    # Remove from mock cache
     if str(document_id) in _mock_knowledge_docs:
         del _mock_knowledge_docs[str(document_id)]
-        return True
-    return False
+
+    # Delete file from storage if any
+    try:
+        if storage_key and is_storage_configured():
+            delete_object(storage_key)
+        # Delete local file if stored locally (/files/ or uploaded_files)
+        if file_url and file_url.startswith("/files/"):
+            local_path = Path(__file__).parent.parent / file_url.lstrip("/")
+            if local_path.exists():
+                local_path.unlink()
+    except Exception as exc:
+        logger.warning("Cleanup storage for %s failed: %s", document_id, exc)
+
+    return deleted
 
 
 def _build_vector_filters(request: KnowledgeSearchRequest):
