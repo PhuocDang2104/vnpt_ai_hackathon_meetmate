@@ -1,15 +1,12 @@
 """
-Email Service - Send emails via SMTP (Gmail)
+Email Service - Send emails via SMTP (UTF-8 safe)
 """
 import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from email.utils import formataddr, make_msgid
+from email.message import EmailMessage
+from email.headerregistry import Address
+from email.policy import SMTP
 from email.header import Header
-from email.policy import SMTPUTF8
 from typing import Optional, List
 from app.core.config import get_settings
 
@@ -35,23 +32,10 @@ def send_email(
     attachment_filename: Optional[str] = None,
 ) -> dict:
     """
-    Send email via SMTP
-    
-    Args:
-        to_emails: List of recipient email addresses
-        subject: Email subject
-        body_text: Plain text body
-        body_html: HTML body (optional)
-        attachment_content: File content as bytes (optional)
-        attachment_filename: Attachment filename (optional)
-    
-    Returns:
-        dict with status and details
+    Send email via SMTP (UTF-8 safe, cleans NBSP).
     """
     def _clean(s: Optional[str]) -> str:
-        if not s:
-            return ""
-        return s.replace("\xa0", " ").strip()
+        return s.replace("\xa0", " ").strip() if s else ""
 
     to_emails = [_clean(e) for e in to_emails if _clean(e)]
     subject = _clean(subject)
@@ -68,71 +52,46 @@ def send_email(
         }
     
     try:
-        # Create message (UTF-8 safe headers)
-        msg = MIMEMultipart('alternative', policy=SMTPUTF8)
+        msg = EmailMessage(policy=SMTP)
         from_name = _clean(settings.email_from_name) or settings.smtp_user
         from_email = _clean(settings.smtp_user)
-        msg['From'] = formataddr((str(Header(from_name, 'utf-8')), from_email))
-        msg['To'] = ', '.join([formataddr((str(Header('', 'utf-8')), e)) for e in to_emails])
-        msg['Subject'] = str(Header(subject, 'utf-8'))
-        msg['Message-ID'] = make_msgid()
-        
-        # Add text body
-        msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-        
-        # Add HTML body if provided
+
+        msg['From'] = Address(from_name, addr_spec=from_email)
+        msg['To'] = ", ".join(to_emails)
+        msg['Subject'] = Header(subject, 'utf-8')
+
+        # Plain text
+        msg.set_content(body_text or " ", subtype='plain', charset='utf-8')
+        # HTML
         if body_html:
-            msg.attach(MIMEText(body_html, 'html', 'utf-8'))
-        
-        # Add attachment if provided
+            msg.add_alternative(body_html, subtype='html', charset='utf-8')
+
+        # Attachment (optional)
         if attachment_content and attachment_filename:
-            safe_filename = str(Header(attachment_filename, 'utf-8'))
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment_content)
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename="{safe_filename}"'
+            msg.add_attachment(
+                attachment_content,
+                maintype='application',
+                subtype='octet-stream',
+                filename=str(Header(_clean(attachment_filename), 'utf-8')),
             )
-            msg.attach(part)
-        
-        # Send email
+
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             server.starttls()
-            server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_user, to_emails, msg.as_bytes(policy=SMTPUTF8))
-        
+            server.login(from_email, settings.smtp_password)
+            server.send_message(msg)
+
         logger.info(f"Email sent successfully to {len(to_emails)} recipients")
-        return {
-            'success': True,
-            'sent_to': to_emails,
-            'failed': []
-        }
-        
+        return {'success': True, 'sent_to': to_emails, 'failed': []}
+
     except smtplib.SMTPAuthenticationError as e:
         logger.error(f"SMTP Authentication failed: {e}")
-        return {
-            'success': False,
-            'error': 'SMTP authentication failed. Check email/password.',
-            'sent_to': [],
-            'failed': to_emails
-        }
+        return {'success': False, 'error': 'SMTP authentication failed. Check email/password.', 'sent_to': [], 'failed': to_emails}
     except smtplib.SMTPException as e:
         logger.error(f"SMTP error: {e}")
-        return {
-            'success': False,
-            'error': f'SMTP error: {str(e)}',
-            'sent_to': [],
-            'failed': to_emails
-        }
+        return {'success': False, 'error': f'SMTP error: {str(e)}', 'sent_to': [], 'failed': to_emails}
     except Exception as e:
         logger.error(f"Email send error: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'sent_to': [],
-            'failed': to_emails
-        }
+        return {'success': False, 'error': str(e), 'sent_to': [], 'failed': to_emails}
 
 
 def send_meeting_minutes_email(
