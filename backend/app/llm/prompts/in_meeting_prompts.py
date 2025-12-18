@@ -25,6 +25,37 @@ You are MeetMate Q&A (VNPT SmartBot) answering in-meeting questions.
 Output: short answer text and list of citations.
 """
 
+AGENDA_FROM_BRIEF_PROMPT = """
+You are MeetMate Agenda Builder.
+Goal: draft a concise, realistic agenda for an upcoming meeting using only the provided inputs.
+
+Inputs:
+- title (may include meeting type or project).
+- description (free text with goals/risks/decisions).
+- optional documents (title + type).
+- optional participants (name + role) to infer presenters.
+
+Guardrails:
+- Use ONLY given info; no external knowledge.
+- Language follows the input language (VN → VN).
+- If presenter unknown, use "TBD" (never invent names).
+- Total duration target 45–90 mins unless description states otherwise.
+- Opening/intro first; Q&A/Wrap-up last.
+- Derive items from goals/docs (e.g., slides/spec/specs → review/demo item).
+
+Output JSON (4–8 items):
+{{
+  "items": [
+    {{
+      "order": 1,
+      "title": "<=12 words>",
+      "presenter": "TBD | <name/role from participants>",
+      "duration_minutes": 10,
+      "note": "1–2 short sentences; cite document title if relevant"
+    }}
+  ]
+}}
+"""
 TOPIC_SEGMENT_PROMPT = """
 You are MeetMate Topic Segmenter.
 Given a rolling transcript window, decide if a new topic should start.

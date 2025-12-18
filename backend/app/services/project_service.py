@@ -166,9 +166,46 @@ def update_project(db: Session, project_id: str, data: ProjectUpdate) -> Optiona
 
 
 def delete_project(db: Session, project_id: str) -> bool:
-    result = db.execute(text("DELETE FROM project WHERE id = :project_id RETURNING id"), {'project_id': project_id})
-    db.commit()
-    return result.fetchone() is not None
+    try:
+        # Delete knowledge chunks/documents tied to project
+        db.execute(
+            text(
+                "DELETE FROM knowledge_chunk WHERE document_id IN "
+                "(SELECT id FROM knowledge_document WHERE project_id = :pid)"
+            ),
+            {"pid": project_id},
+        )
+        db.execute(
+            text("DELETE FROM knowledge_document WHERE project_id = :pid"),
+            {"pid": project_id},
+        )
+        # Delete meeting participants then meetings
+        db.execute(
+            text(
+                "DELETE FROM meeting_participant "
+                "WHERE meeting_id IN (SELECT id FROM meeting WHERE project_id = :pid)"
+            ),
+            {"pid": project_id},
+        )
+        db.execute(
+            text("DELETE FROM meeting WHERE project_id = :pid"),
+            {"pid": project_id},
+        )
+        # Delete project members
+        db.execute(
+            text("DELETE FROM project_member WHERE project_id = :pid"),
+            {"pid": project_id},
+        )
+        # Delete project
+        result = db.execute(
+            text("DELETE FROM project WHERE id = :project_id RETURNING id"),
+            {"project_id": project_id},
+        )
+        db.commit()
+        return result.fetchone() is not None
+    except Exception as exc:
+        db.rollback()
+        raise
 
 
 # Members
@@ -219,4 +256,3 @@ def remove_member(db: Session, project_id: str, user_id: str) -> bool:
     """), {'project_id': project_id, 'user_id': user_id})
     db.commit()
     return result.fetchone() is not None
-

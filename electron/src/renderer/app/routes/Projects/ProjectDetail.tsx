@@ -10,6 +10,7 @@ import projectsApi from '../../../lib/api/projects'
 import meetingsApi from '../../../lib/api/meetings'
 import { knowledgeApi, type KnowledgeDocument } from '../../../lib/api/knowledge'
 import { FolderOpen, Users, FileText, MessageSquare, Calendar } from 'lucide-react'
+import { adminListUsers } from '../../../lib/api/admin'
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>()
@@ -29,6 +30,8 @@ const ProjectDetail = () => {
   const [chatLoading, setChatLoading] = useState(false)
   const [showMemberModal, setShowMemberModal] = useState(false)
   const [memberForm, setMemberForm] = useState({ user_id: '', role: 'member' })
+  const [availableUsers, setAvailableUsers] = useState<any[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [showMeetingModal, setShowMeetingModal] = useState(false)
   const [meetingForm, setMeetingForm] = useState<{ title: string; start_time: string; location?: string; meeting_type?: string }>({
     title: '',
@@ -71,6 +74,16 @@ const ProjectDetail = () => {
           console.error('Failed to load docs', err)
         } finally {
           setIsLoadingDocs(false)
+        }
+        // load users for member selection
+        setLoadingUsers(true)
+        try {
+          const resUsers = await adminListUsers({ limit: 200 })
+          setAvailableUsers(resUsers.users || resUsers.data || [])
+        } catch (err) {
+          console.error('Failed to load users', err)
+        } finally {
+          setLoadingUsers(false)
         }
       } finally {
         setLoading(false)
@@ -130,13 +143,30 @@ const ProjectDetail = () => {
               <h3 className="modal__title">Thêm thành viên</h3>
             </div>
             <div className="modal__body">
-              <label className="modal__label">Email hoặc User ID</label>
-              <input
-                className="input"
-                placeholder="user@example.com"
-                value={memberForm.user_id}
-                onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
-              />
+              <label className="modal__label">Chọn người dùng</label>
+              {loadingUsers ? (
+                <div className="form-loading">Đang tải danh sách...</div>
+              ) : (
+                <select
+                  className="input"
+                  value={memberForm.user_id}
+                  onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
+                >
+                  <option value="">-- Chọn thành viên --</option>
+                  {availableUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.display_name || u.email || u.id}</option>
+                  ))}
+                </select>
+              )}
+              <div style={{ marginTop: 10 }}>
+                <label className="modal__label">Hoặc nhập email/User ID</label>
+                <input
+                  className="input"
+                  placeholder="user@example.com"
+                  value={memberForm.user_id}
+                  onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
+                />
+              </div>
               <label className="modal__label" style={{ marginTop: 12 }}>Role</label>
               <select
                 className="input"
