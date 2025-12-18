@@ -70,3 +70,17 @@ class MeetingWithParticipants(Meeting):
 class MeetingList(BaseModel):
     meetings: List[Meeting]
     total: int
+
+
+class MeetingNotifyRecipient(BaseModel):
+    email: str
+    name: Optional[str] = None
+    role: Optional[str] = None
+
+
+class MeetingNotifyRequest(BaseModel):
+    recipients: List[MeetingNotifyRecipient]
+    include_agenda: bool = True
+    include_documents: bool = True
+    include_notes: bool = False
+    custom_message: Optional[str] = None
