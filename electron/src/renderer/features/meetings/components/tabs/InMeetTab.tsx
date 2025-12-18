@@ -24,6 +24,7 @@ import {
 } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
+import { sessionsApi } from '../../../../lib/api/sessions';
 
 type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
 interface InMeetTabProps {
@@ -49,6 +50,9 @@ export const InMeetTab = ({
   const [liveTranscript, setLiveTranscript] = useState<
     { id: string; speaker: string; text: string; time: number; isFinal: boolean }[]
   >([]);
+  const [audioIngestToken, setAudioIngestToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
 
   const feedRef = useRef<WebSocket | null>(null);
   const wsBase = useMemo(() => {
@@ -57,6 +61,7 @@ export const InMeetTab = ({
     return API_URL.replace(/\/$/, '');
   }, []);
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${streamSessionId}`, [wsBase, streamSessionId]);
+  const audioEndpoint = useMemo(() => `${wsBase}/api/v1/ws/audio/${streamSessionId}`, [wsBase, streamSessionId]);
 
   const transcript = useMemo(
     () => transcriptChunks.filter(chunk => chunk.meetingId === meeting.id).slice(0, 8),
@@ -136,6 +141,21 @@ export const InMeetTab = ({
     setWsNonce(prev => prev + 1);
   };
 
+  const handleFetchAudioToken = async () => {
+    if (!USE_API) return;
+    setIsTokenLoading(true);
+    setTokenError(null);
+    try {
+      const res = await sessionsApi.registerSource(streamSessionId);
+      setAudioIngestToken(res.audio_ingest_token);
+    } catch (err) {
+      console.error('Failed to register source:', err);
+      setTokenError('Không lấy được audio_ingest_token. Kiểm tra backend /api/v1/sessions/{id}/sources.');
+    } finally {
+      setIsTokenLoading(false);
+    }
+  };
+
   return (
     <div className="inmeet-tab">
       <div className="inmeet-grid">
@@ -147,6 +167,11 @@ export const InMeetTab = ({
             joinLink={joinLink}
             feedStatus={feedStatus}
             lastTranscriptAt={lastTranscriptAt}
+            audioIngestToken={audioIngestToken}
+            audioWsUrl={audioEndpoint}
+            tokenError={tokenError}
+            isTokenLoading={isTokenLoading}
+            onFetchAudioToken={handleFetchAudioToken}
             onReconnect={handleReconnect}
           />
           <LiveRecapPanel />
@@ -173,6 +198,11 @@ interface TranscriptPanelProps {
   joinLink: string;
   feedStatus: WsStatus;
   lastTranscriptAt: number | null;
+  audioIngestToken: string | null;
+  audioWsUrl: string;
+  tokenError: string | null;
+  isTokenLoading: boolean;
+  onFetchAudioToken: () => void;
   onReconnect: () => void;
 }
 
@@ -235,6 +265,11 @@ const LiveTranscriptPanel = ({
   joinLink,
   feedStatus,
   lastTranscriptAt,
+  audioIngestToken,
+  audioWsUrl,
+  tokenError,
+  isTokenLoading,
+  onFetchAudioToken,
   onReconnect,
 }: TranscriptPanelProps) => {
   const displayItems = useMemo(() => {
@@ -265,6 +300,10 @@ const LiveTranscriptPanel = ({
       second: '2-digit',
     })}`;
   }, [feedStatus, lastTranscriptAt]);
+  const audioWithToken = useMemo(() => {
+    if (!audioIngestToken) return null;
+    return `${audioWsUrl}?token=${audioIngestToken}`;
+  }, [audioIngestToken, audioWsUrl]);
 
   return (
     <div className="transcript-panel transcript-panel--glass">
@@ -308,6 +347,43 @@ const LiveTranscriptPanel = ({
                 <LinkIcon size={12} style={{ marginRight: 6 }} />
                 Mở link cuộc họp
               </a>
+            )}
+          </div>
+
+          <div
+            className="transcript-card transcript-card--live"
+            style={{
+              marginTop: 10,
+              padding: 10,
+              background: 'var(--bg-elevated)',
+              borderRadius: 10,
+              border: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={onFetchAudioToken}
+                disabled={isTokenLoading || !USE_API}
+              >
+                {isTokenLoading ? 'Đang lấy token...' : 'Lấy audio_ingest_token'}
+              </button>
+              {tokenError && <span className="pill pill--error">{tokenError}</span>}
+            </div>
+            {audioIngestToken && (
+              <>
+                <div className="pill pill--ghost" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  token: {audioIngestToken}
+                </div>
+                {audioWithToken && (
+                  <div className="pill pill--accent" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    WS audio: {audioWithToken}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
