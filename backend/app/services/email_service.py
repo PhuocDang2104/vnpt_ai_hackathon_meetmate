@@ -58,7 +58,7 @@ def send_email(
 
         msg['From'] = Address(from_name, addr_spec=from_email)
         msg['To'] = ", ".join(to_emails)
-        msg['Subject'] = Header(subject, 'utf-8')
+        msg['Subject'] = str(Header(subject, 'utf-8'))
 
         # Plain text
         msg.set_content(body_text or " ", subtype='plain', charset='utf-8')
