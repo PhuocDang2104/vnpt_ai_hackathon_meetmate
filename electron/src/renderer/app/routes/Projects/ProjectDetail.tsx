@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { getStoredUser } from '../../../lib/api/auth'
 import { Project } from '../../../shared/dto/project'
 import { Document } from '../../../shared/dto/document'
@@ -14,6 +14,7 @@ import { adminListUsers } from '../../../lib/api/admin'
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
   const { t } = useLanguage()
   const user = getStoredUser()
   const isAdmin = (user?.role || '').toLowerCase() === 'admin'
@@ -27,7 +28,14 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true)
   const [chatQuestion, setChatQuestion] = useState('')
   const [chatAnswer, setChatAnswer] = useState<string | null>(null)
+  const [chatDocs, setChatDocs] = useState<KnowledgeDocument[]>([])
+  const [chatError, setChatError] = useState<string | null>(null)
   const [chatLoading, setChatLoading] = useState(false)
+  const aiSuggestions = [
+    'Những điểm chính cần thảo luận?',
+    'Rủi ro tiềm ẩn của dự án?',
+    'Policy liên quan cần biết?',
+  ]
   const [showMemberModal, setShowMemberModal] = useState(false)
   const [memberForm, setMemberForm] = useState({ user_id: '', role: 'member' })
   const [availableUsers, setAvailableUsers] = useState<any[]>([])
@@ -47,6 +55,9 @@ const ProjectDetail = () => {
   const [showAttachModal, setShowAttachModal] = useState(false)
   const [searchDoc, setSearchDoc] = useState('')
   const [attaching, setAttaching] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editForm, setEditForm] = useState<{ name: string; code?: string; description?: string }>({ name: '', code: '', description: '' })
 
   useEffect(() => {
     const load = async () => {
@@ -56,6 +67,11 @@ const ProjectDetail = () => {
         // project detail
         const proj = await projectsApi.get(projectId)
         setProject(proj)
+        setEditForm({
+          name: proj.name || '',
+          code: proj.code || '',
+          description: proj.description || '',
+        })
         // members
         const m = await projectsApi.listMembers(projectId)
         setMembers(m.members || [])
@@ -79,7 +95,8 @@ const ProjectDetail = () => {
         setLoadingUsers(true)
         try {
           const resUsers = await adminListUsers({ limit: 200 })
-          setAvailableUsers(resUsers.users || resUsers.data || [])
+          const list = (resUsers as any).users || (resUsers as any).data || []
+          setAvailableUsers(list)
         } catch (err) {
           console.error('Failed to load users', err)
         } finally {
@@ -133,6 +150,27 @@ const ProjectDetail = () => {
           <h1 className="page-header__title">{project.name}</h1>
           <p className="page-header__subtitle">{project.description || 'Chưa có mô tả'}</p>
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn--ghost btn--sm" onClick={() => setShowEditModal(true)}>Chỉnh sửa</button>
+          <button
+            className="btn btn--primary btn--sm"
+            style={{ background: 'var(--error)', borderColor: 'var(--error)' }}
+            onClick={async () => {
+              if (!projectId) return
+              const ok = window.confirm('Bạn có chắc muốn xóa dự án này? Tất cả cuộc họp, tài liệu, embedding liên quan sẽ bị xóa.')
+              if (!ok) return
+              try {
+                await projectsApi.remove(projectId)
+                navigate('/app/projects')
+              } catch (err) {
+                console.error('Delete project failed', err)
+                alert('Xóa dự án thất bại. Kiểm tra quyền admin.')
+              }
+            }}
+          >
+            Xóa
+          </button>
+        </div>
       </div>
 
       {/* Modal: Add Member */}
@@ -142,41 +180,45 @@ const ProjectDetail = () => {
             <div className="modal__header">
               <h3 className="modal__title">Thêm thành viên</h3>
             </div>
-            <div className="modal__body">
-              <label className="modal__label">Chọn người dùng</label>
-              {loadingUsers ? (
-                <div className="form-loading">Đang tải danh sách...</div>
-              ) : (
-                <select
-                  className="input"
-                  value={memberForm.user_id}
-                  onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
-                >
-                  <option value="">-- Chọn thành viên --</option>
-                  {availableUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.display_name || u.email || u.id}</option>
-                  ))}
-                </select>
-              )}
-              <div style={{ marginTop: 10 }}>
-                <label className="modal__label">Hoặc nhập email/User ID</label>
+            <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Chọn người dùng</label>
+                {loadingUsers ? (
+                  <div className="form-loading">Đang tải danh sách...</div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={memberForm.user_id}
+                    onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
+                  >
+                    <option value="">-- Chọn thành viên --</option>
+                    {availableUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.display_name || u.email || u.id}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Hoặc nhập email/User ID</label>
                 <input
-                  className="input"
+                  className="form-input"
                   placeholder="user@example.com"
                   value={memberForm.user_id}
                   onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
                 />
               </div>
-              <label className="modal__label" style={{ marginTop: 12 }}>Role</label>
-              <select
-                className="input"
-                value={memberForm.role}
-                onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
-              >
-                <option value="member">Member</option>
-                <option value="owner">Owner</option>
-                <option value="viewer">Viewer</option>
-              </select>
+              <div className="form-group">
+                <label className="form-label">Role</label>
+                <select
+                  className="form-select"
+                  value={memberForm.role}
+                  onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
+                >
+                  <option value="member">Member</option>
+                  <option value="owner">Owner</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
             </div>
             <div className="modal__footer">
               <button className="btn btn--ghost" onClick={() => setShowMemberModal(false)}>Hủy</button>
@@ -202,47 +244,60 @@ const ProjectDetail = () => {
                 {memberSaving ? 'Đang thêm...' : 'Thêm'}
               </button>
             </div>
-          </div>
         </div>
-      )}
-
+      </div>
+    )}
       {/* Modal: Add Meeting */}
       {showMeetingModal && (
         <div className="modal-overlay" onClick={() => setShowMeetingModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 540 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 640 }}>
             <div className="modal__header">
               <h3 className="modal__title">Tạo cuộc họp</h3>
             </div>
             <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input
-                className="input"
-                placeholder="Tiêu đề cuộc họp"
-                value={meetingForm.title}
-                onChange={e => setMeetingForm({ ...meetingForm, title: e.target.value })}
-              />
-              <input
-                className="input"
-                type="datetime-local"
-                value={meetingForm.start_time}
-                onChange={e => setMeetingForm({ ...meetingForm, start_time: e.target.value })}
-              />
-              <input
-                className="input"
-                placeholder="Địa điểm / Teams link"
-                value={meetingForm.location}
-                onChange={e => setMeetingForm({ ...meetingForm, location: e.target.value })}
-              />
-              <select
-                className="input"
-                value={meetingForm.meeting_type}
-                onChange={e => setMeetingForm({ ...meetingForm, meeting_type: e.target.value })}
-              >
-                <option value="weekly_status">Weekly Status</option>
-                <option value="steering">Steering</option>
-                <option value="risk_review">Risk Review</option>
-                <option value="workshop">Workshop</option>
-                <option value="daily">Daily</option>
-              </select>
+              <div className="form-group">
+                <label className="form-label">Tiêu đề cuộc họp *</label>
+                <input
+                  className="form-input"
+                  placeholder="VD: Weekly Status - Mobile Banking Sprint 24"
+                  value={meetingForm.title}
+                  onChange={e => setMeetingForm({ ...meetingForm, title: e.target.value })}
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Loại cuộc họp</label>
+                  <select
+                    className="form-select"
+                    value={meetingForm.meeting_type}
+                    onChange={e => setMeetingForm({ ...meetingForm, meeting_type: e.target.value })}
+                  >
+                    <option value="weekly_status">Weekly Status</option>
+                    <option value="steering">Steering</option>
+                    <option value="risk_review">Risk Review</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="daily">Daily</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Thời gian bắt đầu</label>
+                  <input
+                    className="form-input"
+                    type="datetime-local"
+                    value={meetingForm.start_time}
+                    onChange={e => setMeetingForm({ ...meetingForm, start_time: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Địa điểm / Teams link</label>
+                <input
+                  className="form-input"
+                  placeholder="VD: Microsoft Teams / Phòng họp VIP"
+                  value={meetingForm.location}
+                  onChange={e => setMeetingForm({ ...meetingForm, location: e.target.value })}
+                />
+              </div>
             </div>
             <div className="modal__footer">
               <button className="btn btn--ghost" onClick={() => setShowMeetingModal(false)}>Hủy</button>
@@ -286,16 +341,23 @@ const ProjectDetail = () => {
               <h3 className="modal__title">Tải tài liệu lên</h3>
             </div>
             <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input
-                type="file"
-                onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-              />
-              <input
-                className="input"
-                placeholder="Tiêu đề"
-                value={selectedFile ? selectedFile.name : ''}
-                readOnly
-              />
+              <div className="form-group">
+                <label className="form-label">Chọn file</label>
+                <input
+                  className="form-input"
+                  type="file"
+                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tiêu đề</label>
+                <input
+                  className="form-input"
+                  placeholder="Tiêu đề"
+                  value={selectedFile ? selectedFile.name : ''}
+                  readOnly
+                />
+              </div>
             </div>
             <div className="modal__footer">
               <button className="btn btn--ghost" onClick={() => setShowDocModal(false)}>Hủy</button>
@@ -341,7 +403,7 @@ const ProjectDetail = () => {
             </div>
             <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input
-                className="input"
+                className="form-input"
                 placeholder="Tìm kiếm theo tên..."
                 value={searchDoc}
                 onChange={e => setSearchDoc(e.target.value)}
@@ -392,8 +454,76 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 'var(--space-lg)' }}>
-        <div className="card" style={{ height: '100%' }}>
+      {/* Modal: Edit Project */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 520 }}>
+            <div className="modal__header">
+              <h3 className="modal__title">Chỉnh sửa dự án</h3>
+            </div>
+            <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Tên dự án *</label>
+                <input
+                  className="form-input"
+                  value={editForm.name}
+                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="Nhập tên dự án"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mã dự án</label>
+                <input
+                  className="form-input"
+                  value={editForm.code || ''}
+                  onChange={e => setEditForm({ ...editForm, code: e.target.value })}
+                  placeholder="VD: PRJ-001"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mô tả</label>
+                <textarea
+                  className="form-textarea"
+                  rows={4}
+                  value={editForm.description || ''}
+                  onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Tóm tắt mục tiêu, phạm vi..."
+                />
+              </div>
+            </div>
+            <div className="modal__footer">
+              <button className="btn btn--ghost" onClick={() => setShowEditModal(false)}>Hủy</button>
+              <button
+                className="btn btn--primary"
+                disabled={editSaving || !editForm.name.trim()}
+                onClick={async () => {
+                  if (!projectId) return
+                  setEditSaving(true)
+                  try {
+                    const updated = await projectsApi.update(projectId, {
+                      name: editForm.name.trim(),
+                      code: editForm.code?.trim(),
+                      description: editForm.description?.trim(),
+                    } as any)
+                    setProject(updated)
+                    setShowEditModal(false)
+                  } catch (err) {
+                    console.error('Update project failed', err)
+                    alert('Cập nhật dự án thất bại.')
+                  } finally {
+                    setEditSaving(false)
+                  }
+                }}
+              >
+                {editSaving ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-xl)' }}>
+        <div className="card" style={{ height: '100%', minHeight: 320 }}>
           <div className="card__header">
             <h3 className="card__title">Thành viên</h3>
             <p className="card__subtitle">{members.length} người</p>
@@ -421,27 +551,141 @@ const ProjectDetail = () => {
           )}
         </div>
 
-        <div className="card" style={{ height: '100%' }}>
-          <div className="card__header">
-            <h3 className="card__title">Chat AI về dự án</h3>
-            <p className="card__subtitle">Đặt câu hỏi liên quan tài liệu và cuộc họp của dự án.</p>
+        <div
+          className="card"
+          style={{
+            height: '100%',
+            minHeight: 320,
+            padding: 0,
+            overflow: 'hidden',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          <div
+            style={{
+              padding: '16px 20px',
+              background: 'linear-gradient(90deg, #5b5fc7 0%, #7c3aed 50%, #5b5fc7 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#fff',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                }}
+              >
+                🤖
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>MeetMate AI</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+                  <span>Online</span>
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 12,
+                background: 'rgba(0,0,0,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+              }}
+            >
+              ✨
+            </div>
           </div>
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <textarea
-              className="input input--lg"
-              placeholder="Hỏi AI về dự án..."
-              value={chatQuestion}
-              onChange={e => setChatQuestion(e.target.value)}
-              rows={3}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 8 }}>
+
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ textAlign: 'center', padding: '6px 0 4px 0' }}>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  background: 'rgba(91,95,199,0.12)',
+                  margin: '0 auto 10px auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 26,
+                  color: '#8ab4ff',
+                }}
+              >
+                🤖
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5 }}>
+                Tôi là MeetMate AI, có thể giúp bạn chuẩn bị dự án.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+              {aiSuggestions.map(s => (
+                <button
+                  key={s}
+                  className="btn btn--ghost btn--sm"
+                  style={{ borderRadius: 999 }}
+                  onClick={() => setChatQuestion(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 14,
+                background: 'var(--bg-surface-hover)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <textarea
+                className="form-textarea"
+                style={{ flex: 1, minHeight: 72, background: 'transparent', border: 'none', boxShadow: 'none' }}
+                placeholder="Hỏi MeetMate AI..."
+                value={chatQuestion}
+                onChange={e => setChatQuestion(e.target.value)}
+                rows={3}
+              />
               <button
                 className="btn btn--primary"
+                style={{ alignSelf: 'flex-end' }}
                 onClick={async () => {
                   if (!chatQuestion.trim()) return
                   setChatLoading(true)
+                  setChatError(null)
+                  setChatAnswer(null)
+                  setChatDocs([])
                   try {
-                    setChatAnswer(`(Placeholder) AI trả lời về dự án: ${chatQuestion}`)
+                    const res = await knowledgeApi.query({
+                      query: chatQuestion.trim(),
+                      project_id: projectId,
+                      limit: 5,
+                    })
+                    setChatAnswer(res.answer)
+                    setChatDocs(res.relevant_documents || [])
+                  } catch (err: any) {
+                    console.error('AI query failed', err)
+                    setChatError('Hệ thống AI đang bận hoặc không truy cập được. Thử lại sau.')
                   } finally {
                     setChatLoading(false)
                   }
@@ -451,18 +695,51 @@ const ProjectDetail = () => {
                 {chatLoading ? 'Đang hỏi...' : 'Hỏi AI'}
               </button>
             </div>
+
+            {chatError && (
+              <div className="alert alert--error">
+                {chatError}
+              </div>
+            )}
             {chatAnswer && (
-              <div className="card" style={{ background: 'var(--surface-muted)', padding: 12 }}>
-                <strong>Trả lời</strong>
-                <p style={{ marginTop: 6 }}>{chatAnswer}</p>
+              <div
+                className="card"
+                style={{
+                  background: 'var(--bg-surface-hover)',
+                  padding: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>Trả lời</div>
+                <p style={{ margin: 0, color: 'var(--text-primary)' }}>{chatAnswer}</p>
+                {chatDocs.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Nguồn liên quan</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {chatDocs.map(doc => (
+                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{doc.title}</div>
+                          {doc.file_url && (
+                            <a className="btn btn--ghost btn--sm" href={doc.file_url} target="_blank" rel="noreferrer">
+                              Mở
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', marginTop: 'var(--space-lg)' }}>
-        <div className="card">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-xl)', marginTop: 'var(--space-lg)' }}>
+        <div className="card" style={{ minHeight: 320 }}>
           <div className="card__header">
             <h3 className="card__title">Tài liệu</h3>
             <p className="card__subtitle">{docs.length} tài liệu</p>
@@ -483,7 +760,7 @@ const ProjectDetail = () => {
               </div>
               {docs.map(d => (
                 <div key={String(d.id)} className="admin-table__row" style={{ gridTemplateColumns: '1.5fr 0.8fr 1fr 0.8fr' }}>
-                  <span>{d.title || d.name}</span>
+                  <span>{d.title}</span>
                   <span>{d.file_type || '--'}</span>
                   <span>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer">Xem</a> : '--'}</span>
                   <span>{d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : '--'}</span>
@@ -493,7 +770,7 @@ const ProjectDetail = () => {
           )}
         </div>
 
-        <div className="card">
+        <div className="card" style={{ minHeight: 320 }}>
           <div className="card__header">
             <h3 className="card__title">Cuộc họp</h3>
             <p className="card__subtitle">{meetings.length} cuộc họp</p>

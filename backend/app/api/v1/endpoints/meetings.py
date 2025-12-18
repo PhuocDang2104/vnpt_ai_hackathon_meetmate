@@ -126,7 +126,12 @@ async def notify_meeting(
         agenda_html = "<ul>" + "".join([f"<li>{i.order or idx+1}. {i.title or ''} ({i.duration_minutes or 0} phút) - {i.presenter or ''}</li>" for idx, i in enumerate(agenda_items)]) + "</ul>"
     docs_html = ""
     if documents:
-        docs_html = "<ul>" + "".join([f"<li>{d.title} ({d.file_type})</li>" for d in documents]) + "</ul>"
+        docs_html = "<ul>" + "".join([
+            f"<li>{d.title} ({d.file_type})"
+            + (f" - <a href='{d.file_url}' target='_blank' rel='noreferrer'>Tải/đọc</a>" if getattr(d, 'file_url', None) else "")
+            + "</li>"
+            for d in documents
+        ]) + "</ul>"
 
     body_html = f"""
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -139,7 +144,19 @@ async def notify_meeting(
       <p style="color:#666;">Được gửi từ MeetMate.</p>
     </div>
     """
-    body_text = f"Thông báo cuộc họp: {meeting.title}\nThời gian: {fmt_datetime(meeting.start_time)} - {fmt_datetime(meeting.end_time)}\nĐịa điểm: {meeting.location or 'Online'}\n"
+    body_text = (
+        f"Thông báo cuộc họp: {meeting.title}\n"
+        f"Thời gian: {fmt_datetime(meeting.start_time)} - {fmt_datetime(meeting.end_time)}\n"
+        f"Địa điểm: {meeting.location or 'Online'}\n"
+    )
+    if agenda_items:
+        body_text += "\nChương trình:\n" + "\n".join(
+            [f"- {i.order or idx+1}. {i.title or ''} ({i.duration_minutes or 0}p) - {i.presenter or ''}" for idx, i in enumerate(agenda_items)]
+        )
+    if documents:
+        body_text += "\nTài liệu:\n" + "\n".join(
+            [f"- {d.title} ({d.file_type}){(' - ' + d.file_url) if getattr(d, 'file_url', None) else ''}" for d in documents]
+        )
     if payload.custom_message:
         body_text += f"\nGhi chú: {payload.custom_message}\n"
 
