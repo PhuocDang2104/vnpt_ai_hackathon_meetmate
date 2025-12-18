@@ -12,6 +12,7 @@ import type {
   MeetingListResponse,
   MeetingFilters,
 } from '../../shared/dto/meeting';
+import type { MeetingNotifyRequest } from '../../shared/dto/meeting';
 
 const ENDPOINT = '/meetings';
 
@@ -70,6 +71,13 @@ export const meetingsApi = {
    */
   updatePhase: async (id: string, phase: 'pre' | 'in' | 'post'): Promise<Meeting> => {
     return api.patch<Meeting>(`${ENDPOINT}/${id}/phase`, { phase });
+  },
+
+  /**
+   * Send notification email for a meeting
+   */
+  notify: async (id: string, payload: MeetingNotifyRequest): Promise<any> => {
+    return api.post(`${ENDPOINT}/${id}/notify`, payload);
   },
 };
 

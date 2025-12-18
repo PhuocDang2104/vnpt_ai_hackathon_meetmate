@@ -33,6 +33,7 @@ import {
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { agendaApi, type AgendaItem, type AgendaItemCreate } from '../../../../lib/api/agenda';
 import { knowledgeApi, type KnowledgeDocument } from '../../../../lib/api/knowledge';
+import meetingsApi from '../../../../lib/api/meetings';
 
 interface PreMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -184,17 +185,38 @@ const SendPrepEmailModal = ({
     setIsSending(true);
     setSendStatus('sending');
 
-    // Simulate sending (since actual email is not fully implemented)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const recipients = (participants || [])
+        .filter((p: any) => selectedParticipants.has(p.user_id || p.id))
+        .map((p: any) => ({
+          email: p.email || p.user_id, // fallback user_id as email if mock
+          name: p.display_name || p.user_id,
+          role: p.role,
+        }))
+        .filter((r: any) => !!r.email);
 
-    // Show success notification (simulated)
-    setSendStatus('success');
-    setIsSending(false);
+      if (recipients.length === 0) {
+        setSendStatus('error');
+        setIsSending(false);
+        return;
+      }
 
-    // Close after 2 seconds
-    setTimeout(() => {
-      onClose();
-    }, 2000);
+      await meetingsApi.notify(meeting.id, {
+        recipients,
+        include_agenda: includeAgenda,
+        include_documents: includeDocuments,
+        include_notes: includeReminders,
+        custom_message: customMessage,
+      });
+
+      setSendStatus('success');
+      setIsSending(false);
+      setTimeout(() => onClose(), 1500);
+    } catch (err) {
+      console.error('Send notify failed', err);
+      setSendStatus('error');
+      setIsSending(false);
+    }
   };
 
   const formatDate = (dateStr: string | undefined) => {

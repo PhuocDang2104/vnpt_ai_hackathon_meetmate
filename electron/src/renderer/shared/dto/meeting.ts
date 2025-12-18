@@ -122,6 +122,20 @@ export interface MeetingFilters {
   limit?: number;
 }
 
+export interface MeetingNotifyRecipient {
+  email: string;
+  name?: string;
+  role?: string;
+}
+
+export interface MeetingNotifyRequest {
+  recipients: MeetingNotifyRecipient[];
+  include_agenda?: boolean;
+  include_documents?: boolean;
+  include_notes?: boolean;
+  custom_message?: string;
+}
+
 // Meeting type labels
 export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
   steering: 'Steering Committee',

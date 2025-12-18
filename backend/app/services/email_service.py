@@ -7,6 +7,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import formataddr, make_msgid
+from email.header import Header
 from typing import Optional, List
 from app.core.config import get_settings
 
@@ -55,11 +57,13 @@ def send_email(
         }
     
     try:
-        # Create message
+        # Create message (UTF-8 safe headers)
         msg = MIMEMultipart('alternative')
-        msg['From'] = f"{settings.email_from_name} <{settings.smtp_user}>"
+        from_name = settings.email_from_name or settings.smtp_user
+        msg['From'] = formataddr((str(Header(from_name, 'utf-8')), settings.smtp_user))
         msg['To'] = ', '.join(to_emails)
-        msg['Subject'] = subject
+        msg['Subject'] = str(Header(subject, 'utf-8'))
+        msg['Message-ID'] = make_msgid()
         
         # Add text body
         msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
@@ -220,4 +224,3 @@ def test_email_config() -> dict:
             'success': False,
             'error': str(e)
         }
-
