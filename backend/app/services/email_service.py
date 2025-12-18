@@ -106,21 +106,21 @@ def send_meeting_minutes_email(
     """
     Send meeting minutes email with formatted content
     """
-    subject = f"[MeetMate] Biên bản cuộc họp: {meeting_title} - {meeting_date}"
+    subject = f"[MeetMate] Bien ban cuoc hop: {meeting_title} - {meeting_date}"
     
-    body_text = f"""Kính gửi Quý đồng nghiệp,
+    body_text = f"""Kinh gui Quy dong nghiep,
 
-Biên bản cuộc họp "{meeting_title}" đã được hoàn thành.
+Bien ban cuoc hop "{meeting_title}" da duoc hoan thanh.
 
-Thời gian: {meeting_date} - {meeting_time}
-Địa điểm: {meeting_location}
+Thoi gian: {meeting_date} - {meeting_time}
+Dia diem: {meeting_location}
 
-TÓM TẮT:
+TOM TAT:
 {executive_summary}
 
 ---
-Đây là email tự động từ MeetMate AI Assistant.
-Vui lòng không trả lời email này.
+Day la email tu dong tu MeetMate AI Assistant.
+Vui long khong tra loi email nay.
 """
 
     body_html = f"""
@@ -129,7 +129,7 @@ Vui lòng không trả lời email này.
 <head>
     <meta charset="utf-8">
     <style>
-        body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }}
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
         .header {{ background: linear-gradient(135deg, #5b5fc7, #7b7fd7); color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
         .header h1 {{ margin: 0; font-size: 20px; }}
@@ -144,23 +144,23 @@ Vui lòng không trả lời email này.
 <body>
     <div class="container">
         <div class="header">
-            <h1>Biên bản cuộc họp</h1>
+            <h1>Bien ban cuoc hop</h1>
             <p style="margin: 5px 0 0; opacity: 0.9;">{meeting_title}</p>
         </div>
         <div class="content">
             <div class="meta">
-                <div class="meta-item">{meeting_date}</div>
-                <div class="meta-item">{meeting_time}</div>
-                <div class="meta-item">{meeting_location}</div>
+                <div class="meta-item">Ngay: {meeting_date}</div>
+                <div class="meta-item">Gio: {meeting_time}</div>
+                <div class="meta-item">Dia diem: {meeting_location}</div>
             </div>
             <div class="summary">
-                <h3>Tóm tắt cuộc họp</h3>
+                <h3>Tom tat cuoc hop</h3>
                 <p>{executive_summary.replace(chr(10), '<br>')}</p>
             </div>
         </div>
         <div class="footer">
-            <p>Đây là email tự động từ <strong>MeetMate AI Assistant</strong></p>
-            <p>Vui lòng không trả lời email này.</p>
+            <p>Day la email tu dong tu <strong>MeetMate AI Assistant</strong></p>
+            <p>Vui long khong tra loi email nay.</p>
         </div>
     </div>
 </body>
