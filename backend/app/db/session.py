@@ -8,10 +8,10 @@ settings = get_settings()
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
-    pool_size=2,          # keep low to respect Supabase pooler limits
+    pool_size=3,          # keep low to respect Supabase pooler limits
     max_overflow=0,       # disable overflow to avoid MaxClients errors
-    pool_recycle=300,     # recycle connections to avoid stale sessions
-    pool_timeout=30,      # fail fast if pool is exhausted
+    pool_recycle=180,     # recycle connections to avoid stale sessions
+    pool_timeout=10,      # fail fast if pool is exhausted
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

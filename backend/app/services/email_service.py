@@ -47,6 +47,16 @@ def send_email(
     Returns:
         dict with status and details
     """
+    def _clean(s: Optional[str]) -> str:
+        if not s:
+            return ""
+        return s.replace("\xa0", " ").strip()
+
+    to_emails = [_clean(e) for e in to_emails if _clean(e)]
+    subject = _clean(subject)
+    body_text = _clean(body_text)
+    body_html = _clean(body_html) if body_html else None
+
     if not is_email_enabled():
         logger.warning("Email sending is not enabled. Set SMTP credentials and EMAIL_ENABLED=true")
         return {
@@ -59,12 +69,12 @@ def send_email(
     try:
         # Create message (UTF-8 safe headers)
         msg = MIMEMultipart('alternative')
-        from_name = settings.email_from_name or settings.smtp_user
-        msg['From'] = formataddr((str(Header(from_name, 'utf-8')), settings.smtp_user))
-        msg['To'] = ', '.join(to_emails)
+        from_name = _clean(settings.email_from_name) or settings.smtp_user
+        from_email = _clean(settings.smtp_user)
+        msg['From'] = formataddr((str(Header(from_name, 'utf-8')), from_email))
+        msg['To'] = ', '.join([formataddr((str(Header('', 'utf-8')), e)) for e in to_emails])
         msg['Subject'] = str(Header(subject, 'utf-8'))
         msg['Message-ID'] = make_msgid()
-        msg.set_charset('utf-8')
         
         # Add text body
         msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
