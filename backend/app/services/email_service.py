@@ -4,9 +4,9 @@ Email Service - Send emails via SMTP (UTF-8 safe)
 import smtplib
 import logging
 from email.message import EmailMessage
-from email.headerregistry import Address
 from email.policy import SMTPUTF8
 from email.header import Header
+from email.utils import formataddr
 from typing import Optional, List
 from app.core.config import get_settings
 
@@ -41,6 +41,9 @@ def send_email(
     subject = _clean(subject)
     body_text = _clean(body_text)
     body_html = _clean(body_html) if body_html else None
+    smtp_host = _clean(settings.smtp_host)
+    smtp_user = _clean(settings.smtp_user)
+    smtp_pass = _clean(settings.smtp_password)
 
     if not is_email_enabled():
         logger.warning("Email sending is not enabled. Set SMTP credentials and EMAIL_ENABLED=true")
@@ -53,11 +56,11 @@ def send_email(
     
     try:
         msg = EmailMessage(policy=SMTPUTF8)
-        from_name = _clean(settings.email_from_name) or settings.smtp_user
-        from_email = _clean(settings.smtp_user)
+        from_name = _clean(settings.email_from_name) or smtp_user
+        from_email = smtp_user
 
-        msg['From'] = Address(from_name, addr_spec=from_email)
-        msg['To'] = ", ".join(to_emails)
+        msg['From'] = formataddr((str(Header(from_name, 'utf-8')), from_email))
+        msg['To'] = ", ".join([formataddr((str(Header('', 'utf-8')), e)) for e in to_emails])
         msg['Subject'] = str(Header(subject, 'utf-8'))
 
         # Plain text
@@ -77,7 +80,7 @@ def send_email(
 
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             server.starttls()
-            server.login(from_email, settings.smtp_password)
+            server.login(from_email, smtp_pass)
             server.send_message(msg)
 
         logger.info(f"Email sent successfully to {len(to_emails)} recipients")
