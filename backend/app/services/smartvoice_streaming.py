@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import inspect
 from typing import Any, AsyncIterator, Optional
 
 import httpx
@@ -142,8 +143,26 @@ async def stream_recognize(
 
     metadata = [("authorization", f"Bearer {token}")]
     responses = client.streaming_recognize(requests=request_gen(), metadata=metadata)
+    if inspect.isawaitable(responses):
+        responses = await responses
 
-    async for resp in responses:
+    async def _sync_iter_to_async(sync_iter):
+        iterator = iter(sync_iter)
+        while True:
+            try:
+                item = await asyncio.to_thread(next, iterator)
+            except StopIteration:
+                break
+            yield item
+
+    if hasattr(responses, "__aiter__"):
+        resp_iter = responses
+    elif hasattr(responses, "__iter__"):
+        resp_iter = _sync_iter_to_async(responses)
+    else:
+        raise RuntimeError("SmartVoice streaming response is not iterable")
+
+    async for resp in resp_iter:
         for result in getattr(resp, "results", []) or []:
             alternatives = getattr(result, "alternatives", None) or []
             if not alternatives:
