@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
+from pathlib import Path
 from dataclasses import dataclass
-import inspect
 from typing import Any, AsyncIterator, Optional
 
+import grpc
 import httpx
 
 from app.core.config import get_settings
@@ -12,15 +15,21 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+PROTO_DIR = Path(__file__).resolve().parents[2] / "protos_compiled"
+if PROTO_DIR.exists():
+    sys.path.insert(0, str(PROTO_DIR))
 
+
+_proto_import_error: Optional[Exception] = None
 try:
-    from google.api_core.client_options import ClientOptions
-    from google.auth.credentials import AnonymousCredentials
-    from google.cloud import speech_v1 as speech
-except Exception:  # pragma: no cover - optional dependency until SmartVoice is enabled
-    speech = None  # type: ignore[assignment]
-    ClientOptions = None  # type: ignore[assignment]
-    AnonymousCredentials = None  # type: ignore[assignment]
+    from protos_compiled import vnpt_asr_pb2 as rasr
+    from protos_compiled import vnpt_asr_pb2_grpc as rasr_srv
+    from protos_compiled import vnpt_audio_pb2 as ra
+except Exception as exc:  # pragma: no cover - optional dependency until SmartVoice is enabled
+    rasr = None  # type: ignore[assignment]
+    rasr_srv = None  # type: ignore[assignment]
+    ra = None  # type: ignore[assignment]
+    _proto_import_error = exc
 
 
 @dataclass(frozen=True)
@@ -44,19 +53,19 @@ class SmartVoiceResult:
 
 
 def is_smartvoice_configured() -> bool:
-    if not settings.smartvoice_grpc_endpoint:
-        return False
-    if settings.smartvoice_access_token:
-        return True
-    if settings.smartvoice_auth_url and settings.smartvoice_token_id and settings.smartvoice_token_key:
-        return True
-    return False
+    return bool(settings.smartvoice_grpc_endpoint)
 
 
-def _duration_to_seconds(duration: Any) -> float:
-    seconds = float(getattr(duration, "seconds", 0) or 0.0)
-    nanos = float(getattr(duration, "nanos", 0) or 0.0)
-    return seconds + (nanos / 1_000_000_000.0)
+def _smartvoice_time_to_seconds(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) / 1000.0
+    seconds = getattr(value, "seconds", None)
+    if seconds is None:
+        return None
+    nanos = float(getattr(value, "nanos", 0) or 0.0)
+    return float(seconds) + (nanos / 1_000_000_000.0)
 
 
 def _extract_token(resp_json: Any) -> Optional[str]:
@@ -73,7 +82,7 @@ def _extract_token(resp_json: Any) -> Optional[str]:
     return None
 
 
-async def _get_access_token() -> str:
+async def _fetch_access_token() -> Optional[str]:
     if settings.smartvoice_access_token:
         return settings.smartvoice_access_token
 
@@ -92,10 +101,19 @@ async def _get_access_token() -> str:
                 return token
         raise RuntimeError("SmartVoice auth response missing access_token")
 
-    raise RuntimeError(
-        "SmartVoice credentials not configured. Set SMARTVOICE_ACCESS_TOKEN, or SMARTVOICE_AUTH_URL + "
-        "SMARTVOICE_TOKEN_ID/SMARTVOICE_TOKEN_KEY."
-    )
+    return None
+
+
+async def _build_metadata() -> list[tuple[str, str]]:
+    metadata: list[tuple[str, str]] = []
+    token = await _fetch_access_token()
+    if token:
+        metadata.append(("authorization", f"Bearer {token}"))
+    if settings.smartvoice_token_id:
+        metadata.append(("token-id", settings.smartvoice_token_id))
+    if settings.smartvoice_token_key:
+        metadata.append(("token-key", settings.smartvoice_token_key))
+    return metadata
 
 
 def stream_recognize(
@@ -116,87 +134,70 @@ async def _stream_recognize_impl(
     - This implementation is intentionally minimal and expects SmartVoice to be compatible with
       Google Speech-to-Text `StreamingRecognize` proto. Configure endpoint/auth via env.
     """
-    if speech is None:
-        raise RuntimeError("google-cloud-speech is not installed (add it to backend/requirements.txt)")
+    if rasr is None or rasr_srv is None or ra is None:
+        raise RuntimeError(f"SmartVoice protos not available: {_proto_import_error}")
     if not settings.smartvoice_grpc_endpoint:
         raise RuntimeError("SMARTVOICE_GRPC_ENDPOINT is not set")
 
-    token = await _get_access_token()
-
-    client = speech.SpeechAsyncClient(
-        credentials=AnonymousCredentials(),  # type: ignore[misc]
-        client_options=ClientOptions(api_endpoint=settings.smartvoice_grpc_endpoint),  # type: ignore[misc]
-    )
-
-    recognition_config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-        sample_rate_hertz=config.sample_rate_hz,
-        language_code=config.language_code,
-        model=config.model or settings.smartvoice_model or "fast_streaming",
-        enable_word_time_offsets=config.enable_word_time_offsets,
-    )
-    streaming_config = speech.StreamingRecognitionConfig(
-        config=recognition_config,
-        interim_results=config.interim_results,
+    metadata = await _build_metadata()
+    insecure = os.getenv("SMARTVOICE_INSECURE", "0").lower() in {"1", "true", "yes"}
+    channel = grpc.aio.insecure_channel(settings.smartvoice_grpc_endpoint) if insecure else grpc.aio.secure_channel(
+        settings.smartvoice_grpc_endpoint, grpc.ssl_channel_credentials()
     )
 
     async def request_gen():
-        yield speech.StreamingRecognizeRequest(streaming_config=streaming_config)
+        recognition_config = rasr.RecognitionConfig(
+            language_code=config.language_code or "vi-VN",
+            encoding=ra.AudioEncoding.LINEAR_PCM,
+            sample_rate_hertz=config.sample_rate_hz,
+            max_alternatives=1,
+            enable_automatic_punctuation=False,
+            enable_word_time_offsets=config.enable_word_time_offsets,
+            audio_channel_count=1,
+            model=config.model or settings.smartvoice_model or "fast_streaming",
+        )
+        streaming_config = rasr.StreamingRecognitionConfig(
+            config=recognition_config,
+            interim_results=config.interim_results,
+        )
+        yield rasr.StreamingRecognizeRequest(streaming_config=streaming_config)
         while True:
             chunk = await audio_queue.get()
             if chunk is None:
                 break
-            yield speech.StreamingRecognizeRequest(audio_content=chunk)
+            yield rasr.StreamingRecognizeRequest(audio_content=chunk)
 
-    metadata = [("authorization", f"Bearer {token}")]
-    responses = client.streaming_recognize(requests=request_gen(), metadata=metadata)
-    if inspect.isawaitable(responses):
-        responses = await responses
+    async with channel:
+        client = rasr_srv.VnptSpeechRecognitionStub(channel)
+        responses = client.StreamingRecognize(request_gen(), metadata=metadata)
+        async for resp in responses:
+            for result in getattr(resp, "results", []) or []:
+                alternatives = getattr(result, "alternatives", None) or []
+                if not alternatives:
+                    continue
+                alt = alternatives[0]
+                text = (getattr(alt, "transcript", "") or "").strip()
+                if not text:
+                    continue
+                confidence = float(getattr(alt, "confidence", 0.0) or 0.0)
 
-    async def _sync_iter_to_async(sync_iter):
-        iterator = iter(sync_iter)
-        while True:
-            try:
-                item = await asyncio.to_thread(next, iterator)
-            except StopIteration:
-                break
-            yield item
+                time_start = None
+                time_end = None
+                words = getattr(alt, "words", None) or []
+                if words:
+                    try:
+                        time_start = _smartvoice_time_to_seconds(words[0].start_time)
+                        time_end = _smartvoice_time_to_seconds(words[-1].end_time)
+                    except Exception:
+                        time_start = None
+                        time_end = None
 
-    if hasattr(responses, "__aiter__"):
-        resp_iter = responses
-    elif hasattr(responses, "__iter__"):
-        resp_iter = _sync_iter_to_async(responses)
-    else:
-        raise RuntimeError("SmartVoice streaming response is not iterable")
-
-    async for resp in resp_iter:
-        for result in getattr(resp, "results", []) or []:
-            alternatives = getattr(result, "alternatives", None) or []
-            if not alternatives:
-                continue
-            alt = alternatives[0]
-            text = (getattr(alt, "transcript", "") or "").strip()
-            if not text:
-                continue
-            confidence = float(getattr(alt, "confidence", 0.0) or 0.0)
-
-            time_start = None
-            time_end = None
-            words = getattr(alt, "words", None) or []
-            if words:
-                try:
-                    time_start = _duration_to_seconds(words[0].start_time)
-                    time_end = _duration_to_seconds(words[-1].end_time)
-                except Exception:
-                    time_start = None
-                    time_end = None
-
-            lang = (config.language_code.split("-")[0] if config.language_code else "vi").lower()
-            yield SmartVoiceResult(
-                text=text,
-                is_final=bool(getattr(result, "is_final", False)),
-                confidence=confidence if confidence else 1.0,
-                time_start=time_start,
-                time_end=time_end,
-                lang=lang,
-            )
+                lang = (config.language_code.split("-")[0] if config.language_code else "vi").lower()
+                yield SmartVoiceResult(
+                    text=text,
+                    is_final=bool(getattr(result, "is_final", False)),
+                    confidence=confidence if confidence else 1.0,
+                    time_start=time_start,
+                    time_end=time_end,
+                    lang=lang,
+                )
