@@ -73,6 +73,7 @@ const Dashboard = () => {
     .filter(a => a.status !== 'completed' && a.status !== 'cancelled')
     .sort((a, b) => a.deadline.getTime() - b.deadline.getTime())
     .slice(0, 5)
+  const overdueActions = pendingActions.filter(a => isOverdue(a.deadline)).slice(0, 3)
 
   // Handle refresh
   const handleRefresh = () => {
@@ -178,38 +179,87 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Live Meeting Alert */}
-      {!loadingLive && liveMeeting && (
-        <div className="card mb-6" style={{ 
-          borderColor: 'var(--error)',
-          borderLeftWidth: '3px'
-        }}>
-          <div className="card__body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Link to={`/app/meetings/${liveMeeting.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 'var(--space-base)', flex: 1 }}>
-              <div className="live-indicator">
-                <span className="live-indicator__dot"></span>
-                LIVE
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '14px' }}>{liveMeeting.title}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginTop: '4px' }}>
-                  <Users size={14} />
-                  {liveMeeting.participants} người tham gia
+      {/* Attention & blockers */}
+      <div className="grid grid--2 mb-6">
+        <div className="card" style={{ minHeight: 120 }}>
+          <div className="card__header">
+            <h3 className="card__title">
+              <AlertTriangle size={16} className="card__title-icon" />
+              Cần chú ý ngay
+            </h3>
+          </div>
+          <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {!loadingLive && liveMeeting ? (
+              <div className="alert alert--info" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="live-indicator">
+                  <span className="live-indicator__dot"></span>
+                  LIVE
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>{liveMeeting.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Users size={12} /> {liveMeeting.participants} người tham gia
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Link to={`/app/meetings/${liveMeeting.id}/pre`} className="btn btn--ghost btn--sm">Xem</Link>
+                  {liveMeeting.teamsLink && (
+                    <a href={liveMeeting.teamsLink} target="_blank" rel="noopener noreferrer" className="btn btn--primary btn--sm">
+                      <Mic size={14} /> Tham gia
+                    </a>
+                  )}
                 </div>
               </div>
-            </Link>
-            <a 
-              href={liveMeeting.teamsLink} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn btn--primary"
-            >
-              <Mic size={16} />
-              Tham gia ngay
-            </a>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Không có cuộc họp đang diễn ra.</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div className="pill pill--warning">
+                {stats?.actionsOverdue ?? 0} actions quá hạn
+              </div>
+              <div className="pill pill--danger">
+                {stats?.risksHigh ?? 0} rủi ro cao/khẩn cấp
+              </div>
+            </div>
           </div>
         </div>
-      )}
+
+        <div className="card" style={{ minHeight: 120 }}>
+          <div className="card__header">
+            <h3 className="card__title">
+              <AlertTriangle size={16} className="card__title-icon" />
+              Blockers / Overdue
+            </h3>
+          </div>
+          <div className="card__body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {overdueActions.length === 0 ? (
+              <div className="empty-state" style={{ padding: '12px 0' }}>
+                <div className="empty-state__title" style={{ fontSize: 14 }}>Không có blocker</div>
+              </div>
+            ) : (
+              overdueActions.map(item => (
+                <div key={item.id} className="action-item" style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
+                  <div className="action-item__content">
+                    <div className="action-item__title">{item.description}</div>
+                    <div className="action-item__meta">
+                      <span className={`action-item__priority action-item__priority--${item.priority}`}>
+                        {item.priority}
+                      </span>
+                      <span className="action-item__meta-item">
+                        <Clock size={12} /> Quá hạn
+                      </span>
+                      <span className="action-item__meta-item">
+                        <User size={12} /> {item.owner.displayName}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid--4 mb-6">
@@ -222,6 +272,20 @@ const Dashboard = () => {
           </>
         ) : (
           <>
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--warning">
+                <CheckSquare size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Action Items</div>
+                <div className="stats-card__value">{stats?.totalActions ?? 0}</div>
+                <div className="stats-card__trend stats-card__trend--down">
+                  <TrendingDown size={12} />
+                  {stats?.actionsOverdue ?? 0} quá hạn
+                </div>
+              </div>
+            </div>
+
             <div className="card stats-card">
               <div className="stats-card__icon stats-card__icon--info">
                 <Calendar size={22} />
@@ -237,20 +301,6 @@ const Dashboard = () => {
             </div>
 
             <div className="card stats-card">
-              <div className="stats-card__icon stats-card__icon--success">
-                <CheckSquare size={22} />
-              </div>
-              <div className="stats-card__content">
-                <div className="stats-card__label">Action Items</div>
-                <div className="stats-card__value">{stats?.totalActions ?? 0}</div>
-                <div className="stats-card__trend stats-card__trend--down">
-                  <TrendingDown size={12} />
-                  {stats?.actionsOverdue ?? 0} quá hạn
-                </div>
-              </div>
-            </div>
-
-            <div className="card stats-card">
               <div className="stats-card__icon stats-card__icon--accent">
                 <FileText size={22} />
               </div>
@@ -260,6 +310,19 @@ const Dashboard = () => {
                 <div className="stats-card__trend stats-card__trend--up">
                   <TrendingUp size={12} />
                   {stats?.decisionsConfirmed ?? 0} đã xác nhận
+                </div>
+              </div>
+            </div>
+
+            <div className="card stats-card">
+              <div className="stats-card__icon stats-card__icon--warning">
+                <AlertTriangle size={22} />
+              </div>
+              <div className="stats-card__content">
+                <div className="stats-card__label">Tài liệu</div>
+                <div className="stats-card__value">{stats?.totalDocs ?? 0}</div>
+                <div className="stats-card__trend">
+                  {stats?.docsUpdated ?? 0} cập nhật gần đây
                 </div>
               </div>
             </div>
@@ -306,7 +369,7 @@ const Dashboard = () => {
                 {upcomingMeetings.map((meeting: NormalizedMeeting) => (
                   <Link 
                     key={meeting.id} 
-                    to={`/app/meetings/${meeting.id}/detail`}
+                    to={`/app/meetings/${meeting.id}/pre`}
                     style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     <div className="meeting-item">
@@ -398,11 +461,11 @@ const Dashboard = () => {
       </div>
 
       {/* AI Insights */}
-      <div className="card mt-6">
+      <div className="card mb-6">
         <div className="card__header">
           <h3 className="card__title">
             <Lightbulb size={18} className="card__title-icon" />
-            AI Insights
+            AI gợi ý bước tiếp theo
           </h3>
         </div>
         <div className="card__body">
@@ -413,7 +476,7 @@ const Dashboard = () => {
                 Phân tích tiến độ
               </div>
               <div className="insight-box__content">
-                Dự án Core Banking đạt 68% tiến độ. Có thể hoàn thành đúng hạn nếu bổ sung resources như đã phê duyệt.
+                Dự án Core Banking đạt 68% tiến độ. Cần giữ nguồn lực như kế hoạch để không trễ mốc.
               </div>
             </div>
             <div className="insight-box insight-box--warning">
@@ -422,7 +485,7 @@ const Dashboard = () => {
                 Cảnh báo
               </div>
               <div className="insight-box__content">
-                {stats?.actionsOverdue ?? 1} action item đang quá hạn. Cần escalate với Tech Lead để đẩy nhanh tiến độ.
+                {stats?.actionsOverdue ?? 1} action item quá hạn. Ưu tiên đẩy với Tech Lead trong cuộc họp gần nhất.
               </div>
             </div>
             <div className="insight-box insight-box--success">
@@ -431,7 +494,7 @@ const Dashboard = () => {
                 Đề xuất
               </div>
               <div className="insight-box__content">
-                Nên mời Security Architect vào cuộc họp Risk Review sắp tới để review API security design.
+                Mời Security Architect tham gia phiên Risk Review để rà soát API security.
               </div>
             </div>
           </div>

@@ -827,44 +827,8 @@ async def search_documents(
         docs = [_with_presigned_url(_row_to_doc(r)) for r in rows]
         return KnowledgeSearchResponse(documents=docs, total=total, query=request.query)
     except Exception as exc:
-        logger.warning("Search documents fallback to mock: %s", exc)
-
-    docs = list(_mock_knowledge_docs.values())
-    query_lower = request.query.lower()
-    matching_docs = []
-    for doc in docs:
-        score = 0
-        if query_lower in doc.title.lower():
-            score += 10
-        if doc.description and query_lower in doc.description.lower():
-            score += 5
-        if doc.tags:
-            for tag in doc.tags:
-                if query_lower in tag.lower():
-                    score += 3
-        if score > 0:
-            matching_docs.append((score, doc))
-
-    matching_docs.sort(key=lambda x: x[0], reverse=True)
-    results = [doc for _, doc in matching_docs]
-
-    if request.document_type:
-        results = [d for d in results if d.document_type == request.document_type]
-    if request.source:
-        results = [d for d in results if d.source == request.source]
-    if request.category:
-        results = [d for d in results if d.category == request.category]
-    if request.tags:
-        tag_set = set(t.lower() for t in request.tags)
-        results = [d for d in results if d.tags and any(t.lower() in tag_set for t in d.tags)]
-
-    results = [_with_presigned_url(d) for d in results]
-
-    return KnowledgeSearchResponse(
-        documents=results[request.offset:request.offset + request.limit],
-        total=len(results),
-        query=request.query,
-    )
+        logger.warning("Search documents failed, returning empty: %s", exc)
+        return KnowledgeSearchResponse(documents=[], total=0, query=request.query)
 
 
 async def query_knowledge_ai(
