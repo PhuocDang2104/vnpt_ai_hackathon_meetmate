@@ -9955,3 +9955,257 @@ a {
   border-color: var(--border-subtle);
   color: var(--text-muted);
 }
+
+/* ============================================
+   Docked In-Meeting (Sidecar)
+   ============================================ */
+.sidecar-mode .app-shell {
+  width: 520px;
+  max-width: 100%;
+  min-width: 420px;
+  margin-left: auto;
+  border-left: 1px solid var(--border);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.18);
+}
+.sidecar-mode .app-shell__sidebar {
+  display: none;
+}
+.sidecar-mode .app-shell__content {
+  padding: var(--space-md);
+}
+.sidecar-mode .topbar {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-sm) var(--space-md);
+}
+.sidecar-mode .meeting-detail-v2__tabs {
+  display: none;
+}
+.sidecar-mode .inmeet-grid,
+.sidecar-mode .transcript-grid {
+  grid-template-columns: 1fr;
+}
+.sidecar-mode .inmeet-column--side {
+  order: 2;
+}
+
+.sidecar-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  height: 100%;
+}
+.sidecar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-md);
+}
+.sidecar-header__left {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  min-width: 0;
+  width: 100%;
+}
+.sidecar-header__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.sidecar-header__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.sidecar-header__title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.sidecar-header__meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sidecar-header__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: 100%;
+}
+.sidecar-header__actions .btn {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-sm) var(--space-md);
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+}
+@media (max-width: 460px) {
+  .sidecar-header__actions {
+    grid-template-columns: 1fr;
+  }
+}
+.sidecar-inline-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+}
+.sidecar-inline-card__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+.sidecar-inline-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidecar-inline-card__field label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  display: block;
+}
+.sidecar-inline-card__value {
+  font-size: 13px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+.sidecar-inline-card__hint {
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sidecar-body {
+  flex: 1;
+  min-height: 0;
+}
+.link-muted {
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-word;
+}
+.link-muted:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
+   MeetMate Capture Page
+   ============================================ */
+.capture-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.capture-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+.capture-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.capture-card--secondary {
+  background: var(--bg-elevated);
+}
+.capture-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.capture-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.capture-status--idle {
+  background: var(--bg-base);
+  color: var(--text-muted);
+}
+.capture-status--starting {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+.capture-status--streaming {
+  background: var(--success-subtle);
+  color: var(--success);
+}
+.capture-status--error {
+  background: var(--error-subtle);
+  color: var(--error);
+}
+.capture-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.capture-metrics {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.capture-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.capture-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warning-subtle);
+  color: var(--warning);
+  margin-top: var(--space-sm);
+}
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.alert--error {
+  background: var(--error-subtle);
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+.alert--info {
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border);
+}

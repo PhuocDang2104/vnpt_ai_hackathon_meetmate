@@ -115,6 +115,21 @@ export const MeetingDetail = () => {
     }
   };
 
+  const handleOpenMeetingLink = () => {
+    if (!meeting) return;
+    if (joinLink) {
+      window.open(joinLink, '_blank', 'noopener,noreferrer');
+    }
+    setActiveTab('in');
+    const params = new URLSearchParams();
+    const session = streamSessionId || meeting.id;
+    if (session) params.set('session', session);
+    if (joinLink) params.set('link', joinLink);
+    if (joinPlatform) params.set('platform', joinPlatform);
+    const qs = params.toString();
+    navigate(`/app/meetings/${meeting.id}/dock${qs ? `?${qs}` : ''}`);
+  };
+
   const handleInitRealtimeSession = async () => {
     if (!USE_API) {
       setShowJoinModal(false);
@@ -319,10 +334,10 @@ export const MeetingDetail = () => {
               Tham gia cuộc họp
             </button>
             {joinLink && (
-              <a href={joinLink} target="_blank" rel="noopener noreferrer" className="btn btn--ghost">
+              <button type="button" className="btn btn--ghost" onClick={handleOpenMeetingLink}>
                 <LinkIcon size={16} />
                 Mở liên kết
-              </a>
+              </button>
             )}
             
             {/* Meeting action buttons based on phase and time */}

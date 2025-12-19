@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 from typing import Any, Dict, Optional
 
@@ -180,7 +181,12 @@ async def _smartvoice_to_bus(
 ) -> None:
     last_end = 0.0
     try:
-        async for res in stream_recognize(audio_queue, cfg):
+        stream_iter = stream_recognize(audio_queue, cfg)
+        if inspect.isawaitable(stream_iter):
+            stream_iter = await stream_iter
+        if not hasattr(stream_iter, "__aiter__"):
+            raise TypeError("stream_recognize must return an async iterator")
+        async for res in stream_iter:
             time_end = res.time_end if res.time_end is not None else audio_clock.now_s()
             time_start = res.time_start if res.time_start is not None else last_end
             if time_end < time_start:
