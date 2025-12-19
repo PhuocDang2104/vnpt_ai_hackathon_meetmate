@@ -98,7 +98,14 @@ async def _get_access_token() -> str:
     )
 
 
-async def stream_recognize(
+def stream_recognize(
+    audio_queue: "asyncio.Queue[Optional[bytes]]",
+    config: SmartVoiceStreamingConfig,
+) -> AsyncIterator[SmartVoiceResult]:
+    return _stream_recognize_impl(audio_queue, config)
+
+
+async def _stream_recognize_impl(
     audio_queue: "asyncio.Queue[Optional[bytes]]",
     config: SmartVoiceStreamingConfig,
 ) -> AsyncIterator[SmartVoiceResult]:
