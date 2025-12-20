@@ -176,7 +176,7 @@ export const AgendaPanel = ({ meetingId, meetingType }: AgendaPanelProps) => {
                   className="agenda-item__remove"
                   onClick={() => removeItem(index)}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
@@ -217,4 +217,3 @@ export const AgendaPanel = ({ meetingId, meetingType }: AgendaPanelProps) => {
 };
 
 export default AgendaPanel;
-

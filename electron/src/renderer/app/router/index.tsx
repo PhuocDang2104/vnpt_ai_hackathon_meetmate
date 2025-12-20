@@ -26,6 +26,7 @@ const router = createHashRouter([
   { path: '/', element: <Landing /> },
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
+  { path: '/about', element: <About /> },
   
   // App routes (with shell) - Protected
   {
@@ -70,7 +71,6 @@ const router = createHashRouter([
       { path: 'tasks', element: <Tasks /> },
       { path: 'settings', element: <Settings /> },
       { path: 'admin', element: <AdminConsole /> },
-      { path: 'about', element: <About /> },
     ],
   },
 ])

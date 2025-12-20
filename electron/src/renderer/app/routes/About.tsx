@@ -25,9 +25,9 @@ const About = () => {
     <div className="about-page">
       {/* Hero Section */}
       <section className="about-hero">
-        <Link to="/app" className="about-back">
+        <Link to="/" className="about-back">
           <ArrowLeft size={20} />
-          Quay lại Dashboard
+          Quay lại trang chủ
         </Link>
         
         <div className="about-hero__content">
@@ -356,4 +356,3 @@ const About = () => {
 }
 
 export default About
-

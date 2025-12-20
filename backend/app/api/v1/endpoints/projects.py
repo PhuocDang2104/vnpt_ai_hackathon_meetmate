@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.security import require_admin
 from app.schemas.project import (
     Project,
     ProjectCreate,
@@ -17,7 +16,8 @@ from app.schemas.action_item import ActionItemList
 from app.services import project_service
 from app.services import document_service, meeting_service, action_item_service
 
-router = APIRouter(dependencies=[Depends(require_admin)], tags=["projects"])
+# Allow all authenticated users to view/create projects (no admin gate)
+router = APIRouter(tags=["projects"])
 
 
 @router.get("/", response_model=ProjectList)
@@ -130,4 +130,3 @@ def list_project_action_items(
         overdue_only=False,
         project_id=project_id,
     )
-

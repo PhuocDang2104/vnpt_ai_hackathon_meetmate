@@ -417,8 +417,12 @@ export const MeetingDetail = () => {
       {/* Compact Header */}
       <header className="meeting-detail-v2__header">
         <div className="meeting-detail-v2__header-left">
-          <button className="btn btn--ghost btn--icon" onClick={() => navigate('/app/meetings')}>
-            <ArrowLeft size={20} />
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={() => navigate('/app/meetings')}
+          >
+            <ArrowLeft size={16} />
           </button>
           <div className="meeting-detail-v2__header-info">
             <div className="meeting-detail-v2__header-badges">
@@ -455,22 +459,32 @@ export const MeetingDetail = () => {
           <div className="meeting-detail-v2__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Utility */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button className="btn btn--ghost btn--icon" onClick={fetchMeeting} title="Làm mới">
-                <RefreshCw size={18} />
+              <button
+                className="btn btn--ghost btn--icon btn--sm"
+                style={{ padding: '6px', width: '32px', height: '32px' }}
+                onClick={fetchMeeting}
+                title="Làm mới"
+              >
+                <RefreshCw size={16} />
               </button>
               {meeting.phase === 'pre' && (
-                <button className="btn btn--ghost btn--icon" onClick={handleOpenEdit} title="Chỉnh sửa">
-                  <Edit2 size={18} />
+                <button
+                  className="btn btn--ghost btn--icon btn--sm"
+                  style={{ padding: '6px', width: '32px', height: '32px' }}
+                  onClick={handleOpenEdit}
+                  title="Chỉnh sửa"
+                >
+                  <Edit2 size={16} />
                 </button>
               )}
               {meeting.phase === 'pre' && (
                 <button 
-                  className="btn btn--ghost btn--icon" 
+                  className="btn btn--ghost btn--icon btn--sm" 
+                  style={{ padding: '6px', width: '32px', height: '32px', color: 'var(--error)' }}
                   onClick={() => setShowDeleteConfirm(true)} 
                   title="Xóa cuộc họp"
-                  style={{ color: 'var(--error)' }}
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 </button>
               )}
             </div>

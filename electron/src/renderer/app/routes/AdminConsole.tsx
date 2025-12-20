@@ -362,7 +362,7 @@ const AdminConsole = () => {
               <span>{a.deadline ? a.deadline : '--'}</span>
               <span>
                 <button className="btn btn-xs" onClick={() => handleDeleteAction(a.id)}>
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
               </span>
             </div>
@@ -374,4 +374,3 @@ const AdminConsole = () => {
 }
 
 export default AdminConsole
-
