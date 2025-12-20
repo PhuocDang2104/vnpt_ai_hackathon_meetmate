@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Database - supports both local and cloud (Supabase/Railway)
     # Production: Set DATABASE_URL environment variable
     database_url: str = 'postgresql+psycopg2://meetmate:meetmate@localhost:5433/meetmate'
+    db_pool_size: int = 10          # default pool size
+    db_max_overflow: int = 20       # extra connections allowed temporarily
+    db_pool_timeout: int = 30       # seconds to wait before giving up
+    db_pool_recycle: int = 120      # recycle to avoid stale connections
     
     # AI API Keys - Set via environment variable in production
     openai_api_key: str = ''

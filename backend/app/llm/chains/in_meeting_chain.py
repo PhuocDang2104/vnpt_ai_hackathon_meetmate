@@ -6,6 +6,7 @@ from app.llm.prompts.in_meeting_prompts import (
     TOPIC_SEGMENT_PROMPT,
 )
 from app.llm.gemini_client import GeminiChat, get_gemini_client
+from app.core.config import get_settings
 
 
 def _call_gemini(prompt: str) -> str:
@@ -13,10 +14,16 @@ def _call_gemini(prompt: str) -> str:
     if not client:
         return ""
     try:
-        resp = client.generate_content(prompt)
-        return getattr(resp, "text", None) or ""
+        settings = get_settings()
+        resp = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=settings.ai_temperature,
+            max_tokens=min(settings.ai_max_tokens, 512),
+        )
+        return resp.choices[0].message.content or ""
     except Exception as e:
-        print(f"[Gemini] error: {e}")
+        print(f"[Groq] error in _call_gemini: {e}")
         return ""
 
 
