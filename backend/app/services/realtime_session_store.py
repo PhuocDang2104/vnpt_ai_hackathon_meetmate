@@ -3,8 +3,9 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Any, Deque, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,41 @@ class RealtimeSession:
 
     transcript_buffer: str = ""
     state_version: int = 0
+    stream_state: "InMeetingStreamState" = field(default_factory=lambda: InMeetingStreamState())
+
+
+@dataclass
+class FinalTranscriptChunk:
+    seq: int
+    time_start: float
+    time_end: float
+    speaker: str
+    lang: str
+    confidence: float
+    text: str
+
+
+@dataclass
+class InMeetingStreamState:
+    final_stream: List[FinalTranscriptChunk] = field(default_factory=list)
+    final_by_seq: Dict[int, FinalTranscriptChunk] = field(default_factory=dict)
+    rolling_window: Deque[FinalTranscriptChunk] = field(default_factory=deque)
+    recap_batch: List[int] = field(default_factory=list)
+    last_final_seq: int = 0
+    intent_cursor_seq: int = 0
+    recap_cursor_seq: int = 0
+    speech_ms_since_intent: float = 0.0
+    speech_ms_since_recap: float = 0.0
+    last_intent_tick_at: float = 0.0
+    last_recap_tick_at: float = 0.0
+    max_seen_time_end: float = 0.0
+    current_topic_id: Optional[str] = None
+    semantic_intent_label: Optional[str] = None
+    last_live_recap: Optional[str] = None
+    topic_segments: List[Dict[str, Any]] = field(default_factory=list)
+    actions: List[Dict[str, Any]] = field(default_factory=list)
+    decisions: List[Dict[str, Any]] = field(default_factory=list)
+    risks: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class RealtimeSessionStore:

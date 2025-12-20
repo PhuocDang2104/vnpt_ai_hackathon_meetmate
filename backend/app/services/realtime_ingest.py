@@ -1,23 +1,12 @@
 from __future__ import annotations
 
-import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from pydantic import ValidationError
 
-from app.db.session import SessionLocal
 from app.schemas.realtime import TranscriptIngestPayload
-from app.services.in_meeting_persistence import persist_transcript
 from app.services.realtime_bus import session_bus
 from app.services.realtime_session_store import session_store
-
-
-def _is_uuid(value: str) -> bool:
-    try:
-        uuid.UUID(str(value))
-        return True
-    except Exception:
-        return False
 
 
 def _validate_required(payload: TranscriptIngestPayload) -> None:
@@ -35,7 +24,6 @@ async def ingestTranscript(session_id: str, payload: Dict[str, Any], source: str
     - validate required fields
     - allocate seq (monotonic per session)
     - publish transcript_event onto the session bus
-    - persist (best-effort)
     - return seq
     """
     try:
@@ -71,32 +59,6 @@ async def ingestTranscript(session_id: str, payload: Dict[str, Any], source: str
         },
     )
     seq = int(envelope.get("seq") or 0)
-
-    # Best-effort persistence (only when meeting_id looks like UUID)
-    if _is_uuid(seg.meeting_id):
-        try:
-            db = SessionLocal()
-            persist_transcript(
-                db,
-                seg.meeting_id,
-                {
-                    "chunk_index": seq,
-                    "speaker": seg.speaker,
-                    "text": seg.chunk,
-                    "time_start": seg.time_start,
-                    "time_end": seg.time_end,
-                    "is_final": seg.is_final,
-                    "lang": seg.lang,
-                    "confidence": seg.confidence,
-                },
-            )
-        except Exception:
-            pass
-        finally:
-            try:
-                db.close()
-            except Exception:
-                pass
 
     return seq
 

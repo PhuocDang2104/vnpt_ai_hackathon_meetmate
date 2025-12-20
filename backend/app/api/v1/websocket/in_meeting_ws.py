@@ -2,30 +2,32 @@ import asyncio
 import inspect
 import json
 import logging
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.realtime_security import verify_audio_ingest_token
-from app.db.session import SessionLocal
-from app.llm.agents.in_meeting_agent import InMeetingAgent
-from app.llm.graphs.state import MeetingState
-from app.models.meeting import Meeting
+from app.llm.chains.in_meeting_chain import extract_adr, segment_topic, summarize_transcript
+from app.llm.tools.smartbot_intent_tool import predict_intent
 from app.schemas.realtime import AudioStartMessage
-from app.services.in_meeting_persistence import (
-    persist_topic_segment,
-    persist_adr,
-    persist_tool_suggestions,
-)
 from app.services.realtime_bus import session_bus
 from app.services.realtime_ingest import ingestTranscript
-from app.services.realtime_session_store import session_store
+from app.services.realtime_session_store import FinalTranscriptChunk, session_store
 from app.services.smartvoice_streaming import SmartVoiceStreamingConfig, is_smartvoice_configured, stream_recognize
 
 router = APIRouter()
-langgraph_workers: Dict[str, asyncio.Task] = {}
-project_cache: Dict[str, Optional[str]] = {}
+stream_workers: Dict[str, asyncio.Task] = {}
 logger = logging.getLogger(__name__)
+
+INTENT_WINDOW_SEC = 25.0
+ROLLING_RETENTION_SEC = 120.0
+RECAP_MAX_WINDOW_SEC = 120.0
+INTENT_SPEECH_MS = 10_000.0
+INTENT_GUARD_SEC = 20.0
+RECAP_SPEECH_MS = 60_000.0
+RECAP_GUARD_SEC = 75.0
+RECAP_DELAY_SEC = 1.5
 
 
 class _AudioClock:
@@ -47,72 +49,239 @@ class _AudioClock:
         return float(self.total_samples) / float(self.sample_rate_hz)
 
 
-def _resolve_project_id(meeting_id: Optional[str]) -> Optional[str]:
-    if not meeting_id:
-        return None
-    if meeting_id in project_cache:
-        return project_cache[meeting_id]
-    try:
-        db = SessionLocal()
-        record = db.query(Meeting).filter(Meeting.id == meeting_id).first()
-        project_cache[meeting_id] = str(record.project_id) if record and record.project_id else None
-    except Exception:
-        project_cache[meeting_id] = None
-    finally:
-        try:
-            db.close()
-        except Exception:
-            pass
-    return project_cache[meeting_id]
+def _format_chunk_line(chunk: FinalTranscriptChunk) -> str:
+    return f"[{chunk.speaker} {chunk.time_start:.2f}-{chunk.time_end:.2f}] {chunk.text}".strip()
 
 
-def _persist_state_outputs(result: Dict[str, Any]) -> None:
-    try:
-        db = SessionLocal()
-        meeting_id = result.get("meeting_id")
-        if meeting_id:
-            if result.get("topic_segments"):
-                persist_topic_segment(db, meeting_id, result["topic_segments"][-1])
-            persist_adr(db, meeting_id, result.get("new_actions", []), result.get("new_decisions", []), result.get("new_risks", []))
-            persist_tool_suggestions(db, meeting_id, result.get("tool_suggestions", []))
-    except Exception:
-        pass
-    finally:
-        try:
-            db.close()
-        except Exception:
-            pass
+def _build_window_text(chunks: List[FinalTranscriptChunk]) -> str:
+    return "\n".join(_format_chunk_line(chunk) for chunk in chunks if chunk.text)
 
 
-def _build_state_from_payload(session_id: str, payload: Dict[str, Any]) -> MeetingState:
-    meeting_id = payload.get("meeting_id") or session_id
-    project_id = payload.get("project_id") or _resolve_project_id(meeting_id)
-    sess = session_store.get(session_id)
-    transcript_window = payload.get("transcript_window") or (sess.transcript_buffer if sess else "")
-    seg = {
-        "text": payload.get("chunk") or payload.get("text") or "",
-        "time_start": payload.get("time_start", 0.0),
-        "time_end": payload.get("time_end", 0.0),
-        "speaker": payload.get("speaker", "SPEAKER_01"),
-        "is_final": payload.get("is_final", True),
-        "confidence": payload.get("confidence", 1.0),
-        "lang": payload.get("lang", "vi"),
-    }
+def _merge_list(existing: List[Dict[str, Any]], new_items: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
+    seen = set()
+    merged = []
+    for item in (existing or []) + (new_items or []):
+        value = item.get(key)
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        merged.append(item)
+    return merged
+
+
+def _build_tool_suggestions(new_actions: List[Dict[str, Any]], new_risks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    suggestions = []
+    for action in new_actions or []:
+        suggestions.append({
+            "suggestion_id": f"task-{len(suggestions)+1}",
+            "type": "task",
+            "action_hash": action.get("task"),
+            "payload": {"task": action.get("task"), "owner": action.get("owner"), "due": action.get("due_date")},
+        })
+    for risk in new_risks or []:
+        suggestions.append({
+            "suggestion_id": f"schedule-{len(suggestions)+1}",
+            "type": "schedule",
+            "action_hash": risk.get("desc"),
+            "payload": {"title": risk.get("desc"), "owner": risk.get("owner")},
+        })
+    return suggestions
+
+
+def _prune_stream_state(stream_state) -> None:
+    cutoff = stream_state.max_seen_time_end - ROLLING_RETENTION_SEC
+    if cutoff <= 0:
+        return
+    kept = [chunk for chunk in stream_state.rolling_window if chunk.time_end >= cutoff]
+    stream_state.rolling_window.clear()
+    stream_state.rolling_window.extend(kept)
+    keep_seqs = {chunk.seq for chunk in kept}
+    keep_seqs.update(stream_state.recap_batch)
+    for seq in list(stream_state.final_by_seq.keys()):
+        if seq not in keep_seqs:
+            stream_state.final_by_seq.pop(seq, None)
+
+
+def _append_final_chunk(stream_state, chunk: FinalTranscriptChunk, now: float) -> None:
+    stream_state.final_stream.append(chunk)
+    stream_state.final_by_seq[chunk.seq] = chunk
+    stream_state.rolling_window.append(chunk)
+    stream_state.recap_batch.append(chunk.seq)
+    stream_state.last_final_seq = max(stream_state.last_final_seq, chunk.seq)
+    if chunk.time_end > stream_state.max_seen_time_end:
+        stream_state.max_seen_time_end = chunk.time_end
+    duration_ms = max(0.0, chunk.time_end - chunk.time_start) * 1000.0
+    stream_state.speech_ms_since_intent += duration_ms
+    stream_state.speech_ms_since_recap += duration_ms
+    if stream_state.last_intent_tick_at <= 0.0:
+        stream_state.last_intent_tick_at = now
+    if stream_state.last_recap_tick_at <= 0.0:
+        stream_state.last_recap_tick_at = now
+    _prune_stream_state(stream_state)
+
+
+def _select_window_chunks(stream_state, window_sec: float) -> List[FinalTranscriptChunk]:
+    if not stream_state.rolling_window:
+        return []
+    anchor = stream_state.max_seen_time_end or stream_state.rolling_window[-1].time_end
+    cutoff = anchor - window_sec
+    chunks = [chunk for chunk in stream_state.rolling_window if chunk.time_end >= cutoff]
+    chunks.sort(key=lambda chunk: (chunk.time_end, chunk.seq))
+    return chunks
+
+
+def _select_recap_chunks(stream_state) -> List[FinalTranscriptChunk]:
+    if not stream_state.recap_batch:
+        return []
+    chunks = [stream_state.final_by_seq.get(seq) for seq in stream_state.recap_batch]
+    chunks = [chunk for chunk in chunks if chunk]
+    if not chunks:
+        return []
+    max_end = max(chunk.time_end for chunk in chunks)
+    cutoff = max_end - RECAP_MAX_WINDOW_SEC
+    trimmed = [chunk for chunk in chunks if chunk.time_end >= cutoff]
+    trimmed.sort(key=lambda chunk: (chunk.time_end, chunk.seq))
+    return trimmed
+
+
+def _should_intent_tick(stream_state, now: float) -> bool:
+    if stream_state.last_final_seq <= stream_state.intent_cursor_seq:
+        return False
+    if stream_state.speech_ms_since_intent >= INTENT_SPEECH_MS:
+        return True
+    if stream_state.last_intent_tick_at <= 0.0:
+        return False
+    return (now - stream_state.last_intent_tick_at) >= INTENT_GUARD_SEC
+
+
+def _should_recap_tick(stream_state, now: float) -> bool:
+    if not stream_state.recap_batch:
+        return False
+    if stream_state.speech_ms_since_recap >= RECAP_SPEECH_MS:
+        return True
+    if stream_state.last_recap_tick_at <= 0.0:
+        return False
+    return (now - stream_state.last_recap_tick_at) >= RECAP_GUARD_SEC
+
+
+def _run_intent_tick(session_id: str, stream_state, last_chunk: FinalTranscriptChunk, now: float) -> Dict[str, Any]:
+    window_chunks = _select_window_chunks(stream_state, INTENT_WINDOW_SEC)
+    window_text = _build_window_text(window_chunks)
+    intent_label, intent_slots = predict_intent(window_text, lang=last_chunk.lang)
+
+    topic_payload = segment_topic(
+        transcript_window=window_text,
+        current_topic_id=stream_state.current_topic_id,
+    )
+    if topic_payload.get("new_topic") or not stream_state.topic_segments:
+        stream_state.topic_segments.append({
+            "topic_id": topic_payload.get("topic_id") or "T0",
+            "title": topic_payload.get("title") or "General",
+            "start_t": topic_payload.get("start_t", last_chunk.time_start),
+            "end_t": topic_payload.get("end_t", last_chunk.time_end),
+        })
+    stream_state.current_topic_id = topic_payload.get("topic_id") or stream_state.current_topic_id or "T0"
+
+    adr = extract_adr(transcript_window=window_text, topic_id=stream_state.current_topic_id)
+    new_actions = adr.get("actions", [])
+    new_decisions = adr.get("decisions", [])
+    new_risks = adr.get("risks", [])
+
+    stream_state.actions = _merge_list(stream_state.actions, new_actions, key="task")
+    stream_state.decisions = _merge_list(stream_state.decisions, new_decisions, key="title")
+    stream_state.risks = _merge_list(stream_state.risks, new_risks, key="desc")
+    tool_suggestions = _build_tool_suggestions(new_actions, new_risks)
+
+    speech_ms_before = stream_state.speech_ms_since_intent
+    stream_state.intent_cursor_seq = stream_state.last_final_seq
+    stream_state.speech_ms_since_intent = 0.0
+    stream_state.last_intent_tick_at = now
+    stream_state.semantic_intent_label = intent_label
+
     return {
-        "meeting_id": meeting_id,
+        "meeting_id": session_id,
         "stage": "in",
-        "intent": "qa" if payload.get("question") else "tick",
-        "project_id": project_id,
+        "intent": "tick",
         "sla": "realtime",
-        "vnpt_segment": seg,
-        "transcript_window": transcript_window or seg["text"],
-        "full_transcript": transcript_window or "",
-        "last_user_question": payload.get("question"),
-        "actions": payload.get("actions", []),
-        "decisions": payload.get("decisions", []),
-        "risks": payload.get("risks", []),
-        "tool_suggestions": payload.get("tool_suggestions", []),
-        "debug_info": payload.get("debug_info", {}),
+        "live_recap": stream_state.last_live_recap,
+        "vnpt_segment": {
+            "text": last_chunk.text,
+            "time_start": last_chunk.time_start,
+            "time_end": last_chunk.time_end,
+            "speaker": last_chunk.speaker,
+            "is_final": True,
+            "confidence": last_chunk.confidence,
+            "lang": last_chunk.lang,
+        },
+        "transcript_window": window_text,
+        "semantic_intent_label": intent_label,
+        "semantic_intent_slots": intent_slots,
+        "actions": stream_state.actions,
+        "new_actions": new_actions,
+        "decisions": stream_state.decisions,
+        "new_decisions": new_decisions,
+        "risks": stream_state.risks,
+        "new_risks": new_risks,
+        "tool_suggestions": tool_suggestions,
+        "topic_segments": stream_state.topic_segments,
+        "current_topic_id": stream_state.current_topic_id,
+        "debug_info": {
+            "intent_cursor_seq": stream_state.intent_cursor_seq,
+            "recap_cursor_seq": stream_state.recap_cursor_seq,
+            "speech_ms_before": speech_ms_before,
+            "window_sec": INTENT_WINDOW_SEC,
+            "window_chunks": len(window_chunks),
+            "last_final_seq": stream_state.last_final_seq,
+        },
+    }
+
+
+def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[str, Any]]:
+    if not stream_state.recap_batch:
+        return None
+    batch_seqs = list(stream_state.recap_batch)
+    recap_chunks = _select_recap_chunks(stream_state)
+    recap_text = _build_window_text(recap_chunks)
+    if not recap_text:
+        stream_state.recap_batch.clear()
+        stream_state.recap_cursor_seq = stream_state.last_final_seq
+        stream_state.speech_ms_since_recap = 0.0
+        stream_state.last_recap_tick_at = now
+        return None
+
+    live_recap = summarize_transcript(
+        transcript_window=recap_text,
+        topic=stream_state.current_topic_id,
+        intent=stream_state.semantic_intent_label,
+    )
+    stream_state.last_live_recap = live_recap
+
+    speech_ms_before = stream_state.speech_ms_since_recap
+    stream_state.recap_cursor_seq = max(batch_seqs) if batch_seqs else stream_state.recap_cursor_seq
+    stream_state.recap_batch.clear()
+    stream_state.speech_ms_since_recap = 0.0
+    stream_state.last_recap_tick_at = now
+    _prune_stream_state(stream_state)
+
+    return {
+        "meeting_id": session_id,
+        "stage": "in",
+        "intent": "tick",
+        "sla": "near_realtime",
+        "live_recap": live_recap,
+        "actions": stream_state.actions,
+        "decisions": stream_state.decisions,
+        "risks": stream_state.risks,
+        "topic_segments": stream_state.topic_segments,
+        "current_topic_id": stream_state.current_topic_id,
+        "debug_info": {
+            "intent_cursor_seq": stream_state.intent_cursor_seq,
+            "recap_cursor_seq": stream_state.recap_cursor_seq,
+            "speech_ms_before": speech_ms_before,
+            "recap_window_sec": RECAP_MAX_WINDOW_SEC,
+            "recap_chunks": len(recap_chunks),
+            "last_final_seq": stream_state.last_final_seq,
+        },
     }
 
 
@@ -128,8 +297,9 @@ async def _publish_state_event(session_id: str, state: Dict[str, Any]) -> None:
     )
 
 
-async def _langgraph_consumer(session_id: str, queue: asyncio.Queue) -> None:
-    agent = InMeetingAgent()
+async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
+    session = session_store.ensure(session_id)
+    stream_state = session.stream_state
     try:
         while True:
             try:
@@ -139,33 +309,59 @@ async def _langgraph_consumer(session_id: str, queue: asyncio.Queue) -> None:
             if event.get("event") != "transcript_event":
                 continue
             payload = event.get("payload") or {}
-            is_final = payload.get("is_final", True)
-            force = bool(payload.get("question"))
-            # For ADR/recap extraction, prefer running on FINAL chunks; allow question-triggered tick.
-            if not is_final and not force:
+            if not payload.get("is_final", True):
                 continue
-            state = _build_state_from_payload(session_id, payload)
+
             try:
-                result = agent.run_with_scheduler(state, force=force)
-            except Exception:
-                continue
-            if result is None:
-                continue
-            _persist_state_outputs(result)
-            await _publish_state_event(session_id, result)
+                seq = int(event.get("seq") or 0)
+            except (TypeError, ValueError):
+                seq = 0
+
+            confidence = payload.get("confidence")
+            chunk = FinalTranscriptChunk(
+                seq=seq,
+                time_start=float(payload.get("time_start") or 0.0),
+                time_end=float(payload.get("time_end") or 0.0),
+                speaker=payload.get("speaker") or "SPEAKER_01",
+                lang=payload.get("lang") or "vi",
+                confidence=float(1.0 if confidence is None else confidence),
+                text=payload.get("chunk") or payload.get("text") or "",
+            )
+            now = time.time()
+            _append_final_chunk(stream_state, chunk, now)
+
+            intent_due = _should_intent_tick(stream_state, now)
+            recap_due = _should_recap_tick(stream_state, now)
+
+            if intent_due:
+                try:
+                    intent_state = _run_intent_tick(session_id, stream_state, chunk, now)
+                    await _publish_state_event(session_id, intent_state)
+                except Exception:
+                    pass
+
+            if recap_due:
+                if intent_due:
+                    await asyncio.sleep(RECAP_DELAY_SEC)
+                try:
+                    recap_state = _run_recap_tick(session_id, stream_state, now)
+                    if recap_state:
+                        await _publish_state_event(session_id, recap_state)
+                except Exception:
+                    pass
     except asyncio.CancelledError:
         pass
     finally:
         session_bus.unsubscribe(session_id, queue)
-        langgraph_workers.pop(session_id, None)
+        stream_workers.pop(session_id, None)
 
 
-def _ensure_langgraph_worker(session_id: str) -> None:
-    task = langgraph_workers.get(session_id)
+def _ensure_stream_worker(session_id: str) -> None:
+    task = stream_workers.get(session_id)
     if task and not task.done():
         return
     queue = session_bus.subscribe(session_id)
-    langgraph_workers[session_id] = asyncio.create_task(_langgraph_consumer(session_id, queue))
+    stream_workers[session_id] = asyncio.create_task(_stream_consumer(session_id, queue))
 
 
 async def _safe_send_json(websocket: WebSocket, lock: asyncio.Lock, payload: Dict[str, Any]) -> None:
@@ -251,7 +447,7 @@ async def audio_ingest(websocket: WebSocket, session_id: str):
     await websocket.accept()
     await websocket.send_json({"event": "connected", "channel": "audio", "session_id": session_id})
     send_lock = asyncio.Lock()
-    _ensure_langgraph_worker(session_id)
+    _ensure_stream_worker(session_id)
 
     try:
         raw = await websocket.receive_text()
@@ -414,7 +610,7 @@ async def in_meeting_ingest(websocket: WebSocket, session_id: str):
     await websocket.accept()
     await websocket.send_json({"event": "connected", "channel": "ingest", "session_id": session_id})
     session_store.ensure(session_id)
-    _ensure_langgraph_worker(session_id)
+    _ensure_stream_worker(session_id)
     try:
         while True:
             try:
@@ -443,7 +639,7 @@ async def in_meeting_ingest(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"event": "ingest_ack", "session_id": session_id, "seq": seq})
             except Exception as exc:
                 await websocket.send_json({"event": "error", "session_id": session_id, "message": str(exc)})
-            _ensure_langgraph_worker(session_id)
+            _ensure_stream_worker(session_id)
     finally:
         try:
             await websocket.close()
