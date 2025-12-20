@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.realtime_security import verify_audio_ingest_token
+from app.schemas.gomeet import GoMeetJoinUrlRequest, GoMeetJoinUrlResponse
 from app.schemas.in_meeting import TranscriptEvent, ActionEvent
 from app.llm.graphs.router import build_router_graph
 from app.llm.graphs.state import MeetingState
-from app.services import transcript_service, action_item_service
+from app.services import transcript_service, action_item_service, gomeet_service
 
 router = APIRouter()
 router_graph = build_router_graph(default_stage="in")
@@ -88,6 +90,64 @@ def get_meeting_risks(
 @router.get('/transcript', response_model=list[TranscriptEvent])
 def transcript():
     return [TranscriptEvent(speaker='PMO', text='We need to accelerate API A', timestamp=0.0)]
+
+
+@router.post('/gomeet/join-url', response_model=GoMeetJoinUrlResponse)
+async def build_gomeet_join_url(payload: GoMeetJoinUrlRequest) -> GoMeetJoinUrlResponse:
+    token_payload = verify_audio_ingest_token(payload.audio_ingest_token, expected_session_id=payload.session_id)
+    if not token_payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid audio_ingest_token")
+
+    meeting_secret_key = payload.meeting_secret_key
+    access_code = payload.access_code
+    start_raw = None
+    host_join_url = None
+
+    if not meeting_secret_key or not access_code:
+        try:
+            start_result = await gomeet_service.start_new_meeting(idempotency_key=payload.idempotency_key)
+        except gomeet_service.GoMeetConfigError as exc:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+        except gomeet_service.GoMeetRequestError as exc:
+            detail = {"message": str(exc), "upstream": exc.payload}
+            raise HTTPException(status_code=exc.status_code or status.HTTP_502_BAD_GATEWAY, detail=detail) from exc
+        except gomeet_service.GoMeetResponseError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        meeting_secret_key = start_result.meeting_secret_key
+        access_code = start_result.access_code
+        host_join_url = start_result.host_join_url
+        start_raw = start_result.raw
+
+    if not meeting_secret_key or not access_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="meeting_secret_key and access_code required")
+
+    try:
+        join_result = await gomeet_service.join_meeting(
+            meeting_secret_key=meeting_secret_key,
+            access_code=access_code,
+            idempotency_key=payload.idempotency_key,
+        )
+    except gomeet_service.GoMeetConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    except gomeet_service.GoMeetRequestError as exc:
+        detail = {"message": str(exc), "upstream": exc.payload}
+        raise HTTPException(status_code=exc.status_code or status.HTTP_502_BAD_GATEWAY, detail=detail) from exc
+    except gomeet_service.GoMeetResponseError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    full_join_url = gomeet_service.build_full_join_url(
+        join_result.join_url,
+        payload.session_id,
+        payload.audio_ingest_token,
+    )
+
+    return GoMeetJoinUrlResponse(
+        join_url=join_result.join_url,
+        full_join_url=full_join_url,
+        host_join_url=host_join_url,
+        start_raw=start_raw,
+        join_raw=join_result.raw,
+    )
 
 
 @router.get('/transcript/{meeting_id}', response_model=dict)

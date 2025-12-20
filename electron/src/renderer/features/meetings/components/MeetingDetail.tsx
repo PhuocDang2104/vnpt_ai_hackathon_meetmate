@@ -7,7 +7,6 @@ import {
   MapPin,
   Users,
   FileText,
-  Sparkles,
   Mic,
   CheckSquare,
   Play,
@@ -22,6 +21,7 @@ import {
 } from 'lucide-react';
 import { meetingsApi } from '../../../lib/api/meetings';
 import { sessionsApi } from '../../../lib/api/sessions';
+import { inMeetingApi } from '../../../lib/api/inMeeting';
 import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { USE_API } from '../../../config/env';
@@ -43,11 +43,17 @@ export const MeetingDetail = () => {
   const [activeTab, setActiveTab] = useState<MeetingTabType>('pre');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinPlatform, setJoinPlatform] = useState<'gomeet' | 'gmeet'>('gomeet');
-  const [joinLink, setJoinLink] = useState('');
+  const [gmeetJoinLink, setGmeetJoinLink] = useState('');
+  const [gomeetFullJoinUrl, setGomeetFullJoinUrl] = useState('');
+  const [gomeetHostUrl, setGomeetHostUrl] = useState('');
+  const [gomeetMeetingSecretKey, setGomeetMeetingSecretKey] = useState('');
+  const [gomeetAccessCode, setGomeetAccessCode] = useState('');
   const [streamSessionId, setStreamSessionId] = useState<string | null>(null);
   const [audioIngestToken, setAudioIngestToken] = useState('');
   const [sessionInitError, setSessionInitError] = useState<string | null>(null);
   const [isInitSessionLoading, setIsInitSessionLoading] = useState(false);
+  const [gomeetInitError, setGomeetInitError] = useState<string | null>(null);
+  const [isGoMeetLoading, setIsGoMeetLoading] = useState(false);
   
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -75,9 +81,7 @@ export const MeetingDetail = () => {
       const data = await meetingsApi.get(meetingId);
       setMeeting(data);
       setStreamSessionId(data.id);
-      if (data.teams_link) {
-        setJoinLink(data.teams_link);
-      }
+      setGmeetJoinLink(data.teams_link || '');
       // Set active tab based on meeting phase
       if (data.phase === 'in') setActiveTab('in');
       else if (data.phase === 'post') setActiveTab('post');
@@ -116,20 +120,50 @@ export const MeetingDetail = () => {
     }
   };
 
-  const handleOpenMeetingLink = () => {
+  const resolveJoinTarget = (preferredPlatform?: 'gomeet' | 'gmeet') => {
+    const platform = preferredPlatform || joinPlatform;
+    if (platform === 'gomeet' && gomeetFullJoinUrl) {
+      return { link: gomeetFullJoinUrl, platform: 'gomeet' as const };
+    }
+    if (platform === 'gmeet' && gmeetJoinLink) {
+      return { link: gmeetJoinLink, platform: 'gmeet' as const };
+    }
+    if (gomeetFullJoinUrl) {
+      return { link: gomeetFullJoinUrl, platform: 'gomeet' as const };
+    }
+    if (gmeetJoinLink) {
+      return { link: gmeetJoinLink, platform: 'gmeet' as const };
+    }
+    return { link: '', platform };
+  };
+
+  const openMeetingLink = (override?: {
+    link?: string;
+    platform?: 'gomeet' | 'gmeet';
+    sessionId?: string;
+    token?: string;
+  }) => {
     if (!meeting) return;
-    if (joinLink) {
-      window.open(joinLink, '_blank', 'noopener,noreferrer');
+    const resolved = resolveJoinTarget(override?.platform);
+    const link = override?.link || resolved.link;
+    const platform = override?.platform || resolved.platform || joinPlatform;
+    if (link) {
+      window.open(link, '_blank', 'noopener,noreferrer');
     }
     setActiveTab('in');
     const params = new URLSearchParams();
-    const session = streamSessionId || meeting.id;
+    const session = override?.sessionId || streamSessionId || meeting.id;
     if (session) params.set('session', session);
-    if (joinLink) params.set('link', joinLink);
-    if (joinPlatform) params.set('platform', joinPlatform);
-    if (audioIngestToken) params.set('token', audioIngestToken);
+    if (link) params.set('link', link);
+    if (platform) params.set('platform', platform);
+    const token = override?.token || audioIngestToken;
+    if (token) params.set('token', token);
     const qs = params.toString();
     navigate(`/app/meetings/${meeting.id}/dock${qs ? `?${qs}` : ''}`);
+  };
+
+  const handleOpenMeetingLink = () => {
+    openMeetingLink();
   };
 
   const handleInitRealtimeSession = async () => {
@@ -158,7 +192,8 @@ export const MeetingDetail = () => {
 
       let token = audioIngestToken.trim();
       if (!token) {
-        const tokenRes = await sessionsApi.registerSource(sessionId);
+        const platform = joinPlatform === 'gomeet' ? 'vnpt_gomeet' : undefined;
+        const tokenRes = await sessionsApi.registerSource(sessionId, platform);
         token = tokenRes.audio_ingest_token;
       }
       setAudioIngestToken(token);
@@ -168,6 +203,57 @@ export const MeetingDetail = () => {
       setSessionInitError('Không thể khởi tạo realtime session. Kiểm tra backend /api/v1/sessions.');
     } finally {
       setIsInitSessionLoading(false);
+    }
+  };
+
+  const handleLaunchGoMeet = async () => {
+    if (!meeting) return;
+    if (!USE_API) {
+      setGomeetInitError('USE_API=false: không thể gọi backend để tạo GoMeet.');
+      return;
+    }
+    const desiredSessionId = streamSessionId || meeting.id;
+    if (!desiredSessionId) return;
+
+    setIsGoMeetLoading(true);
+    setGomeetInitError(null);
+    try {
+      const res = await sessionsApi.create({
+        session_id: desiredSessionId,
+        language_code: 'vi-VN',
+        target_sample_rate_hz: 16000,
+        audio_encoding: 'PCM_S16LE',
+        channels: 1,
+        realtime: true,
+        interim_results: true,
+        enable_word_time_offsets: true,
+      });
+      const sessionId = res.session_id;
+      setStreamSessionId(sessionId);
+
+      let token = audioIngestToken.trim();
+      if (!token || sessionId !== desiredSessionId) {
+        const tokenRes = await sessionsApi.registerSource(sessionId, 'vnpt_gomeet');
+        token = tokenRes.audio_ingest_token;
+      }
+      setAudioIngestToken(token);
+
+      const joinRes = await inMeetingApi.createGoMeetJoinUrl({
+        session_id: sessionId,
+        audio_ingest_token: token,
+        meeting_secret_key: gomeetMeetingSecretKey.trim() || undefined,
+        access_code: gomeetAccessCode.trim() || undefined,
+      });
+
+      setGomeetFullJoinUrl(joinRes.full_join_url);
+      setGomeetHostUrl(joinRes.host_join_url || '');
+      setShowJoinModal(false);
+      openMeetingLink({ link: joinRes.full_join_url, platform: 'gomeet', sessionId, token });
+    } catch (err) {
+      console.error('Failed to start GoMeet flow:', err);
+      setGomeetInitError('Không thể khởi tạo GoMeet. Kiểm tra token và cấu hình GoMeet API.');
+    } finally {
+      setIsGoMeetLoading(false);
     }
   };
 
@@ -271,6 +357,10 @@ export const MeetingDetail = () => {
     { id: 'in', label: 'Trong họp', icon: <Mic size={18} />, description: 'Transcript, Actions, Decisions' },
     { id: 'post', label: 'Sau họp', icon: <CheckSquare size={18} />, description: 'Summary, MoM, Follow-up' },
   ];
+  const primaryJoinTarget = resolveJoinTarget();
+  const inMeetingPlatform = primaryJoinTarget.platform || joinPlatform;
+  const activeJoinLink = primaryJoinTarget.link;
+  const sessionIdValue = streamSessionId || meeting.id;
 
   return (
     <div className="meeting-detail-v2">
@@ -346,7 +436,7 @@ export const MeetingDetail = () => {
                 <Video size={16} />
                 Tham gia
               </button>
-              {joinLink && (
+              {primaryJoinTarget.link && (
                 <button type="button" className="btn btn--ghost" onClick={handleOpenMeetingLink}>
                   <LinkIcon size={16} />
                   Mở liên kết
@@ -424,9 +514,9 @@ export const MeetingDetail = () => {
         {activeTab === 'in' && (
           <InMeetTab 
             meeting={meeting}
-            joinPlatform={joinPlatform}
-            joinLink={joinLink}
-            streamSessionId={streamSessionId || meeting.id}
+            joinPlatform={inMeetingPlatform}
+            joinLink={activeJoinLink}
+            streamSessionId={sessionIdValue}
             initialAudioIngestToken={audioIngestToken || undefined}
             onRefresh={fetchMeeting}
             onEndMeeting={handleEndMeeting}
@@ -633,71 +723,180 @@ export const MeetingDetail = () => {
               <div className="pill-switch">
                 <button
                   className={`pill-switch__item ${joinPlatform === 'gomeet' ? 'pill-switch__item--active' : ''}`}
-                  onClick={() => setJoinPlatform('gomeet')}
+                  onClick={() => {
+                    setJoinPlatform('gomeet');
+                    setSessionInitError(null);
+                    setGomeetInitError(null);
+                  }}
                 >
                   GoMeet
                 </button>
                 <button
                   className={`pill-switch__item ${joinPlatform === 'gmeet' ? 'pill-switch__item--active' : ''}`}
-                  onClick={() => setJoinPlatform('gmeet')}
+                  onClick={() => {
+                    setJoinPlatform('gmeet');
+                    setSessionInitError(null);
+                    setGomeetInitError(null);
+                  }}
                 >
                   Google Meet
                 </button>
               </div>
 
-              <div className="form-group" style={{ marginTop: '12px' }}>
-                <label className="form-label">Link cuộc họp</label>
-                <input
-                  type="url"
-                  className="form-input"
-                  placeholder="Dán link Google Meet hoặc VNPT GoMeet"
-                  value={joinLink}
-                  onChange={e => setJoinLink(e.target.value)}
-                />
-                <p className="form-hint">Link này sẽ dùng để mở tab mới và gắn vào session in-meeting.</p>
-              </div>
+              {joinPlatform === 'gomeet' ? (
+                <>
+                  <div className="form-group" style={{ marginTop: '12px' }}>
+                    <label className="form-label">GoMeet host (tự tạo phòng)</label>
+                    <p className="form-hint">
+                      MeetMate sẽ tạo phòng GoMeet, gắn sessionId + ingestToken, sau đó mở link để bạn vào họp.
+                    </p>
+                  </div>
 
-              <div className="form-group">
-                <label className="form-label">Session ID cho realtime transcript</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={streamSessionId || meeting.id}
-                  onChange={e => setStreamSessionId(e.target.value)}
-                  placeholder="session_id (mặc định là meeting.id)"
-                />
-                <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
-              </div>
+                  <div className="form-group">
+                    <label className="form-label">Session ID cho realtime transcript</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={sessionIdValue}
+                      onChange={e => setStreamSessionId(e.target.value)}
+                      placeholder="session_id (mặc định là meeting.id)"
+                    />
+                    <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
+                  </div>
 
-              <div className="form-group">
-                <label className="form-label">Audio ingest token (tuỳ chọn)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={audioIngestToken}
-                  onChange={e => setAudioIngestToken(e.target.value)}
-                  placeholder="Dán token nếu đã có"
-                />
-                <p className="form-hint">Để trống: hệ thống sẽ tự tạo token khi bấm Kết nối.</p>
-              </div>
+                  <div className="form-group">
+                    <label className="form-label">Audio ingest token (tuỳ chọn)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={audioIngestToken}
+                      onChange={e => setAudioIngestToken(e.target.value)}
+                      placeholder="Dán token nếu đã có"
+                    />
+                    <p className="form-hint">Để trống: hệ thống sẽ tự tạo token trước khi mở GoMeet.</p>
+                  </div>
 
-              {sessionInitError && (
-                <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
-                  {sessionInitError}
-                </div>
+                  <div className="form-group">
+                    <label className="form-label">meetingSecretKey (tuỳ chọn)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={gomeetMeetingSecretKey}
+                      onChange={e => setGomeetMeetingSecretKey(e.target.value)}
+                      placeholder="Dành cho phòng GoMeet đã có sẵn"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">accessCode (tuỳ chọn)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={gomeetAccessCode}
+                      onChange={e => setGomeetAccessCode(e.target.value)}
+                      placeholder="Access code từ GoMeet"
+                    />
+                    <p className="form-hint">
+                      Nếu không nhập, MeetMate sẽ tự tạo phòng mới qua API StartNewMeeting.
+                    </p>
+                  </div>
+
+                  {(gomeetHostUrl || gomeetFullJoinUrl) && (
+                    <div className="card" style={{ background: 'var(--bg-elevated)', padding: 'var(--space-base)' }}>
+                      {gomeetHostUrl && (
+                        <a href={gomeetHostUrl} target="_blank" rel="noopener noreferrer" className="pill pill--accent">
+                          <LinkIcon size={12} style={{ marginRight: 6 }} />
+                          Mở link host
+                        </a>
+                      )}
+                      {gomeetFullJoinUrl && (
+                        <a
+                          href={gomeetFullJoinUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pill pill--ghost"
+                          style={{ marginLeft: gomeetHostUrl ? 8 : 0 }}
+                        >
+                          <LinkIcon size={12} style={{ marginRight: 6 }} />
+                          Mở link join (đã gắn token)
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {gomeetInitError && (
+                    <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
+                      {gomeetInitError}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="form-group" style={{ marginTop: '12px' }}>
+                    <label className="form-label">Link cuộc họp</label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="Dán link Google Meet hoặc VNPT GoMeet"
+                      value={gmeetJoinLink}
+                      onChange={e => setGmeetJoinLink(e.target.value)}
+                    />
+                    <p className="form-hint">Link này sẽ dùng để mở tab mới và gắn vào session in-meeting.</p>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Session ID cho realtime transcript</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={sessionIdValue}
+                      onChange={e => setStreamSessionId(e.target.value)}
+                      placeholder="session_id (mặc định là meeting.id)"
+                    />
+                    <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Audio ingest token (tuỳ chọn)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={audioIngestToken}
+                      onChange={e => setAudioIngestToken(e.target.value)}
+                      placeholder="Dán token nếu đã có"
+                    />
+                    <p className="form-hint">Để trống: hệ thống sẽ tự tạo token khi bấm Kết nối.</p>
+                  </div>
+
+                  {sessionInitError && (
+                    <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
+                      {sessionInitError}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="modal__footer">
               <button className="btn btn--secondary" onClick={() => setShowJoinModal(false)}>
                 Đóng
               </button>
-              <button
-                className="btn btn--primary"
-                onClick={handleInitRealtimeSession}
-                disabled={!streamSessionId}
-              >
-                {isInitSessionLoading ? 'Đang kết nối...' : 'Kết nối'}
-              </button>
+              {joinPlatform === 'gomeet' ? (
+                <button
+                  className="btn btn--primary"
+                  onClick={handleLaunchGoMeet}
+                  disabled={!sessionIdValue}
+                >
+                  {isGoMeetLoading ? 'Đang mở GoMeet...' : 'Tạo & mở GoMeet'}
+                </button>
+              ) : (
+                <button
+                  className="btn btn--primary"
+                  onClick={handleInitRealtimeSession}
+                  disabled={!sessionIdValue}
+                >
+                  {isInitSessionLoading ? 'Đang kết nối...' : 'Kết nối'}
+                </button>
+              )}
             </div>
           </div>
         </div>

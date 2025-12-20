@@ -33,7 +33,8 @@ export const sessionsApi = {
   create: (data: SessionCreateRequest) =>
     api.post<SessionCreateResponse>('/sessions', data, { skipAuth: true }),
 
-  registerSource: (sessionId: string) =>
-    api.post<SourceRegisterResponse>(`/sessions/${sessionId}/sources`, undefined, { skipAuth: true }),
+  registerSource: (sessionId: string, platform?: string) => {
+    const query = platform ? `?platform=${encodeURIComponent(platform)}` : '';
+    return api.post<SourceRegisterResponse>(`/sessions/${sessionId}/sources${query}`, undefined, { skipAuth: true });
+  },
 };
-

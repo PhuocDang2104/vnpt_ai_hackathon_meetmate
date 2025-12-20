@@ -128,10 +128,12 @@ const MeetingDock = () => {
             <MonitorSmartphone size={14} />
             Mở chế độ đầy đủ
           </button>
-          <button className="btn btn--secondary" onClick={handleOpenCapturePage}>
-            <Mic size={14} />
-            Capture tab audio
-          </button>
+          {joinPlatform === 'gmeet' && (
+            <button className="btn btn--secondary" onClick={handleOpenCapturePage}>
+              <Mic size={14} />
+              Capture tab audio
+            </button>
+          )}
           {joinLink && (
             <button className="btn btn--primary" onClick={handleOpenJoinLink}>
               <Video size={14} />

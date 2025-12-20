@@ -186,7 +186,8 @@ export const InMeetTab = ({
     setIsTokenLoading(true);
     setTokenError(null);
     try {
-      const res = await sessionsApi.registerSource(sessionIdForStream);
+      const platform = joinPlatform === 'gomeet' ? 'vnpt_gomeet' : undefined;
+      const res = await sessionsApi.registerSource(sessionIdForStream, platform);
       setAudioIngestToken(res.audio_ingest_token);
     } catch (err) {
       console.error('Failed to register source:', err);
@@ -330,12 +331,13 @@ const LiveTranscriptPanel = ({
     })}`;
   }, [feedStatus, lastTranscriptAt]);
   const captureUrl = useMemo(() => {
+    if (joinPlatform !== 'gmeet') return null;
     if (!sessionId) return null;
     const params = new URLSearchParams();
     params.set('session', sessionId);
     if (audioIngestToken) params.set('token', audioIngestToken);
     return `#/app/meetings/${meetingId}/capture?${params.toString()}`;
-  }, [audioIngestToken, meetingId, sessionId]);
+  }, [audioIngestToken, joinPlatform, meetingId, sessionId]);
   const partialText = livePartial?.text || 'Đang lắng nghe...';
   const finalText = liveFinal?.text || 'Chưa có final transcript.';
 
@@ -404,7 +406,7 @@ const LiveTranscriptPanel = ({
                   {isTokenLoading ? 'Đang lấy token...' : 'Tạo token'}
                 </button>
               )}
-              {captureUrl && (
+              {joinPlatform === 'gmeet' && captureUrl && (
                 <button
                   className="btn btn--secondary btn--sm"
                   onClick={() => window.open(captureUrl, '_blank', 'noopener,noreferrer')}
@@ -414,6 +416,11 @@ const LiveTranscriptPanel = ({
                 </button>
               )}
             </div>
+            {joinPlatform === 'gomeet' && (
+              <div className="form-hint" style={{ marginTop: 6 }}>
+                GoMeet sẽ tự mở WebSocket và stream audio khi bạn bật mic.
+              </div>
+            )}
             {audioIngestToken && (
               <div className="transcript-setup__token" title={audioIngestToken}>
                 token: {audioIngestToken}

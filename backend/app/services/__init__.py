@@ -14,6 +14,7 @@ from . import (
     transcript_service,
     participant_service,
     minutes_service,
+    gomeet_service,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     'transcript_service',
     'participant_service',
     'minutes_service',
+    'gomeet_service',
 ]
