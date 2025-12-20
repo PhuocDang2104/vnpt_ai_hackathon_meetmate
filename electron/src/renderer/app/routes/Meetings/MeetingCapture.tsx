@@ -17,8 +17,9 @@ import { API_URL, USE_API } from '../../../config/env';
 type CaptureStatus = 'idle' | 'starting' | 'streaming' | 'error';
 
 const TARGET_SAMPLE_RATE = 16000;
-const FRAME_MS = 250;
-const FRAME_SAMPLES = (TARGET_SAMPLE_RATE * FRAME_MS) / 1000;
+const DEFAULT_FRAME_MS = 250;
+const MIN_FRAME_MS = 250;
+const MAX_FRAME_MS = 1000;
 
 const MeetingCapture = () => {
   const { meetingId } = useParams<{ meetingId: string }>();
@@ -33,6 +34,7 @@ const MeetingCapture = () => {
   const [framesSent, setFramesSent] = useState(0);
   const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
   const [isFetchingToken, setIsFetchingToken] = useState(false);
+  const [frameMs, setFrameMs] = useState(DEFAULT_FRAME_MS);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRef = useRef<MediaStream | null>(null);
@@ -40,6 +42,16 @@ const MeetingCapture = () => {
   const ctxRef = useRef<AudioContext | null>(null);
   const pendingRef = useRef<number[]>([]);
   const startAckRef = useRef(false);
+  const frameMsRef = useRef(DEFAULT_FRAME_MS);
+  const frameSamplesRef = useRef(Math.round((TARGET_SAMPLE_RATE * DEFAULT_FRAME_MS) / 1000));
+
+  const applyFrameMs = (nextMs: number) => {
+    const clamped = Math.min(Math.max(Math.round(nextMs), MIN_FRAME_MS), MAX_FRAME_MS);
+    frameMsRef.current = clamped;
+    frameSamplesRef.current = Math.max(1, Math.round((TARGET_SAMPLE_RATE * clamped) / 1000));
+    setFrameMs(clamped);
+    return clamped;
+  };
 
   const wsBase = useMemo(() => {
     if (API_URL.startsWith('https://')) return API_URL.replace(/^https:/i, 'wss:').replace(/\/$/, '');
@@ -120,6 +132,7 @@ const MeetingCapture = () => {
     }
 
     stopCapture();
+    applyFrameMs(DEFAULT_FRAME_MS);
     startAckRef.current = false;
     setStatus('starting');
     setError(null);
@@ -173,11 +186,12 @@ const MeetingCapture = () => {
             const s = Math.max(-1, Math.min(1, input[i]));
             pending.push(s * 0x7fff);
           }
-          while (pending.length >= FRAME_SAMPLES) {
-            const frame = pending.splice(0, FRAME_SAMPLES);
-            const buf = new ArrayBuffer(FRAME_SAMPLES * 2);
+          while (pending.length >= frameSamplesRef.current) {
+            const frameSamples = frameSamplesRef.current;
+            const frame = pending.splice(0, frameSamples);
+            const buf = new ArrayBuffer(frameSamples * 2);
             const view = new DataView(buf);
-            for (let i = 0; i < FRAME_SAMPLES; i++) {
+            for (let i = 0; i < frameSamples; i++) {
               view.setInt16(i * 2, frame[i], true);
             }
             if (ws.readyState === WebSocket.OPEN) {
@@ -192,7 +206,7 @@ const MeetingCapture = () => {
         processor.connect(ctx.destination);
         audioTracks[0].onended = () => stopCapture('Tab audio stream đã dừng.');
         setStatus('streaming');
-        setInfo('Đang stream 16kHz mono PCM S16LE (250ms/frame) lên SmartVoice ingest.');
+        setInfo(`Đang stream 16kHz mono PCM S16LE (${frameMsRef.current}ms/frame) lên SmartVoice ingest.`);
       } catch (err) {
         console.error('AudioContext init failed', err);
         stopCapture('Không khởi tạo được AudioContext để lấy audio tab.');
@@ -221,7 +235,13 @@ const MeetingCapture = () => {
           return;
         }
         if (data?.event === 'throttle') {
-          setInfo('Backend báo throttle, giảm tốc độ gửi audio.');
+          const suggested = Number(data?.suggested_frame_ms);
+          if (Number.isFinite(suggested) && suggested > 0) {
+            const applied = applyFrameMs(suggested);
+            setInfo(`Backend báo throttle, tăng frame lên ${applied}ms để giảm nghẽn.`);
+          } else {
+            setInfo('Backend báo throttle, giảm tốc độ gửi audio.');
+          }
         }
       } catch (_err) {
         // ignore non-JSON messages
@@ -235,7 +255,7 @@ const MeetingCapture = () => {
         platform_meeting_ref: meetingId || sessionId || undefined,
         audio: { codec: 'PCM_S16LE', sample_rate_hz: TARGET_SAMPLE_RATE, channels: 1 },
         language_code: 'vi-VN',
-        frame_ms: FRAME_MS,
+        frame_ms: frameMsRef.current,
         stream_id: `tab_${Date.now()}`,
         client_ts_ms: Date.now(),
       };
@@ -348,6 +368,7 @@ const MeetingCapture = () => {
             </button>
             <div className="capture-metrics">
               <span className="pill pill--ghost">Frames: {framesSent}</span>
+              <span className="pill pill--ghost">Frame: {frameMs}ms</span>
               <span className="pill pill--ghost">Sample rate: 16kHz mono PCM_S16LE</span>
             </div>
           </div>

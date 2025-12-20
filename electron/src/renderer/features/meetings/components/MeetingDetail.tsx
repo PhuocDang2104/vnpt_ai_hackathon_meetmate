@@ -22,6 +22,7 @@ import {
 import { meetingsApi } from '../../../lib/api/meetings';
 import { sessionsApi } from '../../../lib/api/sessions';
 import { inMeetingApi } from '../../../lib/api/inMeeting';
+import { ApiError } from '../../../lib/apiClient';
 import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { USE_API } from '../../../config/env';
@@ -70,6 +71,26 @@ export const MeetingDetail = () => {
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const extractApiDetail = (err: ApiError) => {
+    const data = err.data as { detail?: unknown } | undefined;
+    if (!data) return '';
+    const detail = data.detail;
+    if (typeof detail === 'string') return detail;
+    if (detail && typeof detail === 'object') {
+      try {
+        return JSON.stringify(detail);
+      } catch {
+        return String(detail);
+      }
+    }
+    if (typeof data === 'string') return data;
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return '';
+    }
+  };
 
   const fetchMeeting = useCallback(async () => {
     if (!meetingId) return;
@@ -238,12 +259,30 @@ export const MeetingDetail = () => {
       }
       setAudioIngestToken(token);
 
-      const joinRes = await inMeetingApi.createGoMeetJoinUrl({
+      const requestPayload = {
         session_id: sessionId,
         audio_ingest_token: token,
         meeting_secret_key: gomeetMeetingSecretKey.trim() || undefined,
         access_code: gomeetAccessCode.trim() || undefined,
-      });
+      };
+
+      let joinRes;
+      try {
+        joinRes = await inMeetingApi.createGoMeetJoinUrl(requestPayload);
+      } catch (err) {
+        const apiErr = err as ApiError;
+        if (apiErr instanceof ApiError && apiErr.status === 401) {
+          const tokenRes = await sessionsApi.registerSource(sessionId, 'vnpt_gomeet');
+          token = tokenRes.audio_ingest_token;
+          setAudioIngestToken(token);
+          joinRes = await inMeetingApi.createGoMeetJoinUrl({
+            ...requestPayload,
+            audio_ingest_token: token,
+          });
+        } else {
+          throw err;
+        }
+      }
 
       setGomeetFullJoinUrl(joinRes.full_join_url);
       setGomeetHostUrl(joinRes.host_join_url || '');
@@ -251,7 +290,18 @@ export const MeetingDetail = () => {
       openMeetingLink({ link: joinRes.full_join_url, platform: 'gomeet', sessionId, token });
     } catch (err) {
       console.error('Failed to start GoMeet flow:', err);
-      setGomeetInitError('Không thể khởi tạo GoMeet. Kiểm tra token và cấu hình GoMeet API.');
+      if (err instanceof ApiError) {
+        const detail = err.status === 401 ? extractApiDetail(err) : '';
+        const statusLabel = err.status ? `HTTP ${err.status}` : 'HTTP error';
+        const message = detail
+          ? `Không thể khởi tạo GoMeet (${statusLabel}).\n${detail}`
+          : `Không thể khởi tạo GoMeet (${statusLabel}).`;
+        setGomeetInitError(message);
+      } else if (err instanceof Error) {
+        setGomeetInitError(`Không thể khởi tạo GoMeet.\n${err.message}`);
+      } else {
+        setGomeetInitError('Không thể khởi tạo GoMeet. Kiểm tra token và cấu hình GoMeet API.');
+      }
     } finally {
       setIsGoMeetLoading(false);
     }
@@ -825,7 +875,10 @@ export const MeetingDetail = () => {
                   )}
 
                   {gomeetInitError && (
-                    <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
+                    <div
+                      className="card"
+                      style={{ borderColor: 'var(--error)', color: 'var(--error)', whiteSpace: 'pre-wrap' }}
+                    >
                       {gomeetInitError}
                     </div>
                   )}
