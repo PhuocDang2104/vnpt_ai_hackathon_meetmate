@@ -42,8 +42,8 @@ export const Landing: React.FC = () => {
             Tiết kiệm thời gian, không bỏ lỡ action items quan trọng.
           </p>
           <div className="hero-actions">
-            <Link to="/register" className="btn btn-primary btn-lg">
-              Bắt đầu miễn phí
+          <Link to="/about" className="btn btn-primary btn-lg">
+              Tìm hiểu về chúng tôi
               <ArrowRight size={20} />
             </Link>
             <Link to="/login" className="btn btn-outline btn-lg">
@@ -516,4 +516,3 @@ export const Landing: React.FC = () => {
 };
 
 export default Landing;
-

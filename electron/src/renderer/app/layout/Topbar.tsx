@@ -316,7 +316,7 @@ const Topbar = () => {
         </button>
 
         {/* Help */}
-        <Link to="/app/about" className="topbar__icon-btn" title="Giới thiệu MeetMate">
+        <Link to="/about" className="topbar__icon-btn" title="Giới thiệu MeetMate">
           <HelpCircle size={18} />
         </Link>
       </div>
