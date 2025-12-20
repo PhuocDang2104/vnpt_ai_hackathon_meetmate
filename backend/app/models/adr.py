@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Text, Boolean, DateTime, Float, JSON
+from sqlalchemy import Column, String, ForeignKey, Text, Boolean, DateTime, Float, JSON, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -9,6 +9,7 @@ class TranscriptChunk(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "transcript_chunk"
 
     meeting_id = Column(UUID(as_uuid=True), ForeignKey("meeting.id", ondelete="CASCADE"), nullable=False)
+    chunk_index = Column(Integer, nullable=False)
     speaker = Column(String)
     text = Column(Text, nullable=False)
     time_start = Column(Float)
@@ -108,4 +109,3 @@ class ToolSuggestion(Base, UUIDMixin, TimestampMixin):
     payload = Column(JSON)
     executed = Column(Boolean, default=False)
     execution_result = Column(JSON)
-

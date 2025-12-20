@@ -33,9 +33,9 @@ async def ingestTranscript(session_id: str, payload: Dict[str, Any], source: str
 
     MUST:
     - validate required fields
-    - persist (best-effort)
     - allocate seq (monotonic per session)
     - publish transcript_event onto the session bus
+    - persist (best-effort)
     - return seq
     """
     try:
@@ -47,31 +47,6 @@ async def ingestTranscript(session_id: str, payload: Dict[str, Any], source: str
 
     session_store.ensure(session_id)
     transcript_window = session_store.append_transcript(session_id, seg.chunk, max_chars=4000)
-
-    # Best-effort persistence (only when meeting_id looks like UUID)
-    if _is_uuid(seg.meeting_id):
-        try:
-            db = SessionLocal()
-            persist_transcript(
-                db,
-                seg.meeting_id,
-                {
-                    "speaker": seg.speaker,
-                    "text": seg.chunk,
-                    "time_start": seg.time_start,
-                    "time_end": seg.time_end,
-                    "is_final": seg.is_final,
-                    "lang": seg.lang,
-                    "confidence": seg.confidence,
-                },
-            )
-        except Exception:
-            pass
-        finally:
-            try:
-                db.close()
-            except Exception:
-                pass
 
     event_payload: Dict[str, Any] = {
         "meeting_id": seg.meeting_id,
@@ -95,7 +70,35 @@ async def ingestTranscript(session_id: str, payload: Dict[str, Any], source: str
             "payload": event_payload,
         },
     )
-    return int(envelope.get("seq") or 0)
+    seq = int(envelope.get("seq") or 0)
+
+    # Best-effort persistence (only when meeting_id looks like UUID)
+    if _is_uuid(seg.meeting_id):
+        try:
+            db = SessionLocal()
+            persist_transcript(
+                db,
+                seg.meeting_id,
+                {
+                    "chunk_index": seq,
+                    "speaker": seg.speaker,
+                    "text": seg.chunk,
+                    "time_start": seg.time_start,
+                    "time_end": seg.time_end,
+                    "is_final": seg.is_final,
+                    "lang": seg.lang,
+                    "confidence": seg.confidence,
+                },
+            )
+        except Exception:
+            pass
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+    return seq
 
 
 async def publish_state(session_id: str, state: Dict[str, Any]) -> Dict[str, Any]:
