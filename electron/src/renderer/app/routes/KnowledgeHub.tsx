@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Search,
   BookOpen,
@@ -16,6 +17,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
+import { meetingsApi } from '../../lib/api/meetings'
+import type { Meeting } from '../../shared/dto/meeting'
 import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
 import { API_URL } from '../../config/env'
 
@@ -25,9 +28,11 @@ type UploadToastState = {
 }
 
 const KnowledgeHub = () => {
+  const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<KnowledgeDocument[]>([])
+  const [meetingResults, setMeetingResults] = useState<Meeting[]>([])
   const [recentQueries, setRecentQueries] = useState<RecentQuery[]>([])
   const [suggestedDocs, setSuggestedDocs] = useState<KnowledgeDocument[]>([])
   const [isLoadingDocs, setIsLoadingDocs] = useState(true)
@@ -38,6 +43,15 @@ const KnowledgeHub = () => {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    const qp = searchParams.get('query')
+    if (qp) {
+      setQuery(qp)
+      handleSearch(qp)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   useEffect(() => {
     if (uploadToast && uploadToast.status !== 'pending') {
@@ -62,13 +76,26 @@ const KnowledgeHub = () => {
     }
   }
 
-  const handleSearch = async () => {
-    if (!query.trim() || isSearching) return
+  const handleSearch = async (q?: string) => {
+    const searchText = (q ?? query).trim()
+    if (!searchText || isSearching) return
 
     setIsSearching(true)
     try {
-      const result = await knowledgeApi.search({ query: query.trim() })
+      const result = await knowledgeApi.search({ query: searchText })
       setSearchResults(result.documents)
+      // Meetings: fetch and filter client-side (title/description)
+      try {
+        const meetingsResp = await meetingsApi.list({ limit: 200 })
+        const filtered = (meetingsResp.meetings || []).filter(m =>
+          (m.title || '').toLowerCase().includes(searchText.toLowerCase()) ||
+          (m.description || '').toLowerCase().includes(searchText.toLowerCase())
+        )
+        setMeetingResults(filtered)
+      } catch (err) {
+        console.error('Meeting search failed:', err)
+        setMeetingResults([])
+      }
       // Refresh recent queries
       const recent = await knowledgeApi.getRecentQueries(5)
       setRecentQueries(recent.queries)
@@ -263,6 +290,7 @@ const KnowledgeHub = () => {
                         <ExternalLink size={14} style={{ color: 'var(--text-muted)' }} />
                         <button
                           className="btn btn--ghost btn--icon btn--sm"
+                          style={{ padding: '6px', width: '32px', height: '32px' }}
                           title="Xóa"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -278,6 +306,37 @@ const KnowledgeHub = () => {
               )}
             </div>
           </div>
+
+          {meetingResults.length > 0 && (
+            <div className="card">
+              <div className="card__header">
+                <h3 className="card__title">
+                  <Search size={16} className="card__title-icon" />
+                  Cuộc họp phù hợp ({meetingResults.length})
+                </h3>
+              </div>
+              <div className="card__body">
+                <div className="tool-panel__list">
+                  {meetingResults.map((m) => (
+                    <div key={m.id} className="tool-card tool-card--compact">
+                      <div className="tool-card__icon">
+                        <Clock size={14} />
+                      </div>
+                      <div className="tool-card__body">
+                        <div className="tool-card__title">{m.title}</div>
+                        <div className="tool-card__detail">
+                          {m.start_time ? new Date(m.start_time).toLocaleString('vi-VN') : 'Chưa có lịch'}
+                        </div>
+                      </div>
+                      <Link to={`/app/meetings/${m.id}/detail`} className="btn btn--ghost btn--icon btn--sm">
+                        <ExternalLink size={14} />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Recent Queries */}
           <div className="card">

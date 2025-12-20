@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation, Link } from 'react-router-dom'
+import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { 
   Search, 
   Bell, 
@@ -130,24 +130,42 @@ const getNotificationIcon = (type: NotificationType) => {
 
 const routeTitles: Record<string, string> = {
   '/': 'Dashboard',
-  '/calendar': 'Lịch họp',
-  '/meetings': 'Cuộc họp',
-  '/projects': 'Dự án',
+  '/app': 'Dashboard',
+  '/app/calendar': 'Lịch họp',
+  '/app/meetings': 'Cuộc họp',
   '/app/projects': 'Dự án',
-  '/knowledge': 'Knowledge Hub',
-  '/tasks': 'Action Items',
-  '/settings': 'Cài đặt',
+  '/app/knowledge': 'Kho kiến thức',
+  '/app/tasks': 'Nhiệm vụ',
+  '/app/settings': 'Cài đặt',
+  '/app/admin': 'Bảng quản trị',
 }
+
+const findPageTitle = (path: string) => {
+  if (routeTitles[path]) return routeTitles[path]
+  if (path.startsWith('/app/meetings')) return 'Cuộc họp'
+  if (path.startsWith('/app/projects')) return 'Dự án'
+  if (path.startsWith('/app/knowledge')) return 'Kho kiến thức'
+  if (path.startsWith('/app/tasks')) return 'Nhiệm vụ'
+  if (path.startsWith('/app/settings')) return 'Cài đặt'
+  return 'MeetMate'
+}
+
+const routeBreadcrumbs: Array<{ match: RegExp; trail: string[] }> = [
+  { match: /^\/app\/meetings\/[^/]+\/detail/, trail: ['Cuộc họp', 'Chi tiết cuộc họp'] },
+  { match: /^\/app\/projects\/[^/]+$/, trail: ['Dự án', 'Chi tiết dự án'] },
+]
 
 const Topbar = () => {
   const location = useLocation()
   const currentPath = location.pathname
+  const navigate = useNavigate()
   const { language, setLanguage, t } = useLanguage()
-  const pageTitle = routeTitles[currentPath] || 'MeetMate'
+  const pageTitle = findPageTitle(currentPath)
   
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showLangMenu, setShowLangMenu] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
   const langRef = useRef<HTMLDivElement>(null)
 
@@ -212,20 +230,27 @@ const Topbar = () => {
   return (
     <header className="topbar">
       <div className="topbar__left">
+        {(() => {
+          const matched = routeBreadcrumbs.find(item => item.match.test(currentPath))
+          const baseCrumb = findPageTitle(currentPath)
+          const trail = matched ? matched.trail : []
+          const crumbs = (trail.length && trail[0] === baseCrumb) ? trail : [baseCrumb, ...trail]
+          return (
         <div className="topbar__breadcrumb">
           <Home size={14} />
           <ChevronRight size={14} />
-          <span className="topbar__breadcrumb-current">{pageTitle}</span>
+          {crumbs.map((crumb, idx) => (
+            <span
+              key={`${crumb}-${idx}`}
+              className={idx === 0 ? 'topbar__breadcrumb-current' : 'topbar__breadcrumb-extra'}
+            >
+              {idx > 0 && <ChevronRight size={12} />}
+              {crumb}
+            </span>
+          ))}
         </div>
-        
-        <div className="topbar__search">
-          <Search size={16} className="topbar__search-icon" />
-          <input 
-            type="text" 
-            className="topbar__search-input" 
-            placeholder="Tìm kiếm cuộc họp, tài liệu, action items..." 
-          />
-        </div>
+          )
+        })()}
       </div>
 
       <div className="topbar__right">

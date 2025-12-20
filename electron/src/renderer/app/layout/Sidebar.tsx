@@ -6,7 +6,6 @@ import {
   BookOpen,
   CheckSquare,
   Settings,
-  Bot,
   LogOut,
   FolderOpen,
 } from 'lucide-react'
@@ -62,8 +61,12 @@ const Sidebar = () => {
       {/* Logo */}
       <div className="sidebar__header">
         <div className="sidebar__logo">
-          <div className="sidebar__logo-icon">
-            <Bot size={20} />
+          <div className="sidebar__logo-icon" style={{ padding: 0, background: 'transparent' }}>
+            <img
+              src="/favicon.svg"
+              alt="MeetMate"
+              style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'contain' }}
+            />
           </div>
           <span className="sidebar__logo-text">MeetMate</span>
         </div>
