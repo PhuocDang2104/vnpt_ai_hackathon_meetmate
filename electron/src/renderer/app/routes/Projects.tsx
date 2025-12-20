@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { PlusCircle, RefreshCw, X, FolderOpen } from 'lucide-react'
+import { PlusCircle, RefreshCw, FolderOpen } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { adminListProjects, adminCreateProject } from '../../lib/api/admin'
 import { Project } from '../../shared/dto/project'
 import { getStoredUser } from '../../lib/api/auth'
 import { useLanguage } from '../../contexts/LanguageContext'
+import CreateProjectModal from './Projects/CreateProjectModal'
 
 const Projects = () => {
   const { t } = useLanguage()
@@ -14,9 +15,10 @@ const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState<{ name: string; code?: string; description?: string }>({
+  const [form, setForm] = useState<{ name: string; code?: string; scope?: string; description?: string }>({
     name: '',
     code: '',
+    scope: '',
     description: '',
   })
   const [showModal, setShowModal] = useState(false)
@@ -31,16 +33,18 @@ const Projects = () => {
     }
   }
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) return
+  const handleCreate = async (payload?: { name: string; code?: string; scope?: string; description?: string }) => {
+    const data = payload || form
+    if (!data.name.trim()) return
     setCreating(true)
     try {
       await adminCreateProject({
-        name: form.name.trim(),
-        code: form.code?.trim() || undefined,
-        description: form.description?.trim() || undefined,
-      })
-      setForm({ name: '', code: '', description: '' })
+        name: data.name.trim(),
+        code: data.code?.trim() || undefined,
+        description: data.description?.trim() || undefined,
+        scope: data.scope?.trim() || undefined,
+      } as any)
+      setForm({ name: '', code: '', scope: '', description: '' })
       await loadProjects()
       setShowModal(false)
     } finally {
@@ -130,79 +134,15 @@ const Projects = () => {
         )}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ width: '40vw', maxWidth: 640, minWidth: 420 }}>
-            <div className="modal__header">
-              <div>
-                <p className="modal__eyebrow">Projects</p>
-                <h3 className="modal__title">Tạo dự án mới</h3>
-                <p className="modal__subtitle">Nhập tên, mã và mô tả (tuỳ chọn).</p>
-              </div>
-              <button className="modal__close" onClick={() => setShowModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal__body">
-              <div className="form-grid" style={{ gridTemplateColumns: '1fr', gap: 16 }}>
-                <label className="form-field">
-                  <span className="form-field__label">Tên dự án *</span>
-                  <input
-                    className="input input--lg"
-                    placeholder="VD: LPB - Digital Onboarding"
-                    value={form.name}
-                    onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                    style={{ width: '100%' }}
-                  />
-                </label>
-
-                <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <label className="form-field">
-                    <span className="form-field__label">Mã dự án (tuỳ chọn)</span>
-                    <input
-                      className="input input--lg"
-                      placeholder="VD: PROJ-001"
-                      value={form.code}
-                      onChange={e => setForm(prev => ({ ...prev, code: e.target.value }))}
-                      style={{ width: '100%' }}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span className="form-field__label">Phạm vi / Stakeholder (tuỳ chọn)</span>
-                    <input
-                      className="input input--lg"
-                      placeholder="VD: PMO, Tech, Biz; Org/Dept liên quan"
-                      value={form.description}
-                      onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                      style={{ width: '100%' }}
-                    />
-                  </label>
-                </div>
-
-                <label className="form-field">
-                  <span className="form-field__label">Mô tả chi tiết (tuỳ chọn)</span>
-                  <textarea
-                    className="input input--lg"
-                    placeholder="Mục tiêu, phạm vi, mốc quan trọng, stakeholder chính..."
-                    value={form.description}
-                    onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                    rows={3}
-                    style={{ width: '100%' }}
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="modal__footer">
-              <button className="btn btn--secondary" onClick={() => setShowModal(false)} disabled={creating}>
-                Hủy
-              </button>
-              <button className="btn btn--primary" onClick={handleCreate} disabled={creating}>
-                {creating ? t('common.loading') : 'Tạo dự án'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateProjectModal
+        open={showModal}
+        loading={creating}
+        onClose={() => setShowModal(false)}
+        onSubmit={(data) => {
+          setForm(data)
+          handleCreate(data)
+        }}
+      />
     </div>
   )
 }

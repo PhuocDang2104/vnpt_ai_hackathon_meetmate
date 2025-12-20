@@ -225,12 +225,12 @@ def approve_minutes(
 # ============================================
 
 async def generate_minutes_with_ai(
-    db: Session, 
+    db: Session,
     request: GenerateMinutesRequest
 ) -> MeetingMinutesResponse:
-    """Generate meeting minutes using AI"""
+    """Generate meeting minutes using AI (with meeting fields + transcript + actions/decisions/risks + related docs)."""
     from app.llm.gemini_client import MeetingAIAssistant
-    
+
     meeting_id = request.meeting_id
     
     # Get meeting info
@@ -273,16 +273,68 @@ async def generate_minutes_with_ai(
         risk_list = action_item_service.list_risk_items(db, meeting_id)
         risks = [f"{item.description} (Severity: {item.severity})" for item in risk_list.items]
     
-    # Use AI to generate summary
+    # Get related documents (titles/descriptions) linked to meeting
+    doc_rows = db.execute(
+        text(
+            """
+            SELECT title, description, file_type
+            FROM knowledge_document
+            WHERE meeting_id = :meeting_id
+            ORDER BY created_at DESC
+            LIMIT 10
+            """
+        ),
+        {'meeting_id': meeting_id},
+    ).fetchall()
+    related_docs = [f"{r[0]} ({r[2]}) - {r[1] or ''}".strip() for r in doc_rows]
+
+    # Build context payload for LLM
+    context_payload = {
+        "title": meeting_title,
+        "type": meeting_type,
+        "description": meeting_desc,
+        "time": f"{start_time} - {end_time}",
+        "transcript": transcript or "",
+        "actions": actions,
+        "decisions": decisions,
+        "risks": risks,
+        "documents": related_docs,
+    }
+
+    summary_result = {"summary": "", "key_points": []}
+    minutes_content = ""
     assistant = MeetingAIAssistant(meeting_id, {
         'title': meeting_title,
         'type': meeting_type,
         'description': meeting_desc
     })
-    
-    summary_result = await assistant.generate_summary(transcript or "No transcript available")
-    
-    # Format minutes
+
+    try:
+        if hasattr(assistant, "generate_summary_with_context"):
+            summary_result = await assistant.generate_summary_with_context(context_payload)
+        else:
+            summary_result = await assistant.generate_summary(transcript or "No transcript available")
+    except Exception:
+        # If AI fails, fall back to simple templated summary to avoid 500
+        fallback_summary = meeting_desc or "Chưa có mô tả cuộc họp. Vui lòng cập nhật."
+        summary_result = {
+            "summary": fallback_summary,
+            "key_points": actions[:3] if actions else decisions[:3]
+        }
+
+    if isinstance(summary_result, str):
+        summary_result = {"summary": summary_result, "key_points": []}
+    elif not isinstance(summary_result, dict):
+        summary_result = {"summary": str(summary_result), "key_points": []}
+    else:
+        summary_result = {
+            "summary": summary_result.get("summary", ""),
+            "key_points": summary_result.get("key_points", []),
+        }
+        if not isinstance(summary_result["key_points"], list):
+            summary_result["key_points"] = [str(summary_result["key_points"])]
+
+    # Format minutes with available context (even if AI fallback)
     minutes_content = format_minutes(
         meeting_title=meeting_title,
         meeting_type=meeting_type,
@@ -444,4 +496,3 @@ def create_distribution_log(db: Session, data: DistributionLogCreate) -> Distrib
         sent_at=now,
         status=data.status
     )
-

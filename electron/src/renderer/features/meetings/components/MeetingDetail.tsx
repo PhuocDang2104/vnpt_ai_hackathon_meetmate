@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
@@ -312,72 +312,78 @@ export const MeetingDetail = () => {
             </span>
           </div>
           
-          <div className="meeting-detail-v2__actions">
-            <button className="btn btn--ghost btn--icon" onClick={fetchMeeting} title="Làm mới">
-              <RefreshCw size={18} />
-            </button>
-            
-            {/* Edit button - only for pre-meeting */}
-            {meeting.phase === 'pre' && (
-              <button className="btn btn--ghost btn--icon" onClick={handleOpenEdit} title="Chỉnh sửa">
-                <Edit2 size={18} />
+          <div className="meeting-detail-v2__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Utility */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button className="btn btn--ghost btn--icon" onClick={fetchMeeting} title="Làm mới">
+                <RefreshCw size={18} />
               </button>
-            )}
-            
-            {/* Delete button - only for pre-meeting (draft) */}
-            {meeting.phase === 'pre' && (
-              <button 
-                className="btn btn--ghost btn--icon" 
-                onClick={() => setShowDeleteConfirm(true)} 
-                title="Xóa cuộc họp"
-                style={{ color: 'var(--error)' }}
+              {meeting.phase === 'pre' && (
+                <button className="btn btn--ghost btn--icon" onClick={handleOpenEdit} title="Chỉnh sửa">
+                  <Edit2 size={18} />
+                </button>
+              )}
+              {meeting.phase === 'pre' && (
+                <button 
+                  className="btn btn--ghost btn--icon" 
+                  onClick={() => setShowDeleteConfirm(true)} 
+                  title="Xóa cuộc họp"
+                  style={{ color: 'var(--error)' }}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Navigation / join */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Link to="/app/meetings" className="btn btn--ghost">Thoát</Link>
+              <button
+                className="btn btn--secondary"
+                onClick={() => setShowJoinModal(true)}
+                title="Chọn nền tảng và link tham gia"
               >
-                <Trash2 size={18} />
+                <Video size={16} />
+                Tham gia
               </button>
-            )}
-            <button
-              className="btn btn--secondary"
-              onClick={() => setShowJoinModal(true)}
-              title="Chọn nền tảng và link tham gia"
-            >
-              <Video size={16} />
-              Tham gia cuộc họp
-            </button>
-            {joinLink && (
-              <button type="button" className="btn btn--ghost" onClick={handleOpenMeetingLink}>
-                <LinkIcon size={16} />
-                Mở liên kết
-              </button>
-            )}
-            
-            {/* Meeting action buttons based on phase and time */}
-            {meeting.phase === 'pre' && isLiveByTime && (
-              <button className="btn btn--accent" onClick={handleStartMeeting}>
-                <span className="live-dot" style={{ marginRight: '6px' }}></span>
-                Đang diễn ra - Tham gia
-              </button>
-            )}
-            
-            {meeting.phase === 'pre' && !isLiveByTime && !isEnded && (
-              <button className="btn btn--primary" onClick={handleStartMeeting}>
-                <Play size={16} />
-                Bắt đầu họp
-              </button>
-            )}
-            
-            {meeting.phase === 'in' && (
-              <button className="btn btn--warning" onClick={handleEndMeeting}>
-                <CheckSquare size={16} />
-                Kết thúc họp
-              </button>
-            )}
-            
-            {meeting.phase === 'post' && (
-              <span className="badge badge--success" style={{ padding: '8px 16px' }}>
-                <CheckSquare size={14} style={{ marginRight: '6px' }} />
-                Đã kết thúc
-              </span>
-            )}
+              {joinLink && (
+                <button type="button" className="btn btn--ghost" onClick={handleOpenMeetingLink}>
+                  <LinkIcon size={16} />
+                  Mở liên kết
+                </button>
+              )}
+            </div>
+
+            {/* Primary outcome */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {meeting.phase === 'pre' && isLiveByTime && (
+                <button className="btn btn--accent" onClick={handleStartMeeting}>
+                  <span className="live-dot" style={{ marginRight: '6px' }}></span>
+                  Đang diễn ra - Tham gia
+                </button>
+              )}
+              
+              {meeting.phase === 'pre' && !isLiveByTime && !isEnded && (
+                <button className="btn btn--primary" onClick={handleStartMeeting}>
+                  <Play size={16} />
+                  Bắt đầu họp
+                </button>
+              )}
+              
+              {meeting.phase === 'in' && (
+                <button className="btn btn--primary" onClick={handleEndMeeting}>
+                  <CheckSquare size={16} />
+                  Kết thúc họp
+                </button>
+              )}
+              
+              {meeting.phase === 'post' && (
+                <span className="badge badge--success" style={{ padding: '8px 16px' }}>
+                  <CheckSquare size={14} style={{ marginRight: '6px' }} />
+                  Đã kết thúc
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </header>

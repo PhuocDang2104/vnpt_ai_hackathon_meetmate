@@ -529,12 +529,15 @@ const WeekView = ({ currentDate, meetings, selectedDate, onSelectDate }: WeekVie
                 return (
                   <Link
                     key={meeting.id}
-                    to={`/app/meetings/${meeting.id}/detail`}
+                    to={`/app/meetings/${meeting.id}/pre`}
                     className={`week-view__event week-view__event--${meeting.status === 'in_progress' ? 'live' : meeting.phase}`}
-                    style={{ top: `${top}px`, height: `${Math.max(height, 30)}px` }}
+                    style={{ top: `${top}px`, height: `${Math.max(height, 32)}px` }}
                   >
                     <div className="week-view__event-time">{meeting.start}</div>
-                    <div className="week-view__event-title">{meeting.title}</div>
+                    <div className="week-view__event-title">{truncateTitle(meeting.title, 38)}</div>
+                    <div className="week-view__event-badge">
+                      {meeting.status === 'in_progress' ? 'LIVE' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Đã xong'}
+                    </div>
                   </Link>
                 )
               })}
@@ -557,23 +560,20 @@ const MeetingCard = ({ meeting }: { meeting: NormalizedMeeting }) => {
 
   return (
     <Link 
-      to={`/app/meetings/${meeting.id}/detail`}
+      to={`/app/meetings/${meeting.id}/pre`}
       className="meeting-card"
-      style={{ borderLeftColor: statusColors[meeting.status] }}
+      style={{ borderLeftColor: meeting.status === 'in_progress' ? 'var(--error)' : meeting.phase === 'pre' ? 'var(--info)' : 'var(--text-muted)' }}
     >
       <div className="meeting-card__header">
         <span className="meeting-card__time">
           <Clock size={12} />
           {meeting.start} - {meeting.end}
         </span>
-        {meeting.status === 'in_progress' && (
-          <span className="meeting-card__live">
-            <span className="meeting-card__live-dot" />
-            Live
-          </span>
-        )}
+        <span className={`meeting-item__phase meeting-item__phase--${meeting.status === 'in_progress' ? 'live' : meeting.phase}`}>
+          {meeting.status === 'in_progress' ? 'Live' : meeting.phase === 'pre' ? 'Chuẩn bị' : 'Đã xong'}
+        </span>
       </div>
-      <h4 className="meeting-card__title">{meeting.title}</h4>
+      <h4 className="meeting-card__title">{truncateTitle(meeting.title, 52)}</h4>
       <div className="meeting-card__meta">
         <span>
           <Users size={12} />
@@ -595,6 +595,11 @@ const MeetingCard = ({ meeting }: { meeting: NormalizedMeeting }) => {
       )}
     </Link>
   )
+}
+
+function truncateTitle(text: string, max: number) {
+  if (!text) return ''
+  return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
 export default Calendar

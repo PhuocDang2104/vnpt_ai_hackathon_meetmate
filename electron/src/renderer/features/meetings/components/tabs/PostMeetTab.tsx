@@ -8,72 +8,6 @@ interface PostMeetTabProps {
   onRefresh: () => void;
 }
 
-// Mock minutes generator for fallback
-const generateMockMinutes = (meeting: MeetingWithParticipants): MeetingMinutes => {
-  const startDate = new Date(meeting.start_time);
-  const endDate = new Date(meeting.end_time);
-
-  const executiveSummary = `Cuộc họp "${meeting.title}" đã diễn ra thành công vào ngày ${startDate.toLocaleDateString('vi-VN')} từ ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} đến ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.
-
-Các nội dung chính đã được thảo luận bao gồm:
-• Đánh giá tiến độ dự án và các milestone đã đạt được
-• Thảo luận về các vấn đề kỹ thuật và giải pháp đề xuất
-• Phân bổ nguồn lực và timeline cho giai đoạn tiếp theo
-• Xác định các rủi ro tiềm ẩn và biện pháp giảm thiểu
-
-Cuộc họp đã đạt được sự đồng thuận về các quyết định quan trọng và phân công action items rõ ràng cho các thành viên.`;
-
-  const minutesMarkdown = `# Biên bản cuộc họp: ${meeting.title}
-
-**Loại cuộc họp:** ${meeting.meeting_type || 'General Meeting'}
-**Thời gian:** ${startDate.toLocaleDateString('vi-VN')} ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-**Địa điểm:** ${meeting.location || 'Microsoft Teams'}
-
-## Tóm tắt điều hành
-
-${executiveSummary}
-
-## Điểm chính
-
-1. **Tiến độ dự án**: Dự án đang đi đúng timeline, đã hoàn thành 70% khối lượng công việc
-2. **Vấn đề kỹ thuật**: Đã xác định và giải quyết các vấn đề về hiệu suất hệ thống
-3. **Nguồn lực**: Cần bổ sung thêm 2 developer cho sprint tiếp theo
-4. **Timeline**: Dự kiến hoàn thành UAT vào cuối tháng này
-
-## Action Items
-
-1. [ ] Hoàn thành code review cho module authentication - **Deadline: 3 ngày**
-2. [ ] Chuẩn bị tài liệu UAT - **Deadline: 1 tuần**
-3. [ ] Liên hệ vendor về license phần mềm - **Deadline: 2 ngày**
-4. [ ] Update dashboard báo cáo tiến độ - **Deadline: Cuối tuần**
-
-## Quyết định
-
-1. Sử dụng phương án A cho kiến trúc microservices
-2. Tăng frequency của daily standup lên 2 lần/ngày trong giai đoạn critical
-3. Phê duyệt budget bổ sung cho cloud infrastructure
-
-## Rủi ro đã nhận diện
-
-- **Cao**: Delay từ third-party vendor có thể ảnh hưởng timeline
-- **Trung bình**: Resource constraint trong sprint cuối
-- **Thấp**: Technical debt cần được address sau go-live
-
----
-*Biên bản được tạo bởi MeetMate AI*
-*Ngày tạo: ${new Date().toLocaleString('vi-VN')}*`;
-
-  return {
-    id: `mock-${meeting.id}`,
-    meeting_id: meeting.id,
-    version: 1,
-    minutes_markdown: minutesMarkdown,
-    executive_summary: executiveSummary,
-    status: 'draft',
-    generated_at: new Date().toISOString(),
-  };
-};
-
 interface Chapter {
   id: string;
   title: string;
@@ -162,9 +96,8 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
       });
       setMinutes(generated);
     } catch (err) {
-      console.error('Failed to generate minutes via API, using mock:', err);
-      const mockMinutes = generateMockMinutes(meeting);
-      setMinutes(mockMinutes);
+      console.error('Failed to generate minutes via API:', err);
+      setError('Không thể tạo biên bản từ AI. Thử lại sau khi hệ thống sẵn sàng.');
     } finally {
       setIsGenerating(false);
     }
@@ -345,12 +278,6 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
             )}
           </div>
           <div className="summary-actions">
-            <button
-              className={`btn btn--ghost btn--sm ${hideSensitive ? 'btn--active' : ''}`}
-              onClick={() => setHideSensitive(!hideSensitive)}
-            >
-              {hideSensitive ? 'Hiện thông tin' : 'Ẩn thông tin nhạy cảm'}
-            </button>
             <button className="btn btn--accent btn--sm" onClick={handleGenerateMinutes} disabled={isGenerating || isLoading}>
               {minutes ? 'Tạo lại' : 'AI tạo biên bản'}
             </button>
@@ -359,6 +286,9 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
                 <button className="btn btn--secondary btn--sm" onClick={handleStartEdit}>Chỉnh sửa</button>
                 <button className="btn btn--secondary btn--sm" onClick={handleCopySummary}>
                   {copied ? 'Đã copy' : 'Copy'}
+                </button>
+                <button className="btn btn--ghost btn--sm" onClick={() => setHideSensitive((prev) => !prev)}>
+                  {hideSensitive ? 'Hiện đầy đủ' : 'Ẩn nhạy cảm'}
                 </button>
                 <button className="btn btn--primary btn--sm" onClick={handleExport}>Xuất PDF/In</button>
                 {renderApprovalActions()}

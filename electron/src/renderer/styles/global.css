@@ -8323,15 +8323,19 @@ a {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   flex: 1;
+  grid-auto-rows: 140px;
 }
 
 .month-view__day {
-  min-height: 100px;
+  min-height: 140px;
+  max-height: 140px;
+  height: 140px;
   padding: var(--space-xs);
   border-right: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background var(--transition-fast);
+  overflow: hidden;
 }
 
 .month-view__day:hover {
@@ -8375,6 +8379,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: hidden;
 }
 
 .month-view__meeting {
@@ -8387,6 +8392,7 @@ a {
   background: var(--accent-subtle);
   color: var(--accent);
   overflow: hidden;
+  max-width: 100%;
 }
 
 .month-view__meeting--live {
@@ -8405,9 +8411,13 @@ a {
 }
 
 .month-view__meeting-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .month-view__more {
