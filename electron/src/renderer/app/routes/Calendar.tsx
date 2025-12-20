@@ -184,14 +184,22 @@ const Calendar = () => {
           {/* Calendar Controls */}
           <div className="calendar-controls">
             <div className="calendar-controls__left">
-              <button className="btn btn--ghost btn--icon" onClick={goToPrevious}>
-                <ChevronLeft size={20} />
+              <button
+                className="btn btn--ghost btn--icon btn--sm"
+                style={{ padding: '6px', width: '32px', height: '32px' }}
+                onClick={goToPrevious}
+              >
+                <ChevronLeft size={16} />
               </button>
               <button className="btn btn--secondary btn--sm" onClick={goToToday}>
                 Hôm nay
               </button>
-              <button className="btn btn--ghost btn--icon" onClick={goToNext}>
-                <ChevronRight size={20} />
+              <button
+                className="btn btn--ghost btn--icon btn--sm"
+                style={{ padding: '6px', width: '32px', height: '32px' }}
+                onClick={goToNext}
+              >
+                <ChevronRight size={16} />
               </button>
               <h2 className="calendar-title">{title}</h2>
               {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-muted)' }} />}

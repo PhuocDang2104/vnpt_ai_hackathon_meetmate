@@ -264,9 +264,6 @@ const SendPrepEmailModal = ({
               <p>
                 Đã gửi email xác nhận cuộc họp đến {selectedParticipants.size} thành viên.
                 <br />
-                <span className="send-email-success__note">
-                  * Lưu ý: Đây là tính năng giả định. Email thực sẽ được gửi khi hệ thống hoàn thiện.
-                </span>
               </p>
             </div>
           ) : (
@@ -1169,21 +1166,24 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
           <FileText size={14} />
           Tài liệu ({documents.length})
         </div>
-        <button 
-          className="btn btn--ghost btn--sm" 
-          onClick={() => setShowUpload(!showUpload)}
-          title={showUpload ? 'Đóng' : 'Tải lên tài liệu'}
-        >
-          {showUpload ? <X size={14} /> : <Upload size={14} />}
-        </button>
-        <button 
-          className="btn btn--ghost btn--sm" 
-          onClick={() => setShowSelect(true)}
-          title="Chọn tài liệu có sẵn"
-          style={{ marginLeft: 8 }}
-        >
-          <Search size={14} />
-        </button>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button 
+            className="btn btn--ghost btn--icon btn--sm" 
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={() => setShowUpload(!showUpload)}
+            title={showUpload ? 'Đóng' : 'Tải lên tài liệu'}
+          >
+            {showUpload ? <X size={14} /> : <Upload size={14} />}
+          </button>
+          <button 
+            className="btn btn--ghost btn--icon btn--sm" 
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={() => setShowSelect(true)}
+            title="Chọn tài liệu có sẵn"
+          >
+            <Search size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Upload Notification */}
@@ -1444,14 +1444,19 @@ const AIAssistantPanel = ({ meetingId }: { meetingId: string }) => {
             Online
           </span>
         </div>
-        <div className="ai-chat-panel__actions">
-          {messages.length > 0 && (
-            <button className="btn btn--ghost btn--icon btn--sm" onClick={clearChat} title="Xóa cuộc trò chuyện">
-              <Trash2 size={12} />
+          <div className="ai-chat-panel__actions">
+            {messages.length > 0 && (
+            <button
+              className="btn btn--ghost btn--icon btn--sm"
+              style={{ padding: '6px', width: '32px', height: '32px' }}
+              onClick={clearChat}
+              title="Xóa cuộc trò chuyện"
+            >
+              <Trash2 size={16} />
             </button>
-          )}
-          <button 
-            className="btn btn--ghost btn--icon btn--sm" 
+            )}
+            <button 
+              className="btn btn--ghost btn--icon btn--sm" 
             onClick={() => setIsExpanded(!isExpanded)}
             title={isExpanded ? 'Thu nhỏ' : 'Mở rộng'}
           >

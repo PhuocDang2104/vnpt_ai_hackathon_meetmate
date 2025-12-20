@@ -268,6 +268,64 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
     except Exception as exc:
         logger.error("PDF extract failed: %s", exc)
         return ""
+
+
+def _extract_docx_text(file_bytes: bytes) -> str:
+    """Extract text from DOCX bytes using python-docx if available."""
+    try:
+        from docx import Document  # type: ignore
+    except Exception as exc:
+        logger.error("DOCX extract skipped (python-docx not available?): %s", exc)
+        return ""
+    try:
+        doc = Document(io.BytesIO(file_bytes))
+        parts: List[str] = []
+        for p in doc.paragraphs:
+            text = (p.text or "").strip()
+            if text:
+                parts.append(text)
+        # Optionally extract table cells
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells if c.text and c.text.strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        return "\n".join(parts)
+    except Exception as exc:
+        logger.error("DOCX extract failed: %s", exc)
+        return ""
+
+
+def _extract_excel_text(file_bytes: bytes) -> str:
+    """Extract text from XLSX/XLS using openpyxl if available."""
+    try:
+        from openpyxl import load_workbook  # type: ignore
+    except Exception as exc:
+        logger.error("Excel extract skipped (openpyxl not available?): %s", exc)
+        return ""
+    try:
+        wb = load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+        lines: List[str] = []
+        for sheet in wb:
+            lines.append(f"# {sheet.title}")
+            for idx, row in enumerate(sheet.iter_rows(values_only=True)):
+                if idx >= 200:  # avoid huge sheets
+                    break
+                cells = []
+                for val in row:
+                    if val is None:
+                        continue
+                    text = str(val).strip()
+                    if text:
+                        cells.append(text)
+                if cells:
+                    lines.append(" | ".join(cells))
+            if len(lines) > 2000:
+                break
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.error("Excel extract failed: %s", exc)
+        return ""
 def _chunk_text(text: str, max_len: int = 1200, overlap: int = 200) -> list[str]:
     """Greedy chunk by characters with overlap."""
     chunks = []
@@ -497,9 +555,13 @@ async def upload_document(
         # If original file content is available, try decode
         try:
             if file and "content" in locals() and content:
-                # If PDF, extract text via pdfplumber
+                # Extract by type
                 if file_ext == "pdf":
                     text_content = _sanitize_text(_extract_pdf_text(content))
+                elif file_ext in ("doc", "docx"):
+                    text_content = _sanitize_text(_extract_docx_text(content))
+                elif file_ext in ("xls", "xlsx"):
+                    text_content = _sanitize_text(_extract_excel_text(content))
                 else:
                     text_content = _sanitize_text(content.decode("utf-8", errors="ignore"))
         except Exception:

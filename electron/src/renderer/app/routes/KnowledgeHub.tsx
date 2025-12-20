@@ -269,7 +269,7 @@ const KnowledgeHub = () => {
                             handleDelete(doc.id);
                           }}
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
