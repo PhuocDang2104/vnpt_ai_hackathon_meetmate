@@ -1,6 +1,7 @@
 """
 LLM Client via Groq (replaces legacy Gemini usage)
 """
+import json
 from typing import Optional, List, Dict, Any
 from groq import Groq
 from app.core.config import get_settings
@@ -254,10 +255,55 @@ Format output JSON:
 ]"""
         
         return await self.chat.chat(prompt)
+
+    async def generate_summary_with_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate meeting summary with full context and strict guardrails."""
+        prompt = f"""Bạn là trợ lý tạo biên bản cuộc họp.
+Hãy tóm tắt dựa trên dữ liệu JSON bên dưới và KHÔNG bịa thông tin.
+
+Quy tắc:
+- Chỉ dùng dữ liệu đã cung cấp.
+- Nếu transcript, description, actions, decisions, risks, documents đều rỗng:
+  - Nếu title đủ cụ thể thì cho phép suy đoán 1-2 câu, bắt đầu bằng "Ước đoán: ".
+  - Nếu title quá chung chung (vd: "Meeting", "Cuộc họp", "Sync", "Họp nhanh") thì trả về summary rỗng.
+- Nếu có dữ liệu, tóm tắt 2-5 câu, ngắn gọn.
+- key_points: 3-5 gạch đầu dòng rút từ transcript hoặc actions/decisions/risks; nếu không có thì [].
+
+Dữ liệu:
+{json.dumps(context, ensure_ascii=False)}
+
+Trả về đúng JSON, không kèm text khác:
+{{"summary": "...", "key_points": ["...", "..."]}}"""
+        response = await self.chat.chat(prompt)
+        result: Dict[str, Any] = {}
+        try:
+            result = json.loads(response)
+        except Exception:
+            import re
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                try:
+                    result = json.loads(match.group(0))
+                except Exception:
+                    result = {}
+
+        summary = ""
+        key_points: List[str] = []
+        if isinstance(result, dict):
+            summary = str(result.get("summary", "") or "")
+            raw_points = result.get("key_points", [])
+            if isinstance(raw_points, list):
+                key_points = [str(item) for item in raw_points if str(item).strip()]
+            elif raw_points:
+                key_points = [str(raw_points)]
+        if not summary and not key_points:
+            summary = response.strip()
+        return {"summary": summary, "key_points": key_points}
     
     async def generate_summary(self, transcript: str) -> str:
         """Generate meeting summary"""
-        prompt = f"""Tạo tóm tắt cuộc họp từ transcript sau:
+        prompt = f"""Tạo tóm tắt cuộc họp dựa trên transcript sau, không bịa thông tin.
+Nếu transcript trống hoặc không đủ dữ liệu thì trả về chuỗi rỗng.
 
 {transcript[:3000]}
 

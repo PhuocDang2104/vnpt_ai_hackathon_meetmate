@@ -41,6 +41,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [copied, setCopied] = useState(false);
+  const [hideSensitive, setHideSensitive] = useState(false);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [showChapters, setShowChapters] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -285,6 +286,9 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
                 <button className="btn btn--secondary btn--sm" onClick={handleStartEdit}>Chỉnh sửa</button>
                 <button className="btn btn--secondary btn--sm" onClick={handleCopySummary}>
                   {copied ? 'Đã copy' : 'Copy'}
+                </button>
+                <button className="btn btn--ghost btn--sm" onClick={() => setHideSensitive((prev) => !prev)}>
+                  {hideSensitive ? 'Hiện đầy đủ' : 'Ẩn nhạy cảm'}
                 </button>
                 <button className="btn btn--primary btn--sm" onClick={handleExport}>Xuất PDF/In</button>
                 {renderApprovalActions()}
