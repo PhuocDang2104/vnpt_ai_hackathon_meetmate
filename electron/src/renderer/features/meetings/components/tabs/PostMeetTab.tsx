@@ -483,13 +483,18 @@ const ActionItemsSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-    <div className="card">
-      <div className="card__header">
-        <h3>Action Items</h3>
-        <button className="btn btn--ghost btn--icon btn--sm" onClick={loadActions} title="Làm mới">
-          Làm mới
-        </button>
-      </div>
+      <div className="card">
+        <div className="card__header">
+          <h3>Action Items</h3>
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={loadActions}
+            title="Làm mới"
+          >
+            Làm mới
+          </button>
+        </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -561,13 +566,18 @@ const DecisionsSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-    <div className="card">
-      <div className="card__header">
-        <h3>Quyết định</h3>
-        <button className="btn btn--ghost btn--icon btn--sm" onClick={loadDecisions} title="Làm mới">
-          Làm mới
-        </button>
-      </div>
+      <div className="card">
+        <div className="card__header">
+          <h3>Quyết định</h3>
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={loadDecisions}
+            title="Làm mới"
+          >
+            Làm mới
+          </button>
+        </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -627,13 +637,18 @@ const RisksSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-    <div className="card">
-      <div className="card__header">
-        <h3>Rủi ro đã nhận diện</h3>
-        <button className="btn btn--ghost btn--icon btn--sm" onClick={loadRisks} title="Làm mới">
-          Làm mới
-        </button>
-      </div>
+      <div className="card">
+        <div className="card__header">
+          <h3>Rủi ro đã nhận diện</h3>
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
+            style={{ padding: '6px', width: '32px', height: '32px' }}
+            onClick={loadRisks}
+            title="Làm mới"
+          >
+            Làm mới
+          </button>
+        </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -703,7 +718,10 @@ const QAAgentSection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <h3>Q&A Agent - Hỏi về cuộc họp</h3>
-        <button className="btn btn--ghost btn--icon btn--sm">
+        <button
+          className="btn btn--ghost btn--icon btn--sm"
+          style={{ padding: '6px', width: '32px', height: '32px' }}
+        >
           {isExpanded ? 'Thu gọn' : 'Mở'}
         </button>
       </div>
@@ -973,7 +991,13 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
           <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
             <button className="btn btn--ghost btn--sm" onClick={selectAll}>Chọn tất cả</button>
             <button className="btn btn--ghost btn--sm" onClick={deselectAll}>Bỏ chọn</button>
-            <button className="btn btn--ghost btn--icon btn--sm" onClick={loadActions}>Làm mới</button>
+            <button
+              className="btn btn--ghost btn--icon btn--sm"
+              style={{ padding: '6px', width: '32px', height: '32px' }}
+              onClick={loadActions}
+            >
+              Làm mới
+            </button>
           </div>
         </div>
         <div className="card__body">

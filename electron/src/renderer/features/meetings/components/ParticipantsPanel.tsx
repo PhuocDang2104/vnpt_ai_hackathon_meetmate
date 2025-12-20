@@ -174,7 +174,7 @@ const AddParticipantModal = ({
           />
           {searchQuery && (
             <button className="search-box__clear" onClick={() => setSearchQuery('')}>
-              <X size={14} />
+              <X size={16} />
             </button>
           )}
         </div>
@@ -249,4 +249,3 @@ const AddParticipantModal = ({
 };
 
 export default ParticipantsPanel;
-

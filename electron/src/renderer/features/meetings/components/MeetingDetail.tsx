@@ -533,7 +533,7 @@ export const MeetingDetail = () => {
               
               {meeting.phase === 'post' && (
                 <span className="badge badge--success" style={{ padding: '8px 16px' }}>
-                  <CheckSquare size={14} style={{ marginRight: '6px' }} />
+                  <CheckSquare size={16} style={{ marginRight: '6px' }} />
                   Đã kết thúc
                 </span>
               )}
