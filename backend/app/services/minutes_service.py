@@ -322,6 +322,18 @@ async def generate_minutes_with_ai(
             "key_points": actions[:3] if actions else decisions[:3]
         }
 
+    if isinstance(summary_result, str):
+        summary_result = {"summary": summary_result, "key_points": []}
+    elif not isinstance(summary_result, dict):
+        summary_result = {"summary": str(summary_result), "key_points": []}
+    else:
+        summary_result = {
+            "summary": summary_result.get("summary", ""),
+            "key_points": summary_result.get("key_points", []),
+        }
+        if not isinstance(summary_result["key_points"], list):
+            summary_result["key_points"] = [str(summary_result["key_points"])]
+
     # Format minutes with available context (even if AI fallback)
     minutes_content = format_minutes(
         meeting_title=meeting_title,

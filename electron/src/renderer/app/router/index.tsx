@@ -1,4 +1,4 @@
-giimport { createHashRouter } from 'react-router-dom'
+import { createHashRouter } from 'react-router-dom'
 import AppShell from '../layout/AppShell'
 import Dashboard from '../routes/Dashboard'
 import Calendar from '../routes/Calendar'
