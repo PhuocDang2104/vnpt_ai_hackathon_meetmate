@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -24,6 +25,7 @@ from app.services.smartvoice_streaming import SmartVoiceStreamingConfig, is_smar
 router = APIRouter()
 langgraph_workers: Dict[str, asyncio.Task] = {}
 project_cache: Dict[str, Optional[str]] = {}
+logger = logging.getLogger(__name__)
 
 
 class _AudioClock:
@@ -211,6 +213,7 @@ async def _smartvoice_to_bus(
     except asyncio.CancelledError:
         raise
     except Exception as exc:
+        logger.exception("smartvoice stream failed (session_id=%s)", session_id)
         try:
             await _safe_send_json(
                 websocket,

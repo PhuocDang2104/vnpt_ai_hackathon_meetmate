@@ -1,0 +1,161 @@
+[33mb6cd09b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m ws fixed
+[33mbe28c13[m redis
+[33m3e8bdbf[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33m65aedc5[m in-meeting LLM agentic RAG flow completed
+[33m78c9c10[m fix button size
+[33m366fc7b[m update UI, search function
+[33m96affcb[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33mf196033[m meeting detail
+[33mb326af4[m Delete PROJECTS/AIO25 directory
+[33mc7d11f2[m fix UI
+[33mc05d393[m fix UI
+[33m8dd4903[m fix supabase
+[33m0985509[m aht
+[33me953c2a[m Merge remote-tracking branch 'refs/remotes/origin/main'
+[33m8460759[m groq fix
+[33m5319841[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33m3464b36[m Delete PROJECTS/AIO25 directory
+[33mcae8119[m vnpt gomeet API deploy
+[33mcda7be1[m AHT describe transcript
+[33m550f1e4[m Merge remote-tracking branch 'refs/remotes/origin/main'
+[33ma83bfbc[m describe transcript aht
+[33m6ff46ad[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33mc5652a0[m Meetings transcript real-time refined
+[33m3d561b0[m fix minute
+[33m5537722[m aht fix fe
+[33m4e0777b[m aht
+[33me5e4050[m aht push
+[33mc933c5d[m protobuf fixed
+[33mda09926[m protobuf updated
+[33m83d8075[m vnpt smartvoice connected
+[33mddb29af[m backend SmartVoice test
+[33mf4cf133[m smartvoice backend fixed
+[33mefbfee9[m Audio ingestion from google tab
+[33m318127f[m add docker ignore
+[33m483fc76[m VNPT SmartVoice STT API tested
+[33m6232a30[m new
+[33m3ed7123[m change session
+[33m9589864[m fix
+[33m249bf25[m fix
+[33m53fb0fc[m fix send_email
+[33mb4b1d16[m project function
+[33mb8b8504[m fix timeout
+[33m990117e[m add noti
+[33me3943cd[m new auth
+[33m22504df[m fix auth
+[33m6274b85[m fix
+[33md50e4ad[m fix email
+[33m39e1c37[m fix email
+[33ma038e55[m session change
+[33mc8f335f[m In-meeting frontend refined
+[33m0dfc444[m fix
+[33m120d553[m emial
+[33mfe18673[m mail update
+[33m4f66ec0[m GoMeet control-plane API requirement
+[33m237fe83[m Audio ingest WS API test
+[33m8043199[m Audio ingestion API
+[33m583eda2[m Merge remote-tracking branch 'refs/remotes/origin/main'
+[33m053bb23[m dsoc rag
+[33m4ab12b3[m Delete PROJECTS/AIO25 directory
+[33mecc77b5[m auth
+[33mcd76892[m new
+[33m3a33513[m improve AI
+[33mdb19d47[m fix
+[33m2882083[m finish rag
+[33m39506b0[m read pdf
+[33m94da12e[m fix
+[33mf9fe685[m new fix
+[33mc2df222[m fix
+[33m40c58ee[m fix jina
+[33m9baca71[m jina
+[33m8d34054[m jira
+[33ma48dc05[m new embeding model
+[33mee2e343[m embedding model
+[33mbeafb2c[m rag api
+[33m48d4a72[m chat gpt
+[33m34349c6[m news AI :>>
+[33m7a6983d[m query doc
+[33m05b5194[m  WS updated
+[33m346c380[m fix supa
+[33m0642dec[m fix admin and document
+[33ma6baf45[m in-meeting transcript frontend/backend refined
+[33mad9ee52[m update project entity
+[33mcc1785d[m document view
+[33m0515d05[m admin backend
+[33md1314e1[m admin csonole
+[33m82de700[m chore: auth hardening and docs update
+[33m77f344c[m chore(ui): reduce highlight clip thumbnail font size
+[33m8b6d138[m chore(ui): compact post-meeting layout and prevent text overflow
+[33m376cb3f[m fix: remove duplicated PostMeetTab content (duplicate generateMockMinutes)
+[33m33d76e4[m feat(post-meeting): block layout without icons
+[33md324801[m feat(post-meeting): convert to block layout without icons
+[33me350bec[m feat(post-meeting): Complete Post-Meeting UI with all requested features
+[33me54078a[m docs: Expand PreMeet & PostMeet Architecture with detailed RAG design
+[33md931d93[m docs: Add PreMeet & PostMeet AI Architecture technical documentation
+[33m0ef6040[m feat: Complete PreMeetTab UI enhancements
+[33mebc4eb7[m feat: Add i18n language toggle (English/Vietnamese)
+[33mba7595d[m refactor: Redesign PreMeetTab to match InMeetTab layout
+[33me4da0ae[m feat: Add Reminders section and personalized email for meeting prep
+[33meb9fb9e[m chore: Add Vercel deployment config for frontend
+[33m25f59f8[m feat: Add participant invite, email sending, About page, and fix various UI issues
+[33m0b78319[m fix: use gemini-2.5-flash-lite
+[33m579e0a8[m fix: use gemini-1.5-flash (stable model)
+[33m0a08b1c[m fix: use gemma-3-27b model (14,400 RPD - highest free quota)
+[33m880f653[m fix: use gemini-1.5-flash (valid model with good quota)
+[33m0ec252d[m fix: Dockerfile use dynamic PORT env variable for Render
+[33m2c33932[m fix: change Gemini model to gemini-2.0-flash-live
+[33m6aa39ae[m fix: change Gemini model to gemini-1.5-flash for better quota (1500 req/day)
+[33mfec1f19[m fix: change default Gemini model to gemini-2.0-flash-exp for better quota
+[33m73f03b0[m docs: add changelog for Dec 8, 2025
+[33m79ce8c6[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33m1374c7c[m feat: implement remaining UI features - Dashboard export, Tasks CRUD, Calendar views, Notifications, Settings persistence, PostMeet PDF export
+[33mbd109d2[m fix nonetype
+[33m0a6b8a2[m socket event fix
+[33m7111e0c[m log error backend
+[33mbb18ea9[m fix bug backend
+[33mc43e76b[m Add LightRAG-lite, in-meeting persistence, and tool execution API
+[33mfec5ed2[m refined global css
+[33m52f838b[m Merge branch 'main' of https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate
+[33mbe0b85e[m Added a mock raw-transcript - alternative of VNPT STT API --> set up for WebSocket
+[33mb6314bb[m fix: Invalid UUID prefix in knowledge_service (k -> a)
+[33mc1dc905[m feat: Unified MeetingService for Dashboard & Calendar
+[33ma37e62f[m feat: Knowledge Hub AI Chat Panel
+[33m360a716[m feat: Modern Upload Document modal with improved UX
+[33m966cfd0[m feat: Knowledge Hub - Document upload & AI search
+[33mff5ac2c[m fix: Improve Pre-meet AI Q&A UI and prompts
+[33md2a3be7[m feat: Complete Post-meet tab with Minutes Generation & Testing
+[33mfd4f80f[m global css theme --> teams theme
+[33med05682[m chatbot css
+[33m8ff3190[m chatbox refined
+[33m494b201[m chatbot added in-meeting
+[33m59049ae[m  in-meeting frontend refined
+[33ma9d88da[m set production true
+[33mbec14e9[m feat: Documents & Agenda Management with AI Generation
+[33mbd8276d[m fix: Rollback transaction on auth query failure
+[33m7a36874[m chore: Add local development setup script and update .gitignore
+[33m7717abf[m fix: Add demo mode for login - accept 'demo123' as password
+[33m878f966[m fix: Downgrade bcrypt to 4.0.1 for passlib compatibility
+[33mc8418d9[m fix: Handle missing password_hash column in auth
+[33m6986ee3[m feat: Add Landing Page and improve auth flow
+[33m86f3792[m fix: Fix apiClient import in auth.ts
+[33mf6cb33c[m feat(auth): Implement user registration and login
+[33mf115fca[m feat(backend): Complete meeting management APIs for Pre/In/Post meeting
+[33m8ce09de[m feat: Redesign Meeting Detail with 3-tab layout (Pre/In/Post)
+[33m1f07a07[m fix: Correct transcript_chunk column names (start_time, end_time, speaker_user_id, text)
+[33mee9d8f1[m fix: Correct column names in seed (owner_user_id, confirmed_by)
+[33m9a4b683[m fix: Use valid hex characters in UUIDs for Supabase seed
+[33m83a962d[m feat: Add Supabase seed script with mock data for demo
+[33m80a7e84[m fix: Change Gemini model to gemini-1.5-flash (valid model)
+[33m66f6c8c[m fix: Change Gemini model to gemini-1.5-flash (valid model)
+[33m8a71900[m fix: Add debug endpoints for Gemini API troubleshooting
+[33m64e0809[m feat: Add centralized API config for deployed server
+[33mb4050cd[m fix: Move vite to dependencies for Vercel build
+[33mc0821e0[m fix: Install devDependencies for Vercel build
+[33m901bd1c[m fix: Add vercel.json for frontend deployment
+[33m9e84a05[m fix: Dockerfile build context - remove dependency on infra/env
+[33ma39de2d[m Resolve merge conflict: keep local Dockerfile and requirements
+[33m9cbd4b3[m AI Agentic RAG Skeleton + dockerized backend
+[33m67a5737[m docs: Add deployment guide for free MVP (Supabase + Render)
+[33m0cdb285[m feat: Add Meeting Management UI, Gemini AI Chat & RAG integration
+[33m2a0fa69[m AHT Database setup and config
+[33meb37a57[m Initial commit
