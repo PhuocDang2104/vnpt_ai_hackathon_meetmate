@@ -234,6 +234,11 @@ def _sanitize_text(text: str) -> str:
     return text.replace("\x00", "").strip()
 
 
+def _normalize_for_embedding(text: str) -> str:
+    """Lowercase + sanitize for case-insensitive embeddings/search."""
+    return _sanitize_text(text).lower()
+
+
 def _is_smalltalk_or_noise(query: str) -> bool:
     """Heuristic: greetings or too-short queries => handle without RAG."""
     q = (query or "").strip().lower()
@@ -513,7 +518,8 @@ async def upload_document(
             # skip if still empty
             if not chunks:
                 raise ValueError("No valid text chunks to embed (maybe binary/pdf without extraction)")
-            embeddings = embed_texts(chunks)
+            embed_inputs = [_normalize_for_embedding(c) for c in chunks]
+            embeddings = embed_texts(embed_inputs)
             for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
                 emb_literal = "[" + ",".join(str(x) for x in emb) + "]"
                 db.execute(
@@ -709,7 +715,7 @@ async def _vector_search_documents(
     if not is_jina_available():
         return None
     try:
-        query_vec = embed_texts([_sanitize_text(request.query)])[0]
+        query_vec = embed_texts([_normalize_for_embedding(request.query)])[0]
         vec_literal = _format_vector(query_vec)
 
         where_clause, params = _build_vector_filters(request)
@@ -854,7 +860,7 @@ async def query_knowledge_ai(
 
     if is_jina_available():
         try:
-            query_vec = embed_texts([_sanitize_text(request.query)])[0]
+            query_vec = embed_texts([_normalize_for_embedding(request.query)])[0]
             vec_literal = _format_vector(query_vec)
 
             where_clause, params = _build_vector_filters(
