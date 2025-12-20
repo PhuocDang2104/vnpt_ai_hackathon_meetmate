@@ -21,6 +21,7 @@ const MeetingDock = () => {
   const sessionFromQuery = searchParams.get('session');
   const linkFromQuery = searchParams.get('link');
   const platformFromQuery = searchParams.get('platform');
+  const tokenFromQuery = searchParams.get('token') || '';
 
   useEffect(() => {
     if (platformFromQuery === 'gmeet') {
@@ -75,6 +76,7 @@ const MeetingDock = () => {
     const params = new URLSearchParams();
     if (streamSessionId) params.set('session', streamSessionId);
     if (joinLink) params.set('link', joinLink);
+    if (tokenFromQuery) params.set('token', tokenFromQuery);
     const qs = params.toString();
     window.open(`#/app/meetings/${meeting.id}/capture${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
   };
@@ -145,6 +147,7 @@ const MeetingDock = () => {
           joinPlatform={joinPlatform}
           joinLink={joinLink}
           streamSessionId={streamSessionId || meeting.id}
+          initialAudioIngestToken={tokenFromQuery || undefined}
           onRefresh={fetchMeeting}
           onEndMeeting={handleEndMeeting}
         />
