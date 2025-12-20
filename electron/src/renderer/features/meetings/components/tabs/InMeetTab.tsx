@@ -20,7 +20,6 @@ import {
   decisions,
   formatDuration,
   risks,
-  transcriptChunks,
 } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
@@ -32,6 +31,7 @@ interface InMeetTabProps {
   joinPlatform: 'gomeet' | 'gmeet';
   joinLink: string;
   streamSessionId: string;
+  initialAudioIngestToken?: string;
   onRefresh: () => void;
   onEndMeeting: () => void;
 }
@@ -41,20 +41,35 @@ export const InMeetTab = ({
   joinPlatform,
   joinLink,
   streamSessionId,
+  initialAudioIngestToken,
   onRefresh,
   onEndMeeting,
 }: InMeetTabProps) => {
   const [feedStatus, setFeedStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
   const [wsNonce, setWsNonce] = useState(0);
   const [lastTranscriptAt, setLastTranscriptAt] = useState<number | null>(null);
-  const [liveTranscript, setLiveTranscript] = useState<
-    { id: string; speaker: string; text: string; time: number; isFinal: boolean }[]
+  const [livePartial, setLivePartial] = useState<{
+    speaker: string;
+    text: string;
+    time: number;
+  } | null>(null);
+  const [liveFinal, setLiveFinal] = useState<{
+    speaker: string;
+    text: string;
+    time: number;
+  } | null>(null);
+  const [finalTranscript, setFinalTranscript] = useState<
+    { id: string; speaker: string; text: string; time: number }[]
   >([]);
-  const [audioIngestToken, setAudioIngestToken] = useState<string | null>(null);
+  const [audioIngestToken, setAudioIngestToken] = useState<string | null>(
+    initialAudioIngestToken || null,
+  );
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [isTokenLoading, setIsTokenLoading] = useState(false);
 
   const feedRef = useRef<WebSocket | null>(null);
+  const partialClearRef = useRef<number | null>(null);
+  const finalClearRef = useRef<number | null>(null);
   const wsBase = useMemo(() => {
     if (API_URL.startsWith('https://')) return API_URL.replace(/^https:/i, 'wss:').replace(/\/$/, '');
     if (API_URL.startsWith('http://')) return API_URL.replace(/^http:/i, 'ws:').replace(/\/$/, '');
@@ -62,12 +77,6 @@ export const InMeetTab = ({
   }, []);
   const sessionIdForStream = streamSessionId || meeting.id;
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
-  const audioEndpoint = useMemo(() => `${wsBase}/api/v1/ws/audio/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
-
-  const transcript = useMemo(
-    () => transcriptChunks.filter(chunk => chunk.meetingId === meeting.id).slice(0, 8),
-    [meeting.id],
-  );
 
   const actions = useMemo(() => {
     const scoped = actionItems.filter(a => a.meetingId === meeting.id).slice(0, 4);
@@ -83,6 +92,12 @@ export const InMeetTab = ({
     const scoped = risks.filter(r => r.meetingId === meeting.id).slice(0, 3);
     return scoped.length > 0 ? scoped : risks.slice(0, 2);
   }, [meeting.id]);
+
+  useEffect(() => {
+    if (initialAudioIngestToken) {
+      setAudioIngestToken(initialAudioIngestToken);
+    }
+  }, [initialAudioIngestToken]);
 
   useEffect(() => {
     if (!USE_API) {
@@ -110,19 +125,35 @@ export const InMeetTab = ({
         if (data?.event === 'transcript_event') {
           const p = data.payload || {};
           setLastTranscriptAt(Date.now());
-          setLiveTranscript(prev => {
-            const next = [
-              ...prev,
-              {
-                id: String(data.seq || Date.now()),
-                speaker: p.speaker || 'SPEAKER_01',
-                text: p.chunk || '',
-                time: p.time_start || 0,
-                isFinal: p.is_final !== false,
-              },
-            ].slice(-40);
-            return next;
-          });
+          const text = (p.chunk || '').trim();
+          const isFinal = p.is_final !== false;
+          const speaker = p.speaker || 'SPEAKER_01';
+          const time = p.time_start || 0;
+          if (text) {
+            if (isFinal) {
+              setLiveFinal({ speaker, text, time });
+              setLivePartial(null);
+              if (finalClearRef.current) {
+                window.clearTimeout(finalClearRef.current);
+              }
+              finalClearRef.current = window.setTimeout(() => {
+                setLiveFinal(null);
+              }, 5000);
+            } else {
+              setLivePartial({ speaker, text, time });
+              if (partialClearRef.current) {
+                window.clearTimeout(partialClearRef.current);
+              }
+              partialClearRef.current = window.setTimeout(() => {
+                setLivePartial(null);
+              }, 1200);
+            }
+          }
+          if (isFinal && text) {
+            setFinalTranscript(prev =>
+              [...prev, { id: String(data.seq || Date.now()), speaker, text, time }].slice(-120),
+            );
+          }
         }
       } catch (_e) {
         /* ignore */
@@ -132,6 +163,12 @@ export const InMeetTab = ({
     return () => {
       socket.close();
       feedRef.current = null;
+      if (partialClearRef.current) {
+        window.clearTimeout(partialClearRef.current);
+      }
+      if (finalClearRef.current) {
+        window.clearTimeout(finalClearRef.current);
+      }
     };
   }, [feedEndpoint, wsNonce]);
 
@@ -139,6 +176,8 @@ export const InMeetTab = ({
     feedRef.current?.close();
     setFeedStatus(USE_API ? 'connecting' : 'disabled');
     setLastTranscriptAt(null);
+    setLivePartial(null);
+    setLiveFinal(null);
     setWsNonce(prev => prev + 1);
   };
 
@@ -162,14 +201,14 @@ export const InMeetTab = ({
       <div className="inmeet-grid">
         <div className="inmeet-column inmeet-column--main">
           <LiveTranscriptPanel
-            transcript={transcript}
-            liveTranscript={liveTranscript}
+            livePartial={livePartial}
+            liveFinal={liveFinal}
+            finalTranscriptCount={finalTranscript.length}
             joinPlatform={joinPlatform}
             joinLink={joinLink}
             feedStatus={feedStatus}
             lastTranscriptAt={lastTranscriptAt}
             audioIngestToken={audioIngestToken}
-            audioWsUrl={audioEndpoint}
             tokenError={tokenError}
             isTokenLoading={isTokenLoading}
             meetingId={meeting.id}
@@ -195,14 +234,14 @@ export const InMeetTab = ({
 };
 
 interface TranscriptPanelProps {
-  transcript: typeof transcriptChunks;
-  liveTranscript: { id: string; speaker: string; text: string; time: number; isFinal: boolean }[];
+  livePartial: { speaker: string; text: string; time: number } | null;
+  liveFinal: { speaker: string; text: string; time: number } | null;
+  finalTranscriptCount: number;
   joinPlatform: 'gomeet' | 'gmeet';
   joinLink: string;
   feedStatus: WsStatus;
   lastTranscriptAt: number | null;
   audioIngestToken: string | null;
-  audioWsUrl: string;
   tokenError: string | null;
   isTokenLoading: boolean;
   meetingId: string;
@@ -264,14 +303,14 @@ const AudioStreamIndicator = ({
 };
 
 const LiveTranscriptPanel = ({
-  transcript,
-  liveTranscript,
+  livePartial,
+  liveFinal,
+  finalTranscriptCount,
   joinPlatform,
   joinLink,
   feedStatus,
   lastTranscriptAt,
   audioIngestToken,
-  audioWsUrl,
   tokenError,
   isTokenLoading,
   meetingId,
@@ -279,23 +318,6 @@ const LiveTranscriptPanel = ({
   onFetchAudioToken,
   onReconnect,
 }: TranscriptPanelProps) => {
-  const displayItems = useMemo(() => {
-    const maxItems = 50;
-    if (liveTranscript?.length) {
-      return liveTranscript.slice(-maxItems).map(t => ({
-        id: t.id,
-        speakerName: t.speaker,
-        time: t.time,
-        text: t.text,
-      }));
-    }
-    return transcript.slice(-maxItems).map(chunk => ({
-      id: chunk.id,
-      speakerName: chunk.speaker.displayName,
-      time: chunk.startTime,
-      text: chunk.text,
-    }));
-  }, [liveTranscript, transcript]);
   const lastFrameLabel = useMemo(() => {
     if (feedStatus === 'error') return 'Frontend WS lỗi - thử kết nối lại';
     if (feedStatus === 'connecting' || feedStatus === 'idle') return 'Đang chờ bắt tay WebSocket';
@@ -307,10 +329,6 @@ const LiveTranscriptPanel = ({
       second: '2-digit',
     })}`;
   }, [feedStatus, lastTranscriptAt]);
-  const audioWithToken = useMemo(() => {
-    if (!audioIngestToken) return null;
-    return `${audioWsUrl}?token=${audioIngestToken}&stt=1`;
-  }, [audioIngestToken, audioWsUrl]);
   const captureUrl = useMemo(() => {
     if (!sessionId) return null;
     const params = new URLSearchParams();
@@ -318,6 +336,8 @@ const LiveTranscriptPanel = ({
     if (audioIngestToken) params.set('token', audioIngestToken);
     return `#/app/meetings/${meetingId}/capture?${params.toString()}`;
   }, [audioIngestToken, meetingId, sessionId]);
+  const partialText = livePartial?.text || 'Đang lắng nghe...';
+  const finalText = liveFinal?.text || 'Chưa có final transcript.';
 
   return (
     <div className="transcript-panel transcript-panel--glass">
@@ -364,109 +384,77 @@ const LiveTranscriptPanel = ({
             )}
           </div>
 
-          <div
-            className="transcript-card transcript-card--live"
-            style={{
-              marginTop: 10,
-              padding: 10,
-              background: 'var(--bg-elevated)',
-              borderRadius: 10,
-              border: '1px solid var(--border-subtle)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn--primary btn--sm"
-                onClick={onFetchAudioToken}
-                disabled={isTokenLoading || !USE_API}
-              >
-                {isTokenLoading ? 'Đang lấy token...' : 'Lấy audio_ingest_token'}
-              </button>
-              {tokenError && <span className="pill pill--error">{tokenError}</span>}
+          <div className="transcript-setup">
+            <div className="transcript-setup__meta">
+              <div className="transcript-setup__label">Audio ingest</div>
+              <div className="transcript-setup__status">
+                <span className={`pill ${audioIngestToken ? 'pill--success' : 'pill--ghost'}`}>
+                  {audioIngestToken ? 'Token sẵn sàng' : 'Chưa có token'}
+                </span>
+                {tokenError && <span className="pill pill--error">{tokenError}</span>}
+              </div>
+            </div>
+            <div className="transcript-setup__actions">
+              {!audioIngestToken && (
+                <button
+                  className="btn btn--primary btn--sm"
+                  onClick={onFetchAudioToken}
+                  disabled={isTokenLoading || !USE_API}
+                >
+                  {isTokenLoading ? 'Đang lấy token...' : 'Tạo token'}
+                </button>
+              )}
+              {captureUrl && (
+                <button
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => window.open(captureUrl, '_blank', 'noopener,noreferrer')}
+                  disabled={!audioIngestToken}
+                >
+                  Mở MeetMate Capture
+                </button>
+              )}
             </div>
             {audioIngestToken && (
-              <>
-                <div className="pill pill--ghost" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  token: {audioIngestToken}
-                </div>
-                {audioWithToken && (
-                  <div className="pill pill--accent" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    WS audio: {audioWithToken}
-                  </div>
-                )}
-                {captureUrl && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <button
-                      className="btn btn--secondary btn--sm"
-                      onClick={() => window.open(captureUrl, '_blank', 'noopener,noreferrer')}
-                    >
-                      Mở MeetMate Capture (Chrome tab audio)
-                    </button>
-                    <span className="form-hint">
-                      Mở tab mới, chọn Chrome Tab và tick &quot;Share tab audio&quot; để stream 16k PCM S16LE.
-                    </span>
-                  </div>
-                )}
-              </>
+              <div className="transcript-setup__token" title={audioIngestToken}>
+                token: {audioIngestToken}
+              </div>
             )}
           </div>
 
           <div className="transcript-content transcript-content--padded">
-            <div
-              className="transcript-card transcript-card--live"
-              style={{ minHeight: 220, maxHeight: 360, display: 'flex', flexDirection: 'column' }}
-            >
-              <div className="transcript-card__body">
-                <div className="transcript-card__row" style={{ alignItems: 'center', gap: 8 }}>
+            <div className="transcript-live-card">
+              <div className="transcript-live-card__header">
+                <div className="transcript-live-card__title">
                   <div className="pill pill--live pill--solid">
                     <span className="live-dot"></span>
                     SmartVoice API ...
                   </div>
                   <span className="pill pill--ghost">Realtime transcript</span>
                 </div>
-                <div
-                  style={{
-                    marginTop: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                    overflowY: 'auto',
-                    paddingRight: 4,
-                    maxHeight: 260,
-                  }}
-                >
-                  {displayItems.length === 0 && (
-                    <div className="transcript-card__hint">Chưa có đoạn thoại nào.</div>
-                  )}
-                  {displayItems.map(item => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'var(--bg-subtle)',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 4,
-                          color: 'var(--text-muted)',
-                          fontSize: 12,
-                        }}
-                      >
-                        <span>{item.speakerName}</span>
-                        <span>{formatDuration(item.time || 0)}</span>
-                      </div>
-                      <div style={{ fontSize: 16, lineHeight: 1.4 }}>{item.text}</div>
+                <div className="transcript-live-card__meta">
+                  <span className="transcript-live-card__count">Final đã lưu: {finalTranscriptCount}</span>
+                </div>
+              </div>
+              <div className="transcript-live-group">
+                <div className={`transcript-live-line ${livePartial ? '' : 'transcript-live-line--idle'}`}>
+                  <div className="transcript-live-line__header">
+                    <span className="transcript-live-line__tag">Partial</span>
+                    <div className="transcript-live-line__meta">
+                      <span>{livePartial ? livePartial.speaker : '—'}</span>
+                      {livePartial && <span>{formatDuration(livePartial.time || 0)}</span>}
                     </div>
-                  ))}
+                  </div>
+                  <div className="transcript-live-line__text">{partialText}</div>
+                </div>
+                <div className={`transcript-live-line transcript-live-line--final ${liveFinal ? '' : 'transcript-live-line--idle'}`}>
+                  <div className="transcript-live-line__header">
+                    <span className="transcript-live-line__tag">Last final transcript</span>
+                    <div className="transcript-live-line__meta">
+                      <span>{liveFinal ? liveFinal.speaker : '—'}</span>
+                      {liveFinal && <span>{formatDuration(liveFinal.time || 0)}</span>}
+                    </div>
+                  </div>
+                  <div className="transcript-live-line__text">{finalText}</div>
                 </div>
               </div>
             </div>

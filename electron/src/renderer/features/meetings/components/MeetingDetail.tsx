@@ -45,6 +45,7 @@ export const MeetingDetail = () => {
   const [joinPlatform, setJoinPlatform] = useState<'gomeet' | 'gmeet'>('gomeet');
   const [joinLink, setJoinLink] = useState('');
   const [streamSessionId, setStreamSessionId] = useState<string | null>(null);
+  const [audioIngestToken, setAudioIngestToken] = useState('');
   const [sessionInitError, setSessionInitError] = useState<string | null>(null);
   const [isInitSessionLoading, setIsInitSessionLoading] = useState(false);
   
@@ -126,6 +127,7 @@ export const MeetingDetail = () => {
     if (session) params.set('session', session);
     if (joinLink) params.set('link', joinLink);
     if (joinPlatform) params.set('platform', joinPlatform);
+    if (audioIngestToken) params.set('token', audioIngestToken);
     const qs = params.toString();
     navigate(`/app/meetings/${meeting.id}/dock${qs ? `?${qs}` : ''}`);
   };
@@ -151,7 +153,15 @@ export const MeetingDetail = () => {
         interim_results: true,
         enable_word_time_offsets: true,
       });
-      setStreamSessionId(res.session_id);
+      const sessionId = res.session_id;
+      setStreamSessionId(sessionId);
+
+      let token = audioIngestToken.trim();
+      if (!token) {
+        const tokenRes = await sessionsApi.registerSource(sessionId);
+        token = tokenRes.audio_ingest_token;
+      }
+      setAudioIngestToken(token);
       setShowJoinModal(false);
     } catch (err) {
       console.error('Failed to init realtime session:', err);
@@ -411,6 +421,7 @@ export const MeetingDetail = () => {
             joinPlatform={joinPlatform}
             joinLink={joinLink}
             streamSessionId={streamSessionId || meeting.id}
+            initialAudioIngestToken={audioIngestToken || undefined}
             onRefresh={fetchMeeting}
             onEndMeeting={handleEndMeeting}
           />
@@ -652,6 +663,18 @@ export const MeetingDetail = () => {
                 <p className="form-hint">Session ID này sẽ được dùng cho WebSocket ingest/frontend.</p>
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Audio ingest token (tuỳ chọn)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={audioIngestToken}
+                  onChange={e => setAudioIngestToken(e.target.value)}
+                  placeholder="Dán token nếu đã có"
+                />
+                <p className="form-hint">Để trống: hệ thống sẽ tự tạo token khi bấm Kết nối.</p>
+              </div>
+
               {sessionInitError && (
                 <div className="card" style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
                   {sessionInitError}
@@ -667,7 +690,7 @@ export const MeetingDetail = () => {
                 onClick={handleInitRealtimeSession}
                 disabled={!streamSessionId}
               >
-                {isInitSessionLoading ? 'Đang khởi tạo...' : 'Áp dụng'}
+                {isInitSessionLoading ? 'Đang kết nối...' : 'Kết nối'}
               </button>
             </div>
           </div>
