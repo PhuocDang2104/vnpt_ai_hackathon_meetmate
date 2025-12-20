@@ -55,6 +55,11 @@ class InMeetingStreamState:
     rolling_window: Deque[FinalTranscriptChunk] = field(default_factory=deque)
     recap_batch: List[int] = field(default_factory=list)
     last_final_seq: int = 0
+    last_transcript_seq: int = 0
+    last_transcript_chunk: Optional[FinalTranscriptChunk] = None
+    last_transcript_is_final: bool = True
+    last_partial_seq: int = 0
+    last_partial_chunk: Optional[FinalTranscriptChunk] = None
     intent_cursor_seq: int = 0
     recap_cursor_seq: int = 0
     speech_ms_since_intent: float = 0.0

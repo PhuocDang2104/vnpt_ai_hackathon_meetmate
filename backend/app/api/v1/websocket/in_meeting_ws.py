@@ -24,9 +24,9 @@ INTENT_WINDOW_SEC = 25.0
 ROLLING_RETENTION_SEC = 120.0
 RECAP_MAX_WINDOW_SEC = 120.0
 INTENT_SPEECH_MS = 10_000.0
-INTENT_GUARD_SEC = 20.0
-RECAP_SPEECH_MS = 60_000.0
-RECAP_GUARD_SEC = 75.0
+INTENT_GUARD_SEC = 10.0
+RECAP_SPEECH_MS = 45_000.0
+RECAP_GUARD_SEC = 45.0
 RECAP_DELAY_SEC = 1.5
 
 
@@ -120,12 +120,38 @@ def _append_final_chunk(stream_state, chunk: FinalTranscriptChunk, now: float) -
     _prune_stream_state(stream_state)
 
 
-def _select_window_chunks(stream_state, window_sec: float) -> List[FinalTranscriptChunk]:
-    if not stream_state.rolling_window:
+def _update_last_transcript(stream_state, chunk: FinalTranscriptChunk, seq: int, is_final: bool, now: float) -> None:
+    stream_state.last_transcript_seq = max(stream_state.last_transcript_seq, seq)
+    stream_state.last_transcript_chunk = chunk
+    stream_state.last_transcript_is_final = is_final
+    if not is_final:
+        stream_state.last_partial_seq = seq
+        stream_state.last_partial_chunk = chunk
+    if stream_state.last_intent_tick_at <= 0.0:
+        stream_state.last_intent_tick_at = now
+    if stream_state.last_recap_tick_at <= 0.0:
+        stream_state.last_recap_tick_at = now
+
+
+def _select_window_chunks(stream_state, window_sec: float, include_partial: bool = False) -> List[FinalTranscriptChunk]:
+    if not stream_state.rolling_window and not (include_partial and stream_state.last_partial_chunk):
         return []
-    anchor = stream_state.max_seen_time_end or stream_state.rolling_window[-1].time_end
+    anchor = stream_state.max_seen_time_end or 0.0
+    if stream_state.rolling_window:
+        anchor = max(anchor, stream_state.rolling_window[-1].time_end)
+    if include_partial and stream_state.last_partial_chunk:
+        anchor = max(anchor, stream_state.last_partial_chunk.time_end)
     cutoff = anchor - window_sec
     chunks = [chunk for chunk in stream_state.rolling_window if chunk.time_end >= cutoff]
+    if include_partial and stream_state.last_partial_chunk:
+        partial = stream_state.last_partial_chunk
+        if partial.time_end >= cutoff:
+            if not chunks or (
+                partial.time_end != chunks[-1].time_end
+                or partial.text != chunks[-1].text
+                or partial.speaker != chunks[-1].speaker
+            ):
+                chunks.append(partial)
     chunks.sort(key=lambda chunk: (chunk.time_end, chunk.seq))
     return chunks
 
@@ -145,7 +171,7 @@ def _select_recap_chunks(stream_state) -> List[FinalTranscriptChunk]:
 
 
 def _should_intent_tick(stream_state, now: float) -> bool:
-    if stream_state.last_final_seq <= stream_state.intent_cursor_seq:
+    if stream_state.last_transcript_seq <= stream_state.intent_cursor_seq:
         return False
     if stream_state.speech_ms_since_intent >= INTENT_SPEECH_MS:
         return True
@@ -155,7 +181,9 @@ def _should_intent_tick(stream_state, now: float) -> bool:
 
 
 def _should_recap_tick(stream_state, now: float) -> bool:
-    if not stream_state.recap_batch:
+    if stream_state.last_transcript_seq <= stream_state.recap_cursor_seq:
+        return False
+    if not stream_state.recap_batch and not stream_state.last_partial_chunk:
         return False
     if stream_state.speech_ms_since_recap >= RECAP_SPEECH_MS:
         return True
@@ -164,8 +192,15 @@ def _should_recap_tick(stream_state, now: float) -> bool:
     return (now - stream_state.last_recap_tick_at) >= RECAP_GUARD_SEC
 
 
-def _run_intent_tick(session_id: str, stream_state, last_chunk: FinalTranscriptChunk, now: float) -> Dict[str, Any]:
-    window_chunks = _select_window_chunks(stream_state, INTENT_WINDOW_SEC)
+def _run_intent_tick(
+    session_id: str,
+    stream_state,
+    last_chunk: FinalTranscriptChunk,
+    last_chunk_is_final: bool,
+    now: float,
+) -> Dict[str, Any]:
+    include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
+    window_chunks = _select_window_chunks(stream_state, INTENT_WINDOW_SEC, include_partial=include_partial)
     window_text = _build_window_text(window_chunks)
     intent_label, intent_slots = predict_intent(window_text, lang=last_chunk.lang)
 
@@ -193,7 +228,7 @@ def _run_intent_tick(session_id: str, stream_state, last_chunk: FinalTranscriptC
     tool_suggestions = _build_tool_suggestions(new_actions, new_risks)
 
     speech_ms_before = stream_state.speech_ms_since_intent
-    stream_state.intent_cursor_seq = stream_state.last_final_seq
+    stream_state.intent_cursor_seq = stream_state.last_transcript_seq
     stream_state.speech_ms_since_intent = 0.0
     stream_state.last_intent_tick_at = now
     stream_state.semantic_intent_label = intent_label
@@ -209,7 +244,7 @@ def _run_intent_tick(session_id: str, stream_state, last_chunk: FinalTranscriptC
             "time_start": last_chunk.time_start,
             "time_end": last_chunk.time_end,
             "speaker": last_chunk.speaker,
-            "is_final": True,
+            "is_final": last_chunk_is_final,
             "confidence": last_chunk.confidence,
             "lang": last_chunk.lang,
         },
@@ -232,19 +267,21 @@ def _run_intent_tick(session_id: str, stream_state, last_chunk: FinalTranscriptC
             "window_sec": INTENT_WINDOW_SEC,
             "window_chunks": len(window_chunks),
             "last_final_seq": stream_state.last_final_seq,
+            "last_transcript_seq": stream_state.last_transcript_seq,
         },
     }
 
 
 def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[str, Any]]:
-    if not stream_state.recap_batch:
-        return None
     batch_seqs = list(stream_state.recap_batch)
     recap_chunks = _select_recap_chunks(stream_state)
+    if not recap_chunks:
+        include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
+        recap_chunks = _select_window_chunks(stream_state, RECAP_MAX_WINDOW_SEC, include_partial=include_partial)
     recap_text = _build_window_text(recap_chunks)
     if not recap_text:
         stream_state.recap_batch.clear()
-        stream_state.recap_cursor_seq = stream_state.last_final_seq
+        stream_state.recap_cursor_seq = stream_state.last_transcript_seq
         stream_state.speech_ms_since_recap = 0.0
         stream_state.last_recap_tick_at = now
         return None
@@ -257,7 +294,7 @@ def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[
     stream_state.last_live_recap = live_recap
 
     speech_ms_before = stream_state.speech_ms_since_recap
-    stream_state.recap_cursor_seq = max(batch_seqs) if batch_seqs else stream_state.recap_cursor_seq
+    stream_state.recap_cursor_seq = stream_state.last_transcript_seq
     stream_state.recap_batch.clear()
     stream_state.speech_ms_since_recap = 0.0
     stream_state.last_recap_tick_at = now
@@ -281,6 +318,7 @@ def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[
             "recap_window_sec": RECAP_MAX_WINDOW_SEC,
             "recap_chunks": len(recap_chunks),
             "last_final_seq": stream_state.last_final_seq,
+            "last_transcript_seq": stream_state.last_transcript_seq,
         },
     }
 
@@ -309,8 +347,7 @@ async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
             if event.get("event") != "transcript_event":
                 continue
             payload = event.get("payload") or {}
-            if not payload.get("is_final", True):
-                continue
+            is_final = bool(payload.get("is_final", True))
 
             try:
                 seq = int(event.get("seq") or 0)
@@ -328,14 +365,16 @@ async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
                 text=payload.get("chunk") or payload.get("text") or "",
             )
             now = time.time()
-            _append_final_chunk(stream_state, chunk, now)
+            _update_last_transcript(stream_state, chunk, seq, is_final, now)
+            if is_final:
+                _append_final_chunk(stream_state, chunk, now)
 
             intent_due = _should_intent_tick(stream_state, now)
             recap_due = _should_recap_tick(stream_state, now)
 
             if intent_due:
                 try:
-                    intent_state = _run_intent_tick(session_id, stream_state, chunk, now)
+                    intent_state = _run_intent_tick(session_id, stream_state, chunk, is_final, now)
                     await _publish_state_event(session_id, intent_state)
                 except Exception:
                     pass
