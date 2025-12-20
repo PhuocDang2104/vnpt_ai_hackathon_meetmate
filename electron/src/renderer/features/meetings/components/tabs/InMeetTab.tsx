@@ -36,6 +36,20 @@ interface InMeetTabProps {
   onEndMeeting: () => void;
 }
 
+type TopicSegmentState = {
+  topic_id?: string;
+  title?: string;
+  start_t?: number;
+  end_t?: number;
+};
+
+type RecapItem = {
+  id: string;
+  t: string;
+  text: string;
+  topic?: string;
+};
+
 export const InMeetTab = ({
   meeting,
   joinPlatform,
@@ -61,6 +75,11 @@ export const InMeetTab = ({
   const [finalTranscript, setFinalTranscript] = useState<
     { id: string; speaker: string; text: string; time: number }[]
   >([]);
+  const [liveRecap, setLiveRecap] = useState<string | null>(null);
+  const [semanticIntent, setSemanticIntent] = useState('NO_INTENT');
+  const [currentTopicId, setCurrentTopicId] = useState('T0');
+  const [topicSegments, setTopicSegments] = useState<TopicSegmentState[]>([]);
+  const [recapItems, setRecapItems] = useState<RecapItem[]>([]);
   const [audioIngestToken, setAudioIngestToken] = useState<string | null>(
     initialAudioIngestToken || null,
   );
@@ -70,6 +89,7 @@ export const InMeetTab = ({
   const feedRef = useRef<WebSocket | null>(null);
   const partialClearRef = useRef<number | null>(null);
   const finalClearRef = useRef<number | null>(null);
+  const lastFinalTimeRef = useRef(0);
   const wsBase = useMemo(() => {
     if (API_URL.startsWith('https://')) return API_URL.replace(/^https:/i, 'wss:').replace(/\/$/, '');
     if (API_URL.startsWith('http://')) return API_URL.replace(/^http:/i, 'ws:').replace(/\/$/, '');
@@ -92,6 +112,19 @@ export const InMeetTab = ({
     const scoped = risks.filter(r => r.meetingId === meeting.id).slice(0, 3);
     return scoped.length > 0 ? scoped : risks.slice(0, 2);
   }, [meeting.id]);
+
+  const currentTopicTitle = useMemo(() => {
+    const match = topicSegments.find(seg => seg.topic_id === currentTopicId);
+    return match?.title || currentTopicId || 'T0';
+  }, [currentTopicId, topicSegments]);
+
+  const topicLog = useMemo(() => {
+    return topicSegments.slice(-3).map((seg, idx) => ({
+      id: `${seg.topic_id || 'topic'}-${idx}`,
+      time: formatDuration(Math.max(0, Math.floor(Number(seg.start_t || 0)))),
+      text: seg.title || seg.topic_id || 'Topic',
+    }));
+  }, [topicSegments]);
 
   useEffect(() => {
     if (initialAudioIngestToken) {
@@ -150,9 +183,43 @@ export const InMeetTab = ({
             }
           }
           if (isFinal && text) {
+            lastFinalTimeRef.current = Number(time) || 0;
             setFinalTranscript(prev =>
               [...prev, { id: String(data.seq || Date.now()), speaker, text, time }].slice(-120),
             );
+          }
+        } else if (data?.event === 'state') {
+          const p = data.payload || {};
+          if (typeof p.semantic_intent_label === 'string') {
+            setSemanticIntent(p.semantic_intent_label || 'NO_INTENT');
+          }
+          if (typeof p.current_topic_id === 'string' && p.current_topic_id) {
+            setCurrentTopicId(p.current_topic_id);
+          }
+          if (Array.isArray(p.topic_segments)) {
+            setTopicSegments(p.topic_segments);
+          }
+          if (typeof p.live_recap === 'string' && p.live_recap.trim()) {
+            const recapText = p.live_recap.trim();
+            setLiveRecap(recapText);
+            setRecapItems(prev => {
+              if (prev.length && prev[prev.length - 1].text === recapText) {
+                return prev;
+              }
+              const nextTopicId =
+                (typeof p.current_topic_id === 'string' && p.current_topic_id) || currentTopicId || 'T0';
+              const nextSegments = Array.isArray(p.topic_segments) ? p.topic_segments : topicSegments;
+              const topicTitle =
+                nextSegments.find((seg: TopicSegmentState) => seg.topic_id === nextTopicId)?.title || nextTopicId;
+              const timeLabel = formatDuration(Math.max(0, Math.floor(lastFinalTimeRef.current || 0)));
+              const entry: RecapItem = {
+                id: `${Date.now()}`,
+                t: timeLabel,
+                text: recapText,
+                topic: topicTitle,
+              };
+              return [...prev, entry].slice(-5);
+            });
           }
         }
       } catch (_e) {
@@ -205,6 +272,10 @@ export const InMeetTab = ({
             livePartial={livePartial}
             liveFinal={liveFinal}
             finalTranscriptCount={finalTranscript.length}
+            liveRecap={liveRecap}
+            semanticIntent={semanticIntent}
+            currentTopicTitle={currentTopicTitle}
+            topicLog={topicLog}
             joinPlatform={joinPlatform}
             joinLink={joinLink}
             feedStatus={feedStatus}
@@ -217,7 +288,7 @@ export const InMeetTab = ({
             onFetchAudioToken={handleFetchAudioToken}
             onReconnect={handleReconnect}
           />
-          <LiveRecapPanel />
+          <LiveRecapPanel recapItems={recapItems} currentTopicTitle={currentTopicTitle} />
         </div>
 
         <div className="inmeet-column inmeet-column--side">
@@ -238,6 +309,10 @@ interface TranscriptPanelProps {
   livePartial: { speaker: string; text: string; time: number } | null;
   liveFinal: { speaker: string; text: string; time: number } | null;
   finalTranscriptCount: number;
+  liveRecap: string | null;
+  semanticIntent: string;
+  currentTopicTitle: string;
+  topicLog: { id: string; time: string; text: string }[];
   joinPlatform: 'gomeet' | 'gmeet';
   joinLink: string;
   feedStatus: WsStatus;
@@ -307,6 +382,10 @@ const LiveTranscriptPanel = ({
   livePartial,
   liveFinal,
   finalTranscriptCount,
+  liveRecap,
+  semanticIntent,
+  currentTopicTitle,
+  topicLog,
   joinPlatform,
   joinLink,
   feedStatus,
@@ -489,10 +568,7 @@ const LiveTranscriptPanel = ({
               <div className="live-signal-label">Recap</div>
               <div className="live-signal-bubble">
                 <div className="live-signal-bubble__content">
-                  <p>
-                    Core Banking tiến độ 68%. Batch processing đang tối ưu, cần 2 senior dev để giữ timeline 01/01.
-                    Security: còn 3 medium issues, đang fix trước go-live.
-                  </p>
+                  <p>{liveRecap || 'Chưa có recap.'}</p>
                 </div>
               </div>
             </div>
@@ -500,29 +576,27 @@ const LiveTranscriptPanel = ({
             <div className="live-signal-card__section live-signal-card__inline">
               <div>
                 <div className="live-signal-label">Intent</div>
-                <div className="pill pill--live">NO_INTENT</div>
+                <div className="pill pill--live">{semanticIntent || 'NO_INTENT'}</div>
               </div>
               <div>
                 <div className="live-signal-label">Topic</div>
-                <div className="pill">Core Banking Performance</div>
+                <div className="pill">{currentTopicTitle || 'T0'}</div>
               </div>
             </div>
 
             <div className="live-signal-card__section">
               <div className="live-signal-label">Topic log (3-5 phút)</div>
               <div className="topic-log">
-                <div className="topic-log__item">
-                  <span className="topic-log__time">00:45</span>
-                  <span className="topic-log__text">Status update</span>
-                </div>
-                <div className="topic-log__item">
-                  <span className="topic-log__time">01:10</span>
-                  <span className="topic-log__text">Performance & risk</span>
-                </div>
-                <div className="topic-log__item">
-                  <span className="topic-log__time">01:40</span>
-                  <span className="topic-log__text">Resource decision</span>
-                </div>
+                {topicLog.length === 0 ? (
+                  <div className="empty-state empty-state--inline">Chưa có topic log.</div>
+                ) : (
+                  topicLog.map(item => (
+                    <div key={item.id} className="topic-log__item">
+                      <span className="topic-log__time">{item.time}</span>
+                      <span className="topic-log__text">{item.text}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -532,12 +606,14 @@ const LiveTranscriptPanel = ({
   );
 };
 
-const LiveRecapPanel = () => {
-  const recap = [
-    { id: 'rc1', t: '00:45', text: 'Tiến độ Core Banking đạt 68%, milestone 3 đang SIT.', topic: 'Status' },
-    { id: 'rc2', t: '01:10', text: 'Nguy cơ delay 2 tuần nếu không thêm 2 senior dev.', topic: 'Risk' },
-    { id: 'rc3', t: '01:40', text: 'Đề xuất điều chuyển resources từ Mobile team trong 4 tuần.', topic: 'Decision' },
-  ];
+const LiveRecapPanel = ({
+  recapItems,
+  currentTopicTitle,
+}: {
+  recapItems: RecapItem[];
+  currentTopicTitle: string;
+}) => {
+  const topicLabel = currentTopicTitle || 'T0';
 
   return (
     <div className="recap-panel">
@@ -548,19 +624,23 @@ const LiveRecapPanel = () => {
         </div>
         <span className="meta-chip">
           <Calendar size={12} />
-          Topic: Core Banking Performance
+          Topic: {topicLabel}
         </span>
       </div>
       <div className="recap-list">
-        {recap.map(item => (
-          <div key={item.id} className="recap-item">
-            <div className="recap-item__time">{item.t}</div>
-            <div className="recap-item__body">
-              <div className="recap-item__topic">{item.topic}</div>
-              <p>{item.text}</p>
+        {recapItems.length === 0 ? (
+          <div className="empty-state empty-state--inline">Chưa có recap.</div>
+        ) : (
+          recapItems.map(item => (
+            <div key={item.id} className="recap-item">
+              <div className="recap-item__time">{item.t}</div>
+              <div className="recap-item__body">
+                <div className="recap-item__topic">{item.topic || topicLabel}</div>
+                <p>{item.text}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
