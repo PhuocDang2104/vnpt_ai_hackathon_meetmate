@@ -53,6 +53,39 @@ pytest --cov=app --cov-report=html
 pytest -v
 ```
 
+## Google Meet → MeetMate bridge (SmartVoice)
+
+Script: `backend/tests/gmeet_bridge_ingest.py`
+
+What it does:
+- Creates a MeetMate realtime session (`POST /api/v1/sessions`) and fetches `audio_ingest_token`.
+- Opens WS `/api/v1/ws/audio/{session_id}?token=...&stt=1` to stream audio into backend → SmartVoice.
+- Audio source:
+  - Real Google Meet Media API: implement in `_gmeet_audio_frames` (recv-only PCM16 16k mono).
+  - Fallback (dev/demo): set `BRIDGE_WAV_PATH` to a local WAV/MP3; it streams as if from Meet.
+
+Env:
+- `MEET_URL` (required): Google Meet link.
+- `MEETMATE_HTTP_BASE`: e.g., `https://vnpt-ai-hackathon-meetmate.onrender.com`
+- `MEETMATE_LANGUAGE_CODE`: default `vi-VN`
+- `MEETMATE_FRAME_MS`: default `250`
+- `MEETMATE_TARGET_SR`: default `16000`
+- `MEETMATE_SESSION_ID`: optional fixed session id
+- `MEETMATE_STT`: `1` to force STT
+- `BRIDGE_WAV_PATH`: optional, to use local audio instead of Meet stream.
+
+Run (fallback WAV demo):
+```powershell
+cd backend/tests
+$env:MEET_URL="https://meet.google.com/your-link"
+$env:BRIDGE_WAV_PATH="C:\Users\ADMIN\Desktop\vnpt_meetmate\vnpt_ai_hackathon\backend\tests\resources\Chapter-1-Conversation-2.mp3"
+python gmeet_bridge_ingest.py
+```
+
+To go live with Google Meet Media API:
+- Replace `_gmeet_audio_frames` with actual SDK code that yields 250ms PCM16 mono 16k frames.
+- Keep the start message schema and frame size unchanged.
+
 ## Test Categories
 
 ### Unit Tests

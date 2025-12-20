@@ -60,8 +60,9 @@ export const InMeetTab = ({
     if (API_URL.startsWith('http://')) return API_URL.replace(/^http:/i, 'ws:').replace(/\/$/, '');
     return API_URL.replace(/\/$/, '');
   }, []);
-  const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${streamSessionId}`, [wsBase, streamSessionId]);
-  const audioEndpoint = useMemo(() => `${wsBase}/api/v1/ws/audio/${streamSessionId}`, [wsBase, streamSessionId]);
+  const sessionIdForStream = streamSessionId || meeting.id;
+  const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
+  const audioEndpoint = useMemo(() => `${wsBase}/api/v1/ws/audio/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
 
   const transcript = useMemo(
     () => transcriptChunks.filter(chunk => chunk.meetingId === meeting.id).slice(0, 8),
@@ -146,7 +147,7 @@ export const InMeetTab = ({
     setIsTokenLoading(true);
     setTokenError(null);
     try {
-      const res = await sessionsApi.registerSource(streamSessionId);
+      const res = await sessionsApi.registerSource(sessionIdForStream);
       setAudioIngestToken(res.audio_ingest_token);
     } catch (err) {
       console.error('Failed to register source:', err);
@@ -171,6 +172,8 @@ export const InMeetTab = ({
             audioWsUrl={audioEndpoint}
             tokenError={tokenError}
             isTokenLoading={isTokenLoading}
+            meetingId={meeting.id}
+            sessionId={sessionIdForStream}
             onFetchAudioToken={handleFetchAudioToken}
             onReconnect={handleReconnect}
           />
@@ -202,6 +205,8 @@ interface TranscriptPanelProps {
   audioWsUrl: string;
   tokenError: string | null;
   isTokenLoading: boolean;
+  meetingId: string;
+  sessionId: string;
   onFetchAudioToken: () => void;
   onReconnect: () => void;
 }
@@ -269,6 +274,8 @@ const LiveTranscriptPanel = ({
   audioWsUrl,
   tokenError,
   isTokenLoading,
+  meetingId,
+  sessionId,
   onFetchAudioToken,
   onReconnect,
 }: TranscriptPanelProps) => {
@@ -302,8 +309,15 @@ const LiveTranscriptPanel = ({
   }, [feedStatus, lastTranscriptAt]);
   const audioWithToken = useMemo(() => {
     if (!audioIngestToken) return null;
-    return `${audioWsUrl}?token=${audioIngestToken}`;
+    return `${audioWsUrl}?token=${audioIngestToken}&stt=1`;
   }, [audioIngestToken, audioWsUrl]);
+  const captureUrl = useMemo(() => {
+    if (!sessionId) return null;
+    const params = new URLSearchParams();
+    params.set('session', sessionId);
+    if (audioIngestToken) params.set('token', audioIngestToken);
+    return `#/app/meetings/${meetingId}/capture?${params.toString()}`;
+  }, [audioIngestToken, meetingId, sessionId]);
 
   return (
     <div className="transcript-panel transcript-panel--glass">
@@ -381,6 +395,19 @@ const LiveTranscriptPanel = ({
                 {audioWithToken && (
                   <div className="pill pill--accent" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     WS audio: {audioWithToken}
+                  </div>
+                )}
+                {captureUrl && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button
+                      className="btn btn--secondary btn--sm"
+                      onClick={() => window.open(captureUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      Mở MeetMate Capture (Chrome tab audio)
+                    </button>
+                    <span className="form-hint">
+                      Mở tab mới, chọn Chrome Tab và tick &quot;Share tab audio&quot; để stream 16k PCM S16LE.
+                    </span>
                   </div>
                 )}
               </>

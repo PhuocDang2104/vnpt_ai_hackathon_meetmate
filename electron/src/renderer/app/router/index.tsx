@@ -1,4 +1,4 @@
-import { createHashRouter } from 'react-router-dom'
+giimport { createHashRouter } from 'react-router-dom'
 import AppShell from '../layout/AppShell'
 import Dashboard from '../routes/Dashboard'
 import Calendar from '../routes/Calendar'
@@ -6,6 +6,8 @@ import Meetings from '../routes/Meetings'
 import MeetingPre from '../routes/Meetings/MeetingPre'
 import MeetingIn from '../routes/Meetings/MeetingIn'
 import MeetingPost from '../routes/Meetings/MeetingPost'
+import MeetingDock from '../routes/Meetings/MeetingDock'
+import MeetingCapture from '../routes/Meetings/MeetingCapture'
 import Projects from '../routes/Projects'
 import ProjectDetail from '../routes/Projects/ProjectDetail'
 import KnowledgeHub from '../routes/KnowledgeHub'
@@ -44,6 +46,14 @@ const router = createHashRouter([
       {
         path: 'meetings/:meetingId/detail',
         element: <MeetingDetail />,
+      },
+      {
+        path: 'meetings/:meetingId/dock',
+        element: <MeetingDock />,
+      },
+      {
+        path: 'meetings/:meetingId/capture',
+        element: <MeetingCapture />,
       },
       {
         path: 'meetings/:meetingId',
