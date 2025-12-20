@@ -8,10 +8,10 @@ settings = get_settings()
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
-    pool_size=3,          # small pool for limited CPU/DB
-    max_overflow=2,       # allow brief burst
-    pool_recycle=120,     # recycle to avoid stale
-    pool_timeout=10,       # fail fast on exhaustion
+    pool_size=settings.db_pool_size,            # configurable via env
+    max_overflow=settings.db_max_overflow,      # configurable via env
+    pool_recycle=settings.db_pool_recycle,      # recycle to avoid stale
+    pool_timeout=settings.db_pool_timeout,      # wait longer before failing
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
