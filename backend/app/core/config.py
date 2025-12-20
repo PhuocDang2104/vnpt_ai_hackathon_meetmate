@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     smartvoice_token_key: str = ''
     smartvoice_auth_url: str = ''  # optional: exchange token_id/token_key for access_token
     smartvoice_model: str = 'fast_streaming'
+
+    # VNPT GoMeet (control APIs for join URL)
+    gomeet_api_base_url: str = ''  # e.g. https://gomesainterk06.vnpt.vn/api/v1
+    gomeet_partner_token: str = ''  # Bearer token for GoMeet StartNewMeeting
+    gomeet_timeout_seconds: int = 15
     
     # AI Model settings
     groq_model: str = 'llama-3.3-70b-versatile'

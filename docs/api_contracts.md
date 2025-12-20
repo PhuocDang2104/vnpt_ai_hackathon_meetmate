@@ -5,6 +5,7 @@
 ### REST
 - `POST /api/v1/sessions` – tạo realtime session, trả WS URLs + ingest policy.
 - `POST /api/v1/sessions/{session_id}/sources?platform=vnpt_gomeet` – cấp `source_id` + `audio_ingest_token` cho bridge đẩy raw audio.
+- `POST /api/v1/in-meeting/gomeet/join-url` – tạo/join phòng GoMeet và trả `full_join_url` đã gắn `sessionId` + ingest token.
 
 ### WebSockets
 - `WS /api/v1/ws/audio/{session_id}?token=...` – raw audio ingress (production).
