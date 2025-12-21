@@ -106,8 +106,8 @@ export const Login: React.FC = () => {
 
         <div className="auth-demo-info">
           <p><strong>Demo Account:</strong></p>
-          <p>Email: nguyenvana@lpbank.vn</p>
-          <p>Password: demo123</p>
+          <p>Email: vnpt@gmail.com</p>
+          <p>Password: vnpt1234</p>
         </div>
       </div>
 
