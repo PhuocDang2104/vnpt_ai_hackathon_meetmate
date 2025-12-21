@@ -14,7 +14,7 @@ MeetMate chuẩn hóa vòng đời cuộc họp cho doanh nghiệp BFSI/LPBank: 
 ## Mục lục
 - **Product**: [Overview](#overview) · [Problem Summary](#problem-summary) · [Solution Overview (Pre/In/Post)](#solution-overview-preinpost) · [Product Goals & Target Users](#product-goals--target-users)
 - **Architecture**: [SAAR AI Architecture](#saar-ai-architecture) · [System Architecture (4 Layers)](#system-architecture-4-layers) · [AI Components (VNPT Platform)](#ai-components-vnpt-platform) · [Architecture Diagrams](#architecture-diagrams)
-- **Build & Ops**: [Key Capabilities](#key-capabilities) · [Tech Stack](#tech-stack) · [Repository Structure](#repository-structure) · [Quickstart (1 command)](#quickstart-1-command) · [Development](#development) · [Configuration](#configuration) · [API & Realtime](#api--realtime) · [Data Model](#data-model) · [RAG & Knowledge Hub](#rag--knowledge-hub) · [Security & Compliance](#security--compliance) · [Observability & KPIs](#observability--kpis) · [Deployment](#deployment) · [Testing](#testing)
+- **Build & Ops**: [Key Capabilities](#key-capabilities) · [Tech Stack](#tech-stack) · [Repository Structure](#repository-structure) · [Quickstart (1 command)](#quickstart-1-command) · [Development](#development) · [Configuration](#configuration) · [API & Realtime](#api--realtime) · [Data Model](#data-model) · [RAG & Knowledge Hub](#rag--knowledge-hub) · [Security & Compliance](#security--compliance) · [Observability & KPIs](#observability--kpis) · [Deployment](#deployment) · [Test Automation Guide](#test-automation-guide)
 - **Project**: [Roadmap](#roadmap) · [Docs](#docs) · [Development Team](#development-team) · [Mentor Acknowledgements](#mentor-acknowledgements) · [Contributing](#contributing)
 
 ## Overview
@@ -284,12 +284,32 @@ Core entities:
 - MVP cloud: Supabase + Render + Vercel (see `docs/DEPLOYMENT.md`).
 - Production: private VPC/on-prem, WORM storage, audit + retention.
 
-## Testing
-```powershell
-cd backend
-pytest
+## Test Automation Guide
+**Tiêu chí**: có script tự động, ổn định, chạy lặp 3 lần. Repo đã có `scripts/run_tests.sh` để chạy toàn bộ test backend (unit + integration) 3 lần liên tiếp.
+
+### Phạm vi
+- Backend unit tests: `backend/tests/unit`
+- Backend integration tests (FastAPI TestClient, không cần DB ngoài): `backend/tests/integration`
+- Bỏ qua các test audio/WS thủ công: `backend/tests/test_audio_ws.py`, `backend/tests/test_audio_ingest_ws.py`, `backend/tests/test_ingest_ws.py`
+
+### Yêu cầu môi trường
+- Python 3.11+
+- `pip install -r requirements.txt`
+- Không cần Postgres/Supabase (test dùng in-memory/mock)
+
+### Cách chạy
+Từ root repo:
+```bash
+bash scripts/run_tests.sh
 ```
-See `backend/tests/README.md` for WS scripts and realtime demos.
+Script sẽ:
+- Thiết lập `PYTHONPATH` để backend import được.
+- Chạy `pytest -q backend/tests/unit backend/tests/integration` 3 vòng liên tiếp.
+- Dừng ngay nếu có lỗi.
+
+### Ghi chú ổn định
+- Chạy một vòng: `PYTHONPATH=backend pytest -q backend/tests/unit backend/tests/integration`
+- Nếu thêm test mới cần network hoặc DB thật, cập nhật script hoặc đánh dấu skip để giữ bộ smoke này ổn định.
 
 ## Roadmap
 - GĐ0: join meeting + realtime ASR + live recap + post summary.
