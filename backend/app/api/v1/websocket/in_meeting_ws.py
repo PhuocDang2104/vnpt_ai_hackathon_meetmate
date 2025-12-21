@@ -69,6 +69,69 @@ def _merge_list(existing: List[Dict[str, Any]], new_items: List[Dict[str, Any]],
     return merged
 
 
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _intent_to_adr(intent_label: str, intent_slots: Dict[str, Any], fallback_text: str) -> Dict[str, List[Dict[str, Any]]]:
+    source_text = _clean_text(
+        intent_slots.get("source_text")
+        or intent_slots.get("evidence")
+        or intent_slots.get("text")
+        or fallback_text
+    )
+    if not source_text:
+        return {"actions": [], "decisions": [], "risks": []}
+
+    if intent_label == "ACTION_COMMAND":
+        task = _clean_text(intent_slots.get("task") or source_text)
+        if not task:
+            return {"actions": [], "decisions": [], "risks": []}
+        return {
+            "actions": [{
+                "task": task,
+                "owner": intent_slots.get("owner"),
+                "due_date": intent_slots.get("due_date"),
+                "priority": intent_slots.get("priority") or "medium",
+                "source_text": source_text,
+            }],
+            "decisions": [],
+            "risks": [],
+        }
+    if intent_label == "DECISION_STATEMENT":
+        title = _clean_text(intent_slots.get("title") or source_text)
+        if not title:
+            return {"actions": [], "decisions": [], "risks": []}
+        return {
+            "actions": [],
+            "decisions": [{
+                "title": title,
+                "rationale": intent_slots.get("rationale"),
+                "impact": intent_slots.get("impact"),
+                "source_text": source_text,
+            }],
+            "risks": [],
+        }
+    if intent_label == "RISK_STATEMENT":
+        desc = _clean_text(intent_slots.get("risk") or source_text)
+        if not desc:
+            return {"actions": [], "decisions": [], "risks": []}
+        return {
+            "actions": [],
+            "decisions": [],
+            "risks": [{
+                "desc": desc,
+                "severity": intent_slots.get("severity") or "medium",
+                "mitigation": intent_slots.get("mitigation"),
+                "owner": intent_slots.get("owner"),
+                "source_text": source_text,
+            }],
+        }
+    return {"actions": [], "decisions": [], "risks": []}
+
+
 def _build_tool_suggestions(new_actions: List[Dict[str, Any]], new_risks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     suggestions = []
     for action in new_actions or []:
@@ -221,6 +284,14 @@ def _run_intent_tick(
     new_actions = adr.get("actions", [])
     new_decisions = adr.get("decisions", [])
     new_risks = adr.get("risks", [])
+
+    intent_adr = _intent_to_adr(intent_label, intent_slots, last_chunk.text)
+    if intent_adr.get("actions"):
+        new_actions = _merge_list(new_actions, intent_adr.get("actions", []), key="task")
+    if intent_adr.get("decisions"):
+        new_decisions = _merge_list(new_decisions, intent_adr.get("decisions", []), key="title")
+    if intent_adr.get("risks"):
+        new_risks = _merge_list(new_risks, intent_adr.get("risks", []), key="desc")
 
     stream_state.actions = _merge_list(stream_state.actions, new_actions, key="task")
     stream_state.decisions = _merge_list(stream_state.decisions, new_decisions, key="title")

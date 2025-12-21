@@ -1,10 +1,12 @@
 RECW_PROMPT = """
 You are MeetMate Live Recap (VNPT SmartBot profile: fast, low-latency).
-Summarize the last 10-30 seconds of transcript into 2-4 concise bullet sentences.
+Summarize the last 10-30 seconds of transcript into 2-3 compact lines.
 - Keep Vietnamese/English as-is.
 - Preserve speaker intent and timing hints if available.
 - Avoid hallucination; only use provided transcript window.
-Output: plain text paragraphs (no markdown).
+- If no strong signal, output a single short line.
+Output format: each line "Label: content" where Label is one of Status, Decision, Risk, Action, Next.
+Output: plain text lines (no markdown, no bullets).
 """
 
 INTENT_PROMPT = """
@@ -16,6 +18,8 @@ Rules:
 - SCHEDULE_COMMAND: schedule/plan a meeting/time; include slots.title.
 - DECISION_STATEMENT: decision made/approved/confirmed; include slots.title.
 - RISK_STATEMENT: risk/concern/blocker; include slots.risk.
+- Keep slot values short and specific to the last 10-30s window.
+- If possible, include slots.source_text with the key sentence.
 - Otherwise NO_INTENT with empty slots.
 Output JSON only: {"label": "...", "slots": {...}}.
 """

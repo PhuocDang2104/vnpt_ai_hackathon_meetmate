@@ -61,15 +61,15 @@ def _llm_intent(text: str, lang: str | None) -> Optional[Tuple[str, Dict[str, An
 def _heuristic_intent(text: str) -> Tuple[str, Dict[str, Any]]:
     lower = (text or "").lower()
     if "?" in lower or "ai" in lower:
-        return "ASK_AI", {"question": text}
+        return "ASK_AI", {"question": text, "source_text": text}
     if any(k in lower for k in ["giao", "assign", "task"]):
-        return "ACTION_COMMAND", {"task": text}
+        return "ACTION_COMMAND", {"task": text, "source_text": text}
     if any(k in lower for k in ["lịch", "schedule", "meeting"]):
-        return "SCHEDULE_COMMAND", {"title": text}
+        return "SCHEDULE_COMMAND", {"title": text, "source_text": text}
     if any(k in lower for k in ["quyết định", "decide", "chốt"]):
-        return "DECISION_STATEMENT", {"title": text}
+        return "DECISION_STATEMENT", {"title": text, "source_text": text}
     if any(k in lower for k in ["rủi ro", "risk", "lo ngại"]):
-        return "RISK_STATEMENT", {"risk": text}
+        return "RISK_STATEMENT", {"risk": text, "source_text": text}
     return "NO_INTENT", {}
 
 

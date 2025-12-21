@@ -51,12 +51,14 @@ type AdrAction = {
   owner?: string;
   deadline?: string;
   priority?: string;
+  detail?: string;
 };
 
 type AdrDecision = {
   id: string;
   description: string;
   confirmedBy?: string;
+  detail?: string;
 };
 
 type AdrRisk = {
@@ -64,6 +66,7 @@ type AdrRisk = {
   description: string;
   severity?: string;
   owner?: string;
+  detail?: string;
 };
 
 const normalizeAdrActions = (items: any[]): AdrAction[] => {
@@ -74,6 +77,13 @@ const normalizeAdrActions = (items: any[]): AdrAction[] => {
     owner: item?.owner ? String(item.owner) : undefined,
     deadline: item?.due_date ? String(item.due_date) : undefined,
     priority: item?.priority ? String(item.priority) : undefined,
+    detail: item?.source_text
+      ? String(item.source_text)
+      : item?.sourceText
+      ? String(item.sourceText)
+      : item?.detail
+      ? String(item.detail)
+      : undefined,
   }));
 };
 
@@ -83,6 +93,13 @@ const normalizeAdrDecisions = (items: any[]): AdrDecision[] => {
     id: String(item?.id || item?.title || `decision-${idx}`),
     description: String(item?.title || item?.source_text || 'Decision'),
     confirmedBy: item?.confirmed_by ? String(item.confirmed_by) : undefined,
+    detail: item?.rationale
+      ? String(item.rationale)
+      : item?.source_text
+      ? String(item.source_text)
+      : item?.sourceText
+      ? String(item.sourceText)
+      : undefined,
   }));
 };
 
@@ -93,6 +110,13 @@ const normalizeAdrRisks = (items: any[]): AdrRisk[] => {
     description: String(item?.desc || item?.source_text || 'Risk'),
     severity: item?.severity ? String(item.severity) : undefined,
     owner: item?.owner ? String(item.owner) : undefined,
+    detail: item?.mitigation
+      ? String(item.mitigation)
+      : item?.source_text
+      ? String(item.source_text)
+      : item?.sourceText
+      ? String(item.sourceText)
+      : undefined,
   }));
 };
 
@@ -164,6 +188,7 @@ export const InMeetTab = ({
       owner: item.owner.displayName,
       deadline: item.deadline.toISOString(),
       priority: item.priority,
+      detail: item.sourceText,
     }));
   }, [meeting.id]);
 
@@ -174,6 +199,7 @@ export const InMeetTab = ({
       id: item.id,
       description: item.description,
       confirmedBy: item.confirmedBy.displayName,
+      detail: item.rationale,
     }));
   }, [meeting.id]);
 
@@ -185,6 +211,7 @@ export const InMeetTab = ({
       description: item.description,
       severity: item.severity,
       owner: item.owner.displayName,
+      detail: item.mitigation,
     }));
   }, [meeting.id]);
 
@@ -781,6 +808,7 @@ const AdrPanel = ({
               <div key={item.id} className="detected-item detected-item--action">
                 <div className="detected-item__content">
                   <div className="detected-item__text">{item.description}</div>
+                  {item.detail && <div className="detected-item__detail">{item.detail}</div>}
                   <div className="detected-item__meta">
                     <User size={12} />
                     {item.owner || 'Chưa gán'}
@@ -813,6 +841,7 @@ const AdrPanel = ({
               <div key={item.id} className="detected-item detected-item--decision">
                 <div className="detected-item__content">
                   <div className="detected-item__text">{item.description}</div>
+                  {item.detail && <div className="detected-item__detail">{item.detail}</div>}
                   <div className="detected-item__meta">
                     <Check size={12} />
                     Xác nhận bởi {item.confirmedBy || 'SmartBot'}
@@ -834,6 +863,7 @@ const AdrPanel = ({
               >
                 <div className="detected-item__content">
                   <div className="detected-item__text">{item.description}</div>
+                  {item.detail && <div className="detected-item__detail">{item.detail}</div>}
                   <span className={`badge badge--${item.severity === 'high' ? 'error' : 'warning'}`}>
                     {item.severity || 'medium'}
                   </span>
