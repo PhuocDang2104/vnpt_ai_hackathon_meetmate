@@ -1,452 +1,326 @@
-# 🌐 MeetMate (VNPT AI Hackathon) – AI Meeting Co-Host for LPBank PMO
+﻿# MeetMate - Agentic S/CRAG AI Meeting Co-Host for BFSI (VNPT AI Hackathon 2025 | Track 1)
+
+**Desktop app/web + Meetings (VNPT GoMeet | Google Meet) add-in concept | VNPT AI API | S/CRAG | Tool-Calling**
+
+MeetMate chuẩn hóa vòng đời cuộc họp cho doanh nghiệp BFSI/LPBank: thu thập ngữ cảnh trước họp, hỗ trợ realtime trong họp, và phát hành biên bản + action items sau họp - tất cả có trích dẫn, audit và kiểm soát quyền truy cập.
 
 <p align="center">
-  <b>Electron desktop + FastAPI backend + Gemini AI + RAG over pgvector.</b><br>
-  <i>Built for Head of PMO / Program Directors: dependable minutes, action tracking, knowledge recall, and auditability.</i>
+  <img src="https://img.shields.io/badge/Desktop-Electron%20%2B%20Vite%20%2B%20React-1f6feb" alt="Desktop">
+  <img src="https://img.shields.io/badge/Backend-Weebsocket%20%2B%20FastAPI%20%2B%20Postgres-2da44e" alt="Backend">
+  <img src="https://img.shields.io/badge/AI-LangGraph%20%2B%20RAG%20%2B%20Tool--Calling-f97316" alt="AI">
+  <img src="https://img.shields.io/badge/VNPT-SmartVoice%20%7C%20SmartBot%20%7C%20SmartReader%20%7C%20SmartUX-0ea5e9" alt="VNPT">
 </p>
 
----
+## Mục lục
+- **Product**: [Overview](#overview) · [Problem Summary](#problem-summary) · [Solution Overview (Pre/In/Post)](#solution-overview-preinpost) · [Product Goals & Target Users](#product-goals--target-users)
+- **Architecture**: [SAAR AI Architecture](#saar-ai-architecture) · [System Architecture (4 Layers)](#system-architecture-4-layers) · [AI Components (VNPT Platform)](#ai-components-vnpt-platform) · [Architecture Diagrams](#architecture-diagrams)
+- **Build & Ops**: [Key Capabilities](#key-capabilities) · [Tech Stack](#tech-stack) · [Repository Structure](#repository-structure) · [Quickstart (1 command)](#quickstart-1-command) · [Development](#development) · [Configuration](#configuration) · [API & Realtime](#api--realtime) · [Data Model](#data-model) · [RAG & Knowledge Hub](#rag--knowledge-hub) · [Security & Compliance](#security--compliance) · [Observability & KPIs](#observability--kpis) · [Deployment](#deployment) · [Testing](#testing)
+- **Project**: [Roadmap](#roadmap) · [Docs](#docs) · [Development Team](#development-team) · [Mentor Acknowledgements](#mentor-acknowledgements) · [Contributing](#contributing)
 
-## 🚀 Quick Start (Updated 05/12/2024)
+## Overview
+- Stage-aware assistant: Pre -> In -> Post meeting với router LangGraph.
+- Realtime pipeline: audio WS -> SmartVoice STT -> session bus -> live transcript/recap/ADR trên UI.
+- RAG permission-aware: pgvector + metadata filter, "no-source-no-answer".
+- Tool-calling: gợi ý tạo task/đặt lịch/tài liệu với human-in-the-loop.
+- Audit-ready: structured outputs, citations, log và replay theo `meeting_id`.
 
-### 1. Start Database
-```bash
-cd infra
-docker compose up -d
+## Problem Summary
+- Biên bản họp ghi thủ công, phát hành chậm; sai/thiếu ý chính, khó tổng hợp action items.
+- Người họp phải vừa lắng nghe vừa ghi chép -> mất tập trung, bỏ sót quyết định.
+- Tài liệu rải rác (LOffice, SharePoint/OneDrive, email, wiki) -> khó tra nhanh khi đang họp.
+- Sau họp khó theo dõi công việc: ai làm gì, deadline khi nào; cập nhật tiến độ rời rạc.
+- Yêu cầu bảo mật và kiểm toán trong môi trường BFSI (LPBank) rất nghiêm ngặt.
+
+## Solution Overview (Pre/In/Post)
+| Stage | Mục tiêu | Đầu ra chính | Hệ thống liên quan |
+| --- | --- | --- | --- |
+| Pre-Meeting | Chuẩn bị agenda và pre-read theo ngữ cảnh | Agenda + pre-read pack + câu hỏi trước họp | RAG, Calendar, Docs |
+| In-Meeting | Hỗ trợ realtime | Live transcript, live recap, ADR (Actions/Decisions/Risks), tool suggestions | SmartVoice STT, WS, LangGraph |
+| Post-Meeting | Tổng kết và theo dõi | Executive summary, MoM, highlights, sync tasks | LLM strong + RAG long-context |
+
+## Product Goals & Target Users
+- MVP: chuẩn hóa biên bản + action items tự động, tích hợp Teams/LOffice.
+- Mở rộng: phân tích xu hướng họp theo dự án/đơn vị, trợ lý đa kênh, organizational memory.
+- Đối tượng: khối kinh doanh, công nghệ, vận hành, pháp chế, rủi ro, PMO.
+
+## SAAR AI Architecture
+SAAR (Self-aware Adaptive Agentic RAG) là xương sống AI của MeetMate:
+- Stage-aware routing: 1 entry graph, điều phối Pre/In/Post theo stage, sensitivity, SLA.
+- Shared `MeetingState`: giữ agenda/transcript/ADR/RAG hits nhất quán xuyên suốt.
+- RAG-first + graded retrieval: hybrid search, ACL filter, no-source-no-answer.
+- Self-reflect/corrective loop: kiểm định và bổ sung context trước khi trả lời.
+- Tool-calling là output hạng nhất: schema-based, idempotent, có UI confirm và audit log.
+
+![AI Architecture SAAR](docs/assets/saar-architecture.png)
+
+
+### Stage-aware Router Policy (recommended)
+| Stage | SLA | Model Profile | Tools | Notes |
+| --- | --- | --- | --- | --- |
+| Pre-Meeting | Near-realtime/BATCH | Strong (long-context) | calendar, rag_search, send_pre_read | History-aware RAG, citations bắt buộc |
+| In-Meeting | Realtime | Fast streaming | create_task, schedule, attach_doc, poll_vote | Tick scheduler + rolling window |
+| Post-Meeting | Batch | Strong (long-context) | generate_minutes, sync_task, render_highlights | Map-reduce, compliance archive |
+
+## System Architecture (5 Layers)
+- Client Layer: Electron desktop, Teams add-in/bot, overlay Live Notes/Ask AI.
+- Communication Layer: WebSocket/gRPC cho audio -> ASR; REST cho RAG/summary/task; event bus.
+- Backend Core & Data: meeting ingest, transcription, realtime agent, RAG service, minutes/action service, archive.
+- AI/ML Layer: ASR (SmartVoice/Whisper), diarization, LLM serving, LangGraph orchestration.
+- Cloud, Deployment & Security
+
+![System Architecture Layers](docs/assets/system-architecture-4-layers.png)
+
+## AI Components (VNPT Platform)
+- SmartVoice: streaming STT (vi/en), diarization hooks.
+- SmartBot (intent + LLM): intent routing, recap, ADR extraction, tool-calling.
+- SmartReader: OCR + text extraction, ingest vào Knowledge Hub.
+- SmartUX: Collect end-users' UX Metric for frontend / UX improvements.
+- Optional: sentiment/insights, voice verification, vnSocial (marketing use case).
+
+## Architecture Diagrams
+
+### System Architecture
+![System Architecture](docs/assets/architecture.png)
+
+
+### Cloud, Deployment & Security Layer
+![Deployment Architecture](docs/assets/deployment.png)
+
+
+## Key Capabilities
+- Realtime WS flow: `POST /api/v1/sessions` -> `WS /api/v1/ws/audio` -> `WS /api/v1/ws/frontend`.
+- SmartVoice streaming STT (gRPC) với diarization hooks; fallback WS ingest cho dev/test.
+- Live recap + topic segmentation + ADR extraction (actions/decisions/risks).
+- Knowledge Hub: upload -> chunk -> embed -> pgvector search -> grounded Q&A.
+- Tool suggestions: create task/schedule/attach docs; executor + audit layer.
+- Compliance-ready: citations, PII masking plan, retention và audit trails.
+
+## Tech Stack
+- Client: Electron + Vite + React + TypeScript.
+- Backend: FastAPI, Uvicorn, SQLAlchemy, Pydantic, WebSocket.
+- AI: LangChain + LangGraph, Gemini client, SmartBot intent stubs, WhisperX (test).
+- RAG: pgvector, Jina Embeddings API (optional), metadata filters.
+- Infra: Docker Compose (backend + Postgres), seeded SQL init.
+
+## Repository Structure
+```
+vnpt_ai_hackathon/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   └── v1/
+│   │   │       ├── endpoints/         # REST: meetings, transcripts, knowledge, minutes...
+│   │   │       └── websocket/         # realtime WS handlers
+│   │   ├── core/                      # settings, security, logging
+│   │   ├── llm/                       # LangGraph router, chains, prompts, tools
+│   │   ├── services/                  # business logic + realtime pipeline
+│   │   ├── vectorstore/               # pgvector + LightRAG retrieval
+│   │   ├── models/                    # SQLAlchemy models
+│   │   ├── schemas/                   # Pydantic schemas
+│   │   └── workers/                   # background tasks
+│   ├── alembic/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── requirements.txt
+├── electron/
+│   ├── src/
+│   │   ├── main/                      # Electron main process
+│   │   ├── preload/                   # contextBridge
+│   │   └── renderer/
+│   │       ├── app/                   # routes + layouts
+│   │       ├── features/              # domain features (pre/in/post, knowledge)
+│   │       ├── components/            # shared UI
+│   │       ├── services/              # API clients
+│   │       └── store/                 # state
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.ts
+├── infra/
+│   ├── docker-compose.yml             # Postgres + backend containers
+│   ├── env/                           # env templates
+│   └── postgres/init/                 # init SQL + seeds
+├── docs/
+│   ├── CHANGELOG.md
+│   ├── CHANGELOG_history/
+│   ├── DEPLOYMENT.md
+│   ├── in_meeting_flow.md
+│   ├── real_time_transcript.md
+│   ├── transcript_ingest_api.md
+│   ├── rag_architecture.md
+│   ├── MeetMate _ SAAR – Self-aware Adaptive Agentic RAG.md
+│   ├── AI architecture/
+│   └── round_2/
+├── Techni_docs_2/                     # security, test plan, UX metrics
+├── scripts/
+│   ├── dev_start.sh
+│   ├── migrate.sh
+│   ├── seed_data.py
+│   └── setup_local.sh
+├── .gitignore
+├── requirements.txt
+├── CHANGELOG_20251208.md
+└── README.md
 ```
 
-### 2. Start Backend
+## Quickstart (1 command)
+### Docker (backend + DB, recommended)
+```powershell
+cd infra && docker compose up -d --build
+```
 ```bash
-cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+cd infra && docker compose up -d --build
+```
+- API: `http://localhost:8000`
+- DB: `localhost:5433` (user/pass/db: `meetmate`)
+- Init SQL: `infra/postgres/init/01_init_extensions.sql`, `02_schema.sql`, `03_seed_mock.sql`
 
-# Set Gemini API key
-export GEMINI_API_KEY="your_gemini_api_key"
+Optional:
+- Copy env template: `infra/env/.env.local.example` -> `infra/env/.env.local`
+- Pass API keys: `$env:GEMINI_API_KEY="your_key"` before running compose
 
-# Run
-python -m uvicorn app.main:app --reload --port 8000
+Stop containers:
+```powershell
+cd infra && docker compose down
 ```
 
-### 3. Start Frontend
-```bash
+### Frontend (Electron)
+```powershell
 cd electron
 npm install
 npm run dev
 ```
 
-### 4. Test AI Chat
-```bash
-# Check AI status
-curl http://localhost:8000/api/v1/chat/status
-
-# Chat with AI
-curl -X POST http://localhost:8000/api/v1/chat/message \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Xin chào!"}'
-```
-
-### 📖 Full Changelog
-See [docs/CHANGELOG.md](docs/CHANGELOG.md) for detailed updates.
-
----
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Desktop-Electron%20%7C%20Vite%20%7C%20React-blue" alt="Electron badge">
-  <img src="https://img.shields.io/badge/Backend-FastAPI%20%7C%20Postgres%20%7C%20pgvector-green" alt="Backend badge">
-  <img src="https://img.shields.io/badge/AI-LangGraph%20%7C%20RAG%20%7C%20Tool--calling-orange" alt="AI badge">
-  <img src="https://img.shields.io/badge/Usecase-PMO%20Minutes%20%2F%20Actions%20%2F%20Audit-purple" alt="PMO badge">
-</p>
-
----
-
-##  Overview
-- Problem: PMO teams run many cross-functional meetings; manual minutes arrive late, actions are fragmented, and auditors need clean traceability.
-- Personas: Head of PMO / Program Director, project managers, cross-functional leads; they need live recap, clear owners/deadlines, and fast document recall.
-- Solution: Desktop co-host for Pre/In/Post phases, LangGraph agents with RAG, task and calendar hooks, and permission-aware storage.
-- Outcome: Faster minutes, higher action completion, auditable decisions tied to sources.
-
-##  Highlights
-- Stage-aware agents: Pre (agenda/pre-read), In (live transcript + ADR mining), Post (executive minutes + highlights).
-- RAG + pgvector: permission-aware retrieval with citations; “no source, no answer” guardrail.
-- Tool-calling ready: stubs for calendar/task/doc APIs; WebSocket channel for live events.
-- Demo-friendly: seeded Postgres, stub LLM/ASR flows, predictable outputs for fast iterations.
-
-## 📁 Repo layout
-```
-vnpt_ai_hackathon/
-├── electron/                         # Desktop app: Electron + React + TS
-│   ├── src/
-│   │   ├── main/                     # Electron main process
-│   │   │   ├── main.ts               # Electron entry, creates BrowserWindow -> frontend
-│   │   │   ├── preload.ts            # main preload
-│   │   │   ├── windows/
-│   │   │   │   ├── mainWindow.ts
-│   │   │   │   └── settingsWindow.ts
-│   │   │   ├── ipc/
-│   │   │   │   ├── logIpc.ts
-│   │   │   │   └── systemIpc.ts
-│   │   │   └── security/
-│   │   │       └── appSecurity.ts
-│   │   │
-│   │   ├── preload/                  # contextBridge bridges
-│   │   │   ├── apiBridge.ts          # window.api.* -> HTTP/WebSocket backend
-│   │   │   └── fsBridge.ts
-│   │   │
-│   │   ├── renderer/                 # React + TS UI (MeetMate)
-│   │   │   ├── app/                  # “app router” style for Electron
-│   │   │   │   ├── AppRoot.tsx       # App entry: Router, Theme, QueryClient...
-│   │   │   │   ├── layout/
-│   │   │   │   │   ├── AppShell.tsx  # Main layout: Sidebar + Topbar + content
-│   │   │   │   │   ├── Sidebar.tsx   # Nav: Dashboard, Calendar, Meetings, ...
-│   │   │   │   │   ├── Topbar.tsx    # Search, profile, AI status, org switch...
-│   │   │   │   │   └── MeetingLayout.tsx
-│   │   │   │   │                     # Layout for meeting pages (header + tabs)
-│   │   │   │   ├── router/
-│   │   │   │   │   └── index.tsx     # React Router config (Next-like app routes)
-│   │   │   │   └── routes/           # Page-level routes
-│   │   │   │       ├── dashboard/
-│   │   │   │       │   └── DashboardPage.tsx
-│   │   │   │       ├── calendar/
-│   │   │   │       │   └── CalendarPage.tsx
-│   │   │   │       ├── meetings/
-│   │   │   │       │   ├── MeetingsListPage.tsx  # list all meetings + filters
-│   │   │   │       │   └── [meetingId]/          # dynamic route
-│   │   │   │       │       ├── index.tsx         # meeting overview + timeline Pre/In/Post
-│   │   │   │       │       ├── pre.tsx           # Pre-meeting view (agenda, docs, AI prep)
-│   │   │   │       │       ├── in.tsx            # In-meeting view (live panel)
-│   │   │   │       │       └── post.tsx          # Post-meeting view (summary, follow-ups)
-│   │   │   │       ├── live/
-│   │   │   │       │   └── LiveMeetingPage.tsx   # full-screen live meeting UI (recording banner)
-│   │   │   │       ├── knowledge-hub/
-│   │   │   │       │   └── KnowledgeHubPage.tsx  # RAG search + AI Q&A
-│   │   │   │       ├── tasks/
-│   │   │   │       │   └── TasksPage.tsx         # actions (Planner/Jira sync)
-│   │   │   │       └── settings/
-│   │   │   │           └── SettingsPage.tsx      # integrations, org, AI prefs
-│   │   │   │
-│   │   │   ├── features/              # by domain/feature
-│   │   │   │   ├── dashboard/
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── StatsCards.tsx
-│   │   │   │   │   │   └── AiInsightsPanel.tsx
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── dashboardApi.ts       # call backend /dashboard, /stats
-│   │   │   │   │   └── hooks/
-│   │   │   │   │       └── useDashboardData.ts
-│   │   │   │   ├── calendar/
-│   │   │   │   │   ├── components/               # calendar grid, date picker...
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── calendarApi.ts
-│   │   │   │   │   └── hooks/
-│   │   │   │   │       └── useCalendarMeetings.ts
-│   │   │   │   ├── meetings/
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── MeetingList.tsx
-│   │   │   │   │   │   ├── MeetingHeader.tsx
-│   │   │   │   │   │   ├── MeetingTimeline.tsx   # Pre → In → Post timeline
-│   │   │   │   │   │   └── MeetingMetaPanel.tsx
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── meetingsApi.ts        # /meetings, /meetings/{id}
-│   │   │   │   │   └── store.ts                  # Zustand slice for list + filters
-│   │   │   │   ├── inMeeting/                    # live meeting feature
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── LiveBanner.tsx        # “Recording • Live”
-│   │   │   │   │   │   ├── LiveTranscriptPanel.tsx # transcript by speaker
-│   │   │   │   │   │   ├── LiveActionsPanel.tsx  # auto actions/decisions/risks
-│   │   │   │   │   │   └── LiveAiSidebar.tsx     # in-meeting Q&A
-│   │   │   │   │   ├── hooks/
-│   │   │   │   │   │   ├── useInMeetingWs.ts     # WS /ws/in-meeting/{session_id}
-│   │   │   │   │   │   └── useInMeetingHttp.ts   # REST /in-meeting/message
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── inMeetingApi.ts       # in-meeting endpoints
-│   │   │   │   │   └── store.ts                  # live state: transcript, partial tokens...
-│   │   │   │   ├── postMeeting/
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── SummaryPanel.tsx      # exec summary + citations
-│   │   │   │   │   │   └── TimelineReview.tsx    # decisions, risks, actions timeline
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── postMeetingApi.ts
-│   │   │   │   │   └── hooks/
-│   │   │   │   │       └── usePostMeetingSummary.ts
-│   │   │   │   ├── knowledge/
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── KnowledgeSearchBar.tsx
-│   │   │   │   │   │   └── KnowledgeResults.tsx
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── knowledgeApi.ts       # /rag/query, /knowledge/search
-│   │   │   │   │   └── hooks/
-│   │   │   │   │       └── useKnowledgeSearch.ts
-│   │   │   │   ├── tasks/
-│   │   │   │   │   ├── components/
-│   │   │   │   │   │   ├── TaskList.tsx
-│   │   │   │   │   │   └── TaskFilters.tsx
-│   │   │   │   │   ├── api/
-│   │   │   │   │   │   └── tasksApi.ts           # Planner/Jira sync
-│   │   │   │   │   └── store.ts                  # task board state
-│   │   │   │   └── settings/
-│   │   │   │       ├── components/
-│   │   │   │       │   ├── IntegrationList.tsx
-│   │   │   │       │   └── OrgPreferencesForm.tsx
-│   │   │   │       ├── api/
-│   │   │   │       │   └── settingsApi.ts
-│   │   │   │       └── hooks/
-│   │   │   │           └── useSettings.ts
-│   │   │   │
-│   │   │   ├── components/           # shared primitives
-│   │   │   │   ├── ui/               # button, input, select, badge, card...
-│   │   │   │   ├── layout/           # SplitPane, ScrollArea
-│   │   │   │   └── icons/            # logo, status icons
-│   │   │   │
-│   │   │   ├── lib/                  # helpers (apiClient, wsClient, date, formatting...)
-│   │   │   ├── store/                # global store (user, UI)
-│   │   │   ├── styles/               # globals, themes, meeting styles
-│   │   │   ├── assets/               # fonts, icons, logo
-│   │   │   └── index.tsx             # renderer entry: render <AppRoot />
-│   │   │
-│   │   ├── shared/                   # shared types between main & renderer
-│   │   │   ├── dto/                  # ChatMessage, Meeting, etc.
-│   │   │   └── constants.ts
-│   │   └── index.d.ts                # typings for window.api, env
-│   │
-│   ├── public/
-│   ├── package.json
-│   ├── tsconfig.node.json
-│   ├── tsconfig.renderer.json
-│   ├── vite.config.mts
-│   ├── electron.vite.config.mts
-│   └── README.md
-│
-├── backend/                          # FastAPI + LangChain + RAG + multi-agents
-│   ├── app/
-│   │   ├── main.py                   # FastAPI entry, include_router, mount /docs
-│   │   ├── core/                     # config & infra
-│   │   │   ├── config.py             # settings (OpenAI key, DB URL, CORS, WS origins…)
-│   │   │   ├── logging.py
-│   │   │   └── security.py           # auth/JWT if needed
-│   │   │
-│   │   ├── api/                      # routers (HTTP + WebSocket)
-│   │   │   ├── deps.py               # shared Depends (get_db, get_current_user…)
-│   │   │   └── v1/
-│   │   │       ├── endpoints/
-│   │   │       │   ├── auth.py
-│   │   │       │   ├── users.py
-│   │   │       │   ├── meetings.py        # CRUD meeting, participants, metadata
-│   │   │       │   ├── documents.py       # upload/list docs for RAG
-│   │   │       │   ├── in_meeting.py      # REST for in-meeting agent
-│   │   │       │   ├── pre_meeting.py     # REST for pre-meeting agent
-│   │   │       │   ├── post_meeting.py    # REST for post-meeting agent
-│   │   │       │   ├── rag.py             # /rag/query, /rag/reindex,...
-│   │   │       │   ├── agents.py          # /agent/list, /agent/config...
-│   │   │       │   ├── chat_http.py       # generic chat REST
-│   │   │       │   └── health.py          # health/ready
-│   │   │       └── websocket/
-│   │   │           └── in_meeting_ws.py   # /ws/in-meeting/{session_id} – streaming
-│   │   │
-│   │   ├── db/                       # Postgres + pgvector
-│   │   │   ├── base.py               # declarative_base()
-│   │   │   ├── session.py            # SessionLocal, engine
-│   │   │   └── init_db.py            # init schema, enable pgvector if needed
-│   │   │
-│   │   ├── models/                   # SQLAlchemy models
-│   │   │   ├── user.py
-│   │   │   ├── meeting.py
-│   │   │   ├── document.py
-│   │   │   ├── embedding.py
-│   │   │   ├── chat_session.py
-│   │   │   └── __init__.py
-│   │   │
-│   │   ├── schemas/                  # Pydantic schemas
-│   │   │   ├── user.py
-│   │   │   ├── auth.py
-│   │   │   ├── meeting.py
-│   │   │   ├── document.py
-│   │   │   ├── chat.py
-│   │   │   ├── in_meeting.py
-│   │   │   └── rag.py
-│   │   │
-│   │   ├── services/                 # business logic (non-LLM)
-│   │   │   ├── user_service.py
-│   │   │   ├── meeting_service.py
-│   │   │   ├── document_service.py
-│   │   │   ├── chat_service.py
-│   │   │   └── auth_service.py
-│   │   │
-│   │   ├── llm/                      # LangChain/LangGraph flows
-│   │   │   ├── clients/
-│   │   │   │   ├── openai_client.py       # wrapper for OpenAI/VNPT/Azure
-│   │   │   │   └── embedding_client.py
-│   │   │   ├── prompts/
-│   │   │   │   ├── in_meeting_prompts.py
-│   │   │   │   ├── pre_meeting_prompts.py
-│   │   │   │   └── post_meeting_prompts.py
-│   │   │   ├── chains/
-│   │   │   │   ├── in_meeting_chain.py    # (stub) graph/chain per phase
-│   │   │   │   ├── pre_meeting_chain.py
-│   │   │   │   ├── post_meeting_chain.py
-│   │   │   │   └── rag_chain.py           # shared RAG chain
-│   │   │   ├── graphs/                    # LangGraph stage flows
-│   │   │   │   ├── in_meeting_graph.py    # primary graph
-│   │   │   │   ├── pre_meeting_graph.py
-│   │   │   │   ├── post_meeting_graph.py
-│   │   │   │   └── router.py              # select graph by stage
-│   │   │   ├── agents/
-│   │   │   │   ├── base_agent.py
-│   │   │   │   ├── in_meeting_agent.py
-│   │   │   │   ├── pre_meeting_agent.py
-│   │   │   │   └── post_meeting_agent.py
-│   │   │   └── tools/                     # LangChain tools
-│   │   │       ├── fs_tool.py
-│   │   │       ├── search_tool.py
-│   │   │       ├── calendar_tool.py
-│   │   │       └── http_tool.py
-│   │   │
-│   │   ├── vectorstore/              # pgvector + ingestion
-│   │   │   ├── pgvector_client.py
-│   │   │   ├── retrieval.py
-│   │   │   └── ingestion/
-│   │   │       ├── loaders.py
-│   │   │       └── pipelines.py
-│   │   │
-│   │   ├── websocket/                # connection pool, broadcast
-│   │   │   ├── manager.py
-│   │   │   └── events.py
-│   │   │
-│   │   ├── workers/                  # background tasks
-│   │   │   ├── background_tasks.py
-│   │   │   └── indexing_worker.py
-│   │   │
-│   │   └── __init__.py
-│   │
-│   ├── alembic/                      # migrations for Postgres + pgvector
-│   │   ├── env.py
-│   │   ├── script.py.mako
-│   │   └── versions/
-│   │       └── *.py
-│   │
-│   ├── tests/
-│   │   ├── api/
-│   │   ├── llm/
-│   │   └── vectorstore/
-│   ├── requirements.txt
-│   └── README.md
-│
-├── infra/                            # dev/prod infra
-│   ├── docker-compose.yml            # Postgres + backend (+ optional pgadmin/electron dev)
-│   ├── postgres/
-│   │   ├── Dockerfile                # Postgres image with pgvector
-│   │   └── init/                     # init/seed scripts run on first create
-│   │       ├── 01_init_extensions.sql   # CREATE EXTENSION IF NOT EXISTS "vector";
-│   │       ├── 02_schema_minimal.sql    # optional: minimal schema if skipping alembic
-│   │       └── 03_seed_mock.sql         # mock data (users, meetings, docs...)
-│   ├── env/
-│   │   ├── .env.backend.example
-│   │   ├── .env.electron.example
-│   │   └── .env.db.example
-│   └── README.md
-│
-├── scripts/                          # dev/ops helpers
-│   ├── dev_start.sh                  # run backend + DB + electron dev
-│   ├── migrate.sh                    # alembic upgrade head
-│   └── seed_data.py                  # extra seeding beyond SQL init
-│
-├── docs/                             # architecture, flows, contracts
-│   ├── architecture.md               # Electron <-> FastAPI <-> DB
-│   ├── rag_design.md                 # RAG + pgvector design
-│   ├── in_meeting_flow.md            # in-meeting agent flow (graph/state)
-│   └── api_contracts.md              # API contracts (HTTP + WS)
-│
-└── README.md    # This file (project overview and setup)
-```
-
-##  Quickstart (dev)
-### 1) Database + Backend via Docker (recommended)
-```powershell
-cd infra
-copy env\.env.local.example env\.env.local   # optional: set GEMINI_API_KEY, overrides default DB creds if you change them
-$env:GEMINI_API_KEY="your_key"               # optional: pass through to backend container
-docker compose up -d --build                 # starts Postgres + FastAPI backend
-```
-- DB exposed on host `localhost:5433`, backend on `http://localhost:8000`.
-- Init SQL runs automatically on first boot: `infra/postgres/init/01_init_extensions.sql`, `02_schema.sql`, `03_seed_mock.sql`.
-- Code is volume-mounted for hot reload; backend command already uses `--reload`.
-
-### 2) Backend (local venv, optional instead of Docker)
+## Development
+### Backend (local venv)
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r ..\requirements.txt
-copy ..\infra\env\.env.development.example .env
-$env:PYTHONPATH="."
+copy ..\infra\env\.env.local.example .\.env.local
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 3) Electron desktop (dev vs packaged)
-```powershell
-cd electron
-npm install
-# dev: Vite + Electron, renderer served on localhost, but runs inside Electron shell
-npm run dev
-```
-- Production-style run without localhost:
-  ```powershell
-  cd electron
-  npm run build         # builds renderer to dist/renderer
-  npx electron .        # loads built renderer via file:// (no Vite dev server)
-  ```
-- To ship installers later, add a packager (e.g., electron-builder) and point BrowserWindow to the built renderer (`dist/renderer/index.html` is already handled in main.ts).
+### Quick helper scripts (optional)
+- `scripts/dev_start.sh`: boot infra + backend (macOS/Linux).
+- `scripts/setup_local.sh`: full local setup (macOS/Linux).
 
-### 4) Extra seed (optional)
+### Seed data (optional)
 ```powershell
 cd scripts
 python seed_data.py
 ```
-Or add SQL to `infra/postgres/init/03_seed_mock.sql` before first container startup.
 
-##  Database schema & data changes (for data engineers)
-1) Pull repo and start DB:
-   ```powershell
-   cd infra
-   docker compose up -d
-   ```
-2) Set up backend venv:
-   ```powershell
-   cd backend
-   python -m venv .venv
-   .\.venv\Scripts\activate
-   pip install -r ..\requirements.txt
-   copy ..\infra\env\.env.development.example .env
-   $env:PYTHONPATH="."
-   ```
-3) Modify schema:
-   - Edit SQLAlchemy models in `backend/app/models/*.py`.
-   - Generate migration:
-     ```powershell
-     alembic revision -m "describe change" --autogenerate
-     ```
-     Migration files land in `backend/alembic/versions/`.
-   - Apply migration:
-     ```powershell
-     alembic upgrade head
-     ```
-     (Or run `../scripts/migrate.sh` from backend.)
-4) Seed/change data:
-   - SQL path: edit `infra/postgres/init/03_seed_mock.sql` (only for brand-new containers).
-   - Python path: add logic to `scripts/seed_data.py` and run it with env set (`PYTHONPATH=.` from backend root).
-   - For bulk ingestion to vectorstore, extend `backend/app/vectorstore/ingestion/pipelines.py`.
-5) Run backend for verification:
-   ```powershell
-   uvicorn app.main:app --reload --port 8000
-   ```
+### Realtime dev/test
+- WS ingest (no audio): `backend/tests/test_ingest_ws.py`
+- Audio ingest: `backend/tests/test_audio_ingest_ws.py`, `backend/tests/test_audio_ws.py`
+- WhisperX diarization demo: `backend/tests/selfhost_whisperx_diarize.py`
 
-##  Dev tips
-- Backend base URL: `http://localhost:8000` (CORS open for dev).
-- WebSocket stub: `/api/v1/ws/in-meeting` for live transcript/action events.
-- Stage graphs: `app/llm/graphs/` (pre/in/post) with agent wrappers in `app/llm/agents/`.
-- RAG stub: `app/llm/chains/rag_chain.py` plus `app/vectorstore/pgvector_client.py`.
+## Configuration
+Env is loaded from `backend/.env.local` or `infra/env/.env.local` (if present).
 
-##  Near-term roadmap
-- Finish Electron UI per feature map above.
-- Swap in real ASR/diarization for In-meeting graph.
-- Add migrations for actions/decisions/risks and task sync tables.
-- Wire Microsoft Graph/LOffice adapters via tools layer.
+Key variables:
+- `DATABASE_URL` - PostgreSQL connection string
+- `GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`
+- `JINA_API_KEY`, `JINA_EMBED_MODEL`, `JINA_EMBED_DIMENSIONS`
+- `SMARTVOICE_GRPC_ENDPOINT`, `SMARTVOICE_ACCESS_TOKEN`, `SMARTVOICE_TOKEN_ID`, `SMARTVOICE_TOKEN_KEY`
+- `GOMEET_API_BASE_URL`, `GOMEET_PARTNER_TOKEN`
+- `SUPABASE_S3_*` - object storage (optional)
+- `SMTP_*`, `EMAIL_ENABLED` - email distribution (optional)
+- `CORS_ORIGINS`, `SECRET_KEY`
+
+Env templates: `infra/env/.env.*.example`.
+
+## API & Realtime
+Core endpoints:
+- `POST /api/v1/sessions` - create realtime session (returns WS URLs)
+- `POST /api/v1/sessions/{id}/sources` - get `audio_ingest_token` for bridge
+- `WS /api/v1/ws/audio/{id}?token=...` - raw audio ingress (PCM S16LE 16kHz)
+- `WS /api/v1/ws/in-meeting/{id}` - dev/test transcript ingest
+- `WS /api/v1/ws/frontend/{id}` - live transcript + state for UI
+- `POST /api/v1/rag/query` / `POST /api/v1/knowledge/query` - RAG Q&A
+- `POST /api/v1/transcripts/{meeting_id}/chunks` - ingest transcript chunks
+- `POST /api/v1/minutes/generate` - minutes generation
+
+Target APIs (spec-level, see docs):
+- `POST /meetings/{id}/join`
+- `WS /meetings/{id}/audio`
+- `GET /meetings/{id}/recap/live`
+- `POST /actions`
+- `GET /meetings/{id}/minutes`
+- `POST /highlights/{id}/render`
+
+Specs: `docs/api_contracts.md`, `docs/in_meeting_flow.md`, `docs/real_time_transcript.md`.
+
+## Data Model
+Core entities:
+- `Meeting` - metadata, participants, schedule.
+- `TranscriptChunk` - time-coded transcript by speaker.
+- `ActionItem` - task/owner/deadline/priority.
+- `Decision` - decision title/rationale/impact.
+- `Risk` - risk/mitigation/owner/severity.
+- `Citation` - doc/timecode evidence.
+
+## RAG & Knowledge Hub
+- Ingest: upload -> extract text -> chunk -> embed (Jina) -> pgvector.
+- Search: hybrid vector + metadata filter (meeting/project scope).
+- Answering: grounded prompts, citations; no-source-no-answer.
+- Details: `docs/rag_architecture.md`, `docs/knowledge_vector_search.md`.
+
+## Security & Compliance
+- PII masking + tokenization trước khi gọi external provider (policy-driven).
+- Private link / VPC peering cho endpoint LLM bên ngoài.
+- RBAC/ABAC theo phòng ban/dự án; ACL chặt cho RAG.
+- Audit logs cho tool calls, LLM/RAG queries, và state transitions.
+
+## Observability & KPIs
+- Latency: realtime recap, WS tick scheduling, STT WER.
+- Quality: precision/recall action items; ADR consistency.
+- Usage: Ask-AI per meeting, highlight views, post-meeting Q&A.
+- Cost: token budget per meeting; cached glossary/FAQ.
+
+## Deployment
+- Local dev: Docker Compose (`infra/docker-compose.yml`).
+- MVP cloud: Supabase + Render + Vercel (see `docs/DEPLOYMENT.md`).
+- Production: private VPC/on-prem, WORM storage, audit + retention.
+
+## Testing
+```powershell
+cd backend
+pytest
+```
+See `backend/tests/README.md` for WS scripts and realtime demos.
+
+## Roadmap
+- GĐ0: join meeting + realtime ASR + live recap + post summary.
+- GĐ1: action/decision extractor + task sync + RAG internal.
+- GĐ2: guardrails/compliance archive + quality dashboard + highlights.
+- GĐ3: org-level analytics + multi-channel assistant.
+
+## Docs
+- SAAR spec: `docs/MeetMate _ SAAR – Self-aware Adaptive Agentic RAG.md`
+- Realtime flow: `docs/in_meeting_flow.md`, `docs/real_time_transcript.md`
+- API contracts: `docs/api_contracts.md`, `docs/gomeet_control_api_spec.md`
+- Transcript ingest: `docs/transcript_ingest_api.md`
+- RAG architecture: `docs/rag_architecture.md`, `docs/knowledge_vector_search.md`
+- Deployment guide: `docs/DEPLOYMENT.md`
+- AI architecture deep dive: `docs/AI architecture/`
+- Data engineer guide: `docs/data_engineer_guide.md`
+- Security/test/UX plans: `Techni_docs_2/`
+
+## Development Team
+**SAVINAI** - Saigon Vietnam AI
+- **Đặng Như Phước (Leader)**: Software Engineer, AI Engineer, Backend Engineer. Kiến trúc backend FastAPI, realtime WS pipeline (audio -> STT -> bus), LangGraph routing, RAG/ADR flow, tool-calling, và Docker/dev infra.
+- **Thái Hoài An**: Data Engineer, Software Engineer, AI Engineer. Mô hình dữ liệu + schema, pgvector/embeddings, ingest tài liệu (OCR/SmartReader), seed/demo data, và tối ưu truy vấn RAG.
+- **Trương Minh Đạt**: BA, GTM Analyst. Thu thập yêu cầu nghiệp vụ BFSI, chuẩn hóa use-case Pre/In/Post, KPIs, và định hướng go-to-market/documentation.
+- **Hoàng Minh Quân**: End-user Analyst, Product Deployment, BA. UX research, test/validation, kế hoạch triển khai, và hỗ trợ rollout/training.
+
+## Mentor Acknowledgements
+Xin chân thành cảm ơn các mentor đã đồng hành cùng đội thi trong Vòng 2 - Track 1: The Dreamer, hỗ trợ định hướng công nghệ, kiến trúc giải pháp và tính khả thi triển khai:
+- **Hồ Minh Nghĩa (@nghiahm1989)**: Tiến sỹ Khoa học máy tính (Học viện FSO - Liên bang Nga), chuyên gia mật mã và ứng dụng AI/GenAI trong tự động hóa; từng là Phó phòng Phát triển phần mềm Ban Cơ yếu Chính phủ, tư vấn chuyển đổi số TPBank; hiện là chuyên gia phụ trách mảng AI tại LPBank.
+- **Nguyễn Phan Khoa Đức (@dukeng96)**: Giám đốc phát triển công nghệ, sản phẩm và giải pháp AI tại VNPT AI; từng học tập tại Đại học Sydney (USYD) và làm việc tại Úc.
+- **Lâm Vũ Dương**: Giám đốc VNPT, hỗ trợ kết nối và định hướng chung cho chương trình.
+- **Thành Đạt**: VNPT GoMeet Software Engineer, hỗ trợ nền tảng họp và tích hợp kỹ thuật.
+
+## Contributing
+Internal hackathon repo. Open an issue or PR; keep API contracts + docs updated.

@@ -4163,6 +4163,7 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 .transcript-live-card {
   background: var(--bg-surface);
@@ -10121,10 +10122,44 @@ a {
 .sidecar-mode .app-shell {
   width: 520px;
   max-width: 100%;
-  min-width: 420px;
+  min-width: 0;
   margin-left: auto;
   border-left: 1px solid var(--border);
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.18);
+}
+.sidecar-mode {
+  overflow-x: hidden;
+}
+.sidecar-mode #root,
+.sidecar-mode .app-shell,
+.sidecar-mode .app-shell__main,
+.sidecar-mode .app-shell__content,
+.sidecar-mode .sidecar-page,
+.sidecar-mode .sidecar-body,
+.sidecar-mode .inmeet-grid,
+.sidecar-mode .transcript-grid,
+.sidecar-mode .transcript-panel,
+.sidecar-mode .live-signal-card,
+.sidecar-mode .recap-panel,
+.sidecar-mode .detected-panel,
+.sidecar-mode .tool-panel {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.sidecar-mode .transcript-header,
+.sidecar-mode .transcript-live-card__header,
+.sidecar-mode .live-signal-card__header,
+.sidecar-mode .recap-panel__header,
+.sidecar-mode .tool-panel__header,
+.sidecar-mode .detected-tabs {
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.sidecar-mode .pill,
+.sidecar-mode .meta-chip {
+  max-width: 100%;
+  white-space: normal;
 }
 .sidecar-mode .app-shell__sidebar {
   display: none;
@@ -10145,6 +10180,54 @@ a {
 }
 .sidecar-mode .inmeet-column--side {
   order: 2;
+}
+.sidecar-mode .btn {
+  white-space: normal;
+  text-align: center;
+}
+.sidecar-mode .sidecar-header__title,
+.sidecar-mode .sidecar-header__eyebrow,
+.sidecar-mode .sidecar-header__meta,
+.sidecar-mode .transcript-live-line__text,
+.sidecar-mode .transcript-card__text,
+.sidecar-mode .live-signal-bubble__content,
+.sidecar-mode .recap-item__body,
+.sidecar-mode .recap-item__body p,
+.sidecar-mode .detected-item__text,
+.sidecar-mode .detected-item__detail,
+.sidecar-mode .topic-log__text,
+.sidecar-mode .tool-card__title,
+.sidecar-mode .tool-card__detail,
+.sidecar-mode .transcript-setup__token {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.sidecar-mode .transcript-live-line__header,
+.sidecar-mode .transcript-live-line__meta,
+.sidecar-mode .transcript-live-card__meta,
+.sidecar-mode .live-signal-card__inline {
+  flex-wrap: wrap;
+}
+.sidecar-mode .transcript-setup__token {
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  text-overflow: unset;
+}
+.sidecar-mode .detected-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+.sidecar-mode .detected-item__meta {
+  flex-wrap: wrap;
+}
+.sidecar-mode .detected-item__actions {
+  align-self: flex-end;
+  flex-wrap: wrap;
+}
+.sidecar-mode .detected-tab {
+  white-space: normal;
 }
 
 .sidecar-page {
