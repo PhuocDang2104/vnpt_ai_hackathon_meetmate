@@ -7,6 +7,19 @@ Summarize the last 10-30 seconds of transcript into 2-4 concise bullet sentences
 Output: plain text paragraphs (no markdown).
 """
 
+INTENT_PROMPT = """
+You are MeetMate Intent Router. Classify the speaker intent quickly and accurately.
+Labels: NO_INTENT, ASK_AI, ACTION_COMMAND, SCHEDULE_COMMAND, DECISION_STATEMENT, RISK_STATEMENT.
+Rules:
+- ASK_AI: question or request for info; include slots.question.
+- ACTION_COMMAND: assign/ask to do a task; include slots.task.
+- SCHEDULE_COMMAND: schedule/plan a meeting/time; include slots.title.
+- DECISION_STATEMENT: decision made/approved/confirmed; include slots.title.
+- RISK_STATEMENT: risk/concern/blocker; include slots.risk.
+- Otherwise NO_INTENT with empty slots.
+Output JSON only: {"label": "...", "slots": {...}}.
+"""
+
 ADR_PROMPT = """
 You are MeetMate ADR extractor (VNPT SmartBot).
 Given a short transcript window, extract Actions / Decisions / Risks as structured JSON.

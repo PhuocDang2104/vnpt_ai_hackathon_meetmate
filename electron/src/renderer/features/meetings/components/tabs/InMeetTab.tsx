@@ -15,12 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
-import {
-  actionItems,
-  decisions,
-  formatDuration,
-  risks,
-} from '../../../../store/mockData';
+import { actionItems, decisions, formatDuration, risks } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
 import { sessionsApi } from '../../../../lib/api/sessions';
@@ -48,6 +43,64 @@ type RecapItem = {
   t: string;
   text: string;
   topic?: string;
+};
+
+type AdrAction = {
+  id: string;
+  description: string;
+  owner?: string;
+  deadline?: string;
+  priority?: string;
+};
+
+type AdrDecision = {
+  id: string;
+  description: string;
+  confirmedBy?: string;
+};
+
+type AdrRisk = {
+  id: string;
+  description: string;
+  severity?: string;
+  owner?: string;
+};
+
+const normalizeAdrActions = (items: any[]): AdrAction[] => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, idx) => ({
+    id: String(item?.id || item?.task || `action-${idx}`),
+    description: String(item?.task || item?.source_text || 'Action item'),
+    owner: item?.owner ? String(item.owner) : undefined,
+    deadline: item?.due_date ? String(item.due_date) : undefined,
+    priority: item?.priority ? String(item.priority) : undefined,
+  }));
+};
+
+const normalizeAdrDecisions = (items: any[]): AdrDecision[] => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, idx) => ({
+    id: String(item?.id || item?.title || `decision-${idx}`),
+    description: String(item?.title || item?.source_text || 'Decision'),
+    confirmedBy: item?.confirmed_by ? String(item.confirmed_by) : undefined,
+  }));
+};
+
+const normalizeAdrRisks = (items: any[]): AdrRisk[] => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, idx) => ({
+    id: String(item?.id || item?.desc || `risk-${idx}`),
+    description: String(item?.desc || item?.source_text || 'Risk'),
+    severity: item?.severity ? String(item.severity) : undefined,
+    owner: item?.owner ? String(item.owner) : undefined,
+  }));
+};
+
+const formatAdrDate = (value?: string) => {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
 
 export const InMeetTab = ({
@@ -80,6 +133,10 @@ export const InMeetTab = ({
   const [currentTopicId, setCurrentTopicId] = useState('T0');
   const [topicSegments, setTopicSegments] = useState<TopicSegmentState[]>([]);
   const [recapItems, setRecapItems] = useState<RecapItem[]>([]);
+  const [liveActions, setLiveActions] = useState<AdrAction[]>([]);
+  const [liveDecisions, setLiveDecisions] = useState<AdrDecision[]>([]);
+  const [liveRisks, setLiveRisks] = useState<AdrRisk[]>([]);
+  const [hasLiveAdr, setHasLiveAdr] = useState(false);
   const [audioIngestToken, setAudioIngestToken] = useState<string | null>(
     initialAudioIngestToken || null,
   );
@@ -98,20 +155,42 @@ export const InMeetTab = ({
   const sessionIdForStream = streamSessionId || meeting.id;
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
 
-  const actions = useMemo(() => {
+  const actions = useMemo<AdrAction[]>(() => {
     const scoped = actionItems.filter(a => a.meetingId === meeting.id).slice(0, 4);
-    return scoped.length > 0 ? scoped : actionItems.slice(0, 3);
+    const source = scoped.length > 0 ? scoped : actionItems.slice(0, 3);
+    return source.map(item => ({
+      id: item.id,
+      description: item.description,
+      owner: item.owner.displayName,
+      deadline: item.deadline.toISOString(),
+      priority: item.priority,
+    }));
   }, [meeting.id]);
 
-  const meetingDecisions = useMemo(() => {
+  const meetingDecisions = useMemo<AdrDecision[]>(() => {
     const scoped = decisions.filter(d => d.meetingId === meeting.id).slice(0, 3);
-    return scoped.length > 0 ? scoped : decisions.slice(0, 2);
+    const source = scoped.length > 0 ? scoped : decisions.slice(0, 2);
+    return source.map(item => ({
+      id: item.id,
+      description: item.description,
+      confirmedBy: item.confirmedBy.displayName,
+    }));
   }, [meeting.id]);
 
-  const meetingRisks = useMemo(() => {
+  const meetingRisks = useMemo<AdrRisk[]>(() => {
     const scoped = risks.filter(r => r.meetingId === meeting.id).slice(0, 3);
-    return scoped.length > 0 ? scoped : risks.slice(0, 2);
+    const source = scoped.length > 0 ? scoped : risks.slice(0, 2);
+    return source.map(item => ({
+      id: item.id,
+      description: item.description,
+      severity: item.severity,
+      owner: item.owner.displayName,
+    }));
   }, [meeting.id]);
+
+  const resolvedActions = hasLiveAdr ? liveActions : actions;
+  const resolvedDecisions = hasLiveAdr ? liveDecisions : meetingDecisions;
+  const resolvedRisks = hasLiveAdr ? liveRisks : meetingRisks;
 
   const currentTopicTitle = useMemo(() => {
     const match = topicSegments.find(seg => seg.topic_id === currentTopicId);
@@ -221,6 +300,18 @@ export const InMeetTab = ({
               return [...prev, entry].slice(-5);
             });
           }
+          if (Array.isArray(p.actions) || Array.isArray(p.decisions) || Array.isArray(p.risks)) {
+            setHasLiveAdr(true);
+          }
+          if (Array.isArray(p.actions)) {
+            setLiveActions(normalizeAdrActions(p.actions));
+          }
+          if (Array.isArray(p.decisions)) {
+            setLiveDecisions(normalizeAdrDecisions(p.decisions));
+          }
+          if (Array.isArray(p.risks)) {
+            setLiveRisks(normalizeAdrRisks(p.risks));
+          }
         }
       } catch (_e) {
         /* ignore */
@@ -293,9 +384,9 @@ export const InMeetTab = ({
 
         <div className="inmeet-column inmeet-column--side">
           <AdrPanel
-            actions={actions}
-            decisions={meetingDecisions}
-            risks={meetingRisks}
+            actions={resolvedActions}
+            decisions={resolvedDecisions}
+            risks={resolvedRisks}
           />
           <ToolSuggestionsPanel />
           <AIAssistantChat meetingId={meeting.id} meetingTitle={meeting.title} />
@@ -651,9 +742,9 @@ const AdrPanel = ({
   decisions: decisionItems,
   risks: riskItems,
 }: {
-  actions: typeof actionItems;
-  decisions: typeof decisions;
-  risks: typeof risks;
+  actions: AdrAction[];
+  decisions: AdrDecision[];
+  risks: AdrRisk[];
 }) => {
   const [activeTab, setActiveTab] = useState<'actions' | 'decisions' | 'risks'>('actions');
 
@@ -692,10 +783,10 @@ const AdrPanel = ({
                   <div className="detected-item__text">{item.description}</div>
                   <div className="detected-item__meta">
                     <User size={12} />
-                    {item.owner.displayName}
+                    {item.owner || 'Chưa gán'}
                     <span className="dot"></span>
                     <Clock size={12} />
-                    {item.deadline.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                    {formatAdrDate(item.deadline)}
                   </div>
                 </div>
                 <div className="detected-item__actions">
@@ -724,7 +815,7 @@ const AdrPanel = ({
                   <div className="detected-item__text">{item.description}</div>
                   <div className="detected-item__meta">
                     <Check size={12} />
-                    Xác nhận bởi {item.confirmedBy.displayName}
+                    Xác nhận bởi {item.confirmedBy || 'SmartBot'}
                   </div>
                 </div>
               </div>
@@ -739,12 +830,12 @@ const AdrPanel = ({
             riskItems.map(item => (
               <div
                 key={item.id}
-                className={`detected-item detected-item--risk detected-item--${item.severity}`}
+                className={`detected-item detected-item--risk detected-item--${item.severity || 'medium'}`}
               >
                 <div className="detected-item__content">
                   <div className="detected-item__text">{item.description}</div>
                   <span className={`badge badge--${item.severity === 'high' ? 'error' : 'warning'}`}>
-                    {item.severity}
+                    {item.severity || 'medium'}
                   </span>
                 </div>
               </div>
