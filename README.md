@@ -39,9 +39,9 @@ MeetMate chuẩn hóa vòng đời cuộc họp cho doanh nghiệp BFSI/LPBank: 
 | Post-Meeting | Tổng kết và theo dõi | Executive summary, MoM, highlights, sync tasks | LLM strong + RAG long-context |
 
 ## Product Goals & Target Users
-- MVP: chuẩn hóa biên bản + action items tự động, tích hợp Teams/LOffice.
-- Mở rộng: phân tích xu hướng họp theo dự án/đơn vị, trợ lý đa kênh, organizational memory.
-- Đối tượng: khối kinh doanh, công nghệ, vận hành, pháp chế, rủi ro, PMO.
+- Product-ready: MeetMate đã vượt mức MVP, hướng tới sản phẩm hoàn thiện với Pre/In/Post end-to-end, realtime co-host, RAG có trích dẫn, và workflow/action sync.
+- Mở rộng: phân tích xu hướng họp theo dự án/đơn vị, trợ lý đa kênh (meetings/desktop/web/room), organizational memory, và compliance archive.
+- Đối tượng: doanh nghiệp lớn/BFSI, enterprise PMO, khối công nghệ, vận hành, pháp chế, rủi ro, kinh doanh, và các đơn vị cần audit/tuân thủ cao.
 
 ## SAAR AI Architecture
 SAAR (Self-aware Adaptive Agentic RAG) là xương sống AI của MeetMate:
