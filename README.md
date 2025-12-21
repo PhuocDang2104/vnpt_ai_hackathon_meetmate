@@ -164,22 +164,31 @@ vnpt_ai_hackathon/
 
 ## Quickstart (1 command)
 ### Docker (backend + DB, recommended)
+Prerequisites: Docker 24+, Docker Compose, ports `8000` (API) và `5433` (Postgres) trống.
+
 ```powershell
-cd infra && docker compose up -d --build
+cd infra
+docker compose up -d --build
 ```
 ```bash
-cd infra && docker compose up -d --build
+cd infra
+docker compose up -d --build
 ```
 - API: `http://localhost:8000`
 - DB: `localhost:5433` (user/pass/db: `meetmate`)
 - Init SQL: `infra/postgres/init/01_init_extensions.sql`, `02_schema.sql`, `03_seed_mock.sql`
 
-Optional:
-- Copy env template: `infra/env/.env.local.example` -> `infra/env/.env.local`
-- Pass API keys: `$env:GEMINI_API_KEY="your_key"` before running compose
-
-Stop containers:
-```powershell
+Quick checks:
+```bash
+curl http://localhost:8000/api/v1/health
+# or open http://localhost:8000/docs
+```
+Logs:
+```bash
+docker compose logs -f backend
+```
+Stop/cleanup:
+```bash
 cd infra && docker compose down
 ```
 
@@ -191,6 +200,44 @@ npm run dev
 ```
 
 ## Development
+### End-to-end (reviewer quick setup)
+1) Tạo env cho backend tại `infra/env/.env.local`:
+```bash
+cat > infra/env/.env.local <<'EOF'
+ENV=development
+DATABASE_URL=postgresql+psycopg2://meetmate:meetmate@postgres:5432/meetmate
+CORS_ORIGINS=*
+OPENAI_API_KEY=
+EOF
+```
+Nếu chạy backend thuần Python (không Docker), đổi host DB thành `localhost:5433`.
+
+2) Khởi chạy Postgres + Backend:
+```bash
+cd infra
+docker compose up -d --build
+```
+PowerShell:
+```powershell
+cd infra
+docker compose up -d --build
+```
+
+3) Chạy Electron UI (dev):
+```bash
+cd electron
+npm ci
+VITE_API_URL=http://localhost:8000 npm run dev
+```
+Electron dev sẽ load `http://localhost:5173`. Nếu cần mở Electron shell: `npx electron .` (yêu cầu đã build main/preload phù hợp).
+
+4) Build gần-production (không tạo installer):
+```bash
+cd electron
+VITE_API_URL=http://localhost:8000 npm run build
+NODE_ENV=production npx electron .
+```
+
 ### Backend (local venv)
 ```powershell
 cd backend
@@ -198,6 +245,7 @@ python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r ..\requirements.txt
 copy ..\infra\env\.env.local.example .\.env.local
+rem If running without Docker, set DATABASE_URL to localhost:5433
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -216,12 +264,18 @@ python seed_data.py
 - Audio ingest: `backend/tests/test_audio_ingest_ws.py`, `backend/tests/test_audio_ws.py`
 - WhisperX diarization demo: `backend/tests/selfhost_whisperx_diarize.py`
 
+### Demo data & login
+DB đã seed kịch bản PMO LPBank. Tất cả user seed dùng mật khẩu `demo123`:
+- Head of PMO: `nguyenvana@lpbank.vn / demo123`
+- Senior PM: `tranthib@lpbank.vn / demo123`
+- CTO (admin): `phamvand@lpbank.vn / demo123`
+
 ## Configuration
 Env is loaded from `backend/.env.local` or `infra/env/.env.local` (if present).
 
 Key variables:
 - `DATABASE_URL` - PostgreSQL connection string
-- `GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`
+- Optional AI keys: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`
 - `JINA_API_KEY`, `JINA_EMBED_MODEL`, `JINA_EMBED_DIMENSIONS`
 - `SMARTVOICE_GRPC_ENDPOINT`, `SMARTVOICE_ACCESS_TOKEN`, `SMARTVOICE_TOKEN_ID`, `SMARTVOICE_TOKEN_KEY`
 - `GOMEET_API_BASE_URL`, `GOMEET_PARTNER_TOKEN`
@@ -283,6 +337,17 @@ Core entities:
 - Local dev: Docker Compose (`infra/docker-compose.yml`).
 - MVP cloud: Supabase + Render + Vercel (see `docs/DEPLOYMENT.md`).
 - Production: private VPC/on-prem, WORM storage, audit + retention.
+
+### Hướng dẫn đóng gói & khởi chạy (end-to-end)
+Tóm tắt nhanh cho reviewer dựng lại toàn bộ sản phẩm (Postgres + FastAPI + Electron):
+1) Clone repo và vào thư mục dự án:
+   `git clone <repo-url>` -> `cd vnpt_ai_hackathon_meetmate`
+2) Yêu cầu tối thiểu: Docker 24+, Node 18+ + npm 9+, Python 3.11+ (nếu chạy backend thuần Python).
+3) Tạo `infra/env/.env.local` (xem mẫu ở mục Development).
+4) Khởi chạy Postgres + Backend: `cd infra && docker compose up -d --build`.
+5) Kiểm tra API: `curl http://localhost:8000/api/v1/health`.
+6) Chạy UI: `cd electron && VITE_API_URL=http://localhost:8000 npm run dev` (PowerShell: set `$env:VITE_API_URL` trước khi chạy).
+7) Dừng/dọn: `cd infra && docker compose down` (thêm `-v` nếu muốn reset seed).
 
 ## Test Automation Guide
 **Tiêu chí**: có script tự động, ổn định, chạy lặp 3 lần. Repo đã có `scripts/run_tests.sh` để chạy toàn bộ test backend (unit + integration) 3 lần liên tiếp.
