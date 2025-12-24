@@ -1,17 +1,17 @@
 import requests
 
+
 class APIClient:
-    def __init__(self, base_url, meeting_id):
-        self.base_url = base_url
-        self.meeting_id = meeting_id
+    def __init__(self, base_url: str, session_id: str):
+        self.base_url = base_url.rstrip("/")
+        self.session_id = session_id
 
     def send_segments(self, segments):
         payload = {
-            "meeting_id": self.meeting_id,
-            "segments": segments
+            "segments": segments,
         }
         requests.post(
-            f"{self.base_url}/api/diarization",
+            f"{self.base_url}/diarization/{self.session_id}",
             json=payload,
-            timeout=3
+            timeout=3,
         )

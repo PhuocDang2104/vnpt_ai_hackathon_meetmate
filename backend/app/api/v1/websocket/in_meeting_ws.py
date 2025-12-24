@@ -59,7 +59,7 @@ def _coerce_float(value: Any, default: float) -> float:
         return float(default)
 
 
-<<<<<<< HEAD
+
 def _match_speaker_by_time(segments, t_start: float, t_end: float):
     best = None
     best_overlap = 0.0
@@ -74,13 +74,13 @@ def _match_speaker_by_time(segments, t_start: float, t_end: float):
         return None
 
     return best
-=======
+
 def _compute_tick_anchor(stream_state) -> float:
     anchor = stream_state.max_seen_time_end or 0.0
     if stream_state.last_partial_chunk:
         anchor = max(anchor, stream_state.last_partial_chunk.time_end)
     return anchor
->>>>>>> refs/remotes/origin/main
+
 
 
 def _prune_stream_state(stream_state) -> None:
