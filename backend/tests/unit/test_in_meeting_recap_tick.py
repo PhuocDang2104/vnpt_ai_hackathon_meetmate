@@ -43,9 +43,13 @@ def test_should_recap_tick_requires_new_transcript_and_interval() -> None:
     assert in_meeting_ws._should_recap_tick(state, now) is False
 
     state.recap_cursor_seq = 4
+    state.max_seen_time_end = 20.0
+    assert in_meeting_ws._should_recap_tick(state, now) is False
+
+    state.max_seen_time_end = 40.0
     assert in_meeting_ws._should_recap_tick(state, now) is True
 
-    state.last_recap_tick_at = now - (in_meeting_ws.RECAP_TICK_SEC - 1)
+    state.last_recap_tick_anchor = 20.0
     assert in_meeting_ws._should_recap_tick(state, now) is False
 
 
@@ -80,8 +84,8 @@ def test_run_recap_tick_updates_cursor_and_payload(monkeypatch) -> None:
     monkeypatch.setattr(in_meeting_ws, "summarize_and_classify", _fake_summary)
 
     state = InMeetingStreamState()
-    c1 = _chunk(1, 0.0, 10.0, "hello")
-    c2 = _chunk(2, 10.0, 20.0, "world")
+    c1 = _chunk(1, 0.0, 20.0, "hello")
+    c2 = _chunk(2, 20.0, 40.0, "world")
     state.rolling_window.extend([c1, c2])
     state.max_seen_time_end = c2.time_end
     state.last_transcript_seq = 2
@@ -100,3 +104,28 @@ def test_run_recap_tick_updates_cursor_and_payload(monkeypatch) -> None:
     assert state.current_topic_id == "T1"
 
     assert in_meeting_ws._should_recap_tick(state, now) is False
+
+
+def test_run_recap_tick_skips_short_window(monkeypatch) -> None:
+    def _fake_summary(_: str, meta: dict) -> dict:
+        return {
+            "recap": "Status: ok",
+            "topic": {"new_topic": False, "topic_id": "T0", "title": "General", "start_t": 0.0, "end_t": 10.0},
+            "intent": {"label": "NO_INTENT", "slots": {}},
+        }
+
+    monkeypatch.setattr(in_meeting_ws, "summarize_and_classify", _fake_summary)
+
+    state = InMeetingStreamState()
+    c1 = _chunk(1, 0.0, 10.0, "short")
+    state.rolling_window.append(c1)
+    state.max_seen_time_end = c1.time_end
+    state.last_transcript_seq = 1
+    state.last_final_seq = 1
+    now = time.time()
+
+    payload = in_meeting_ws._run_recap_tick("sess-2", state, now)
+
+    assert payload is None
+    assert state.recap_cursor_seq == 1
+    assert state.last_recap_tick_anchor == state.max_seen_time_end

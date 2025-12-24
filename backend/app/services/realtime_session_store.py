@@ -62,6 +62,7 @@ class InMeetingStreamState:
     last_partial_chunk: Optional[FinalTranscriptChunk] = None
     recap_cursor_seq: int = 0
     last_recap_tick_at: float = 0.0
+    last_recap_tick_anchor: float = 0.0
     max_seen_time_end: float = 0.0
     current_topic_id: Optional[str] = None
     semantic_intent_label: Optional[str] = None
