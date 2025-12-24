@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 RECAP_WINDOW_SEC = 60.0
 ROLLING_RETENTION_SEC = 120.0
 RECAP_TICK_SEC = 30.0
+RECAP_WINDOW_MIN = 30.0
 
 
 class _AudioClock:
@@ -56,6 +57,13 @@ def _coerce_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return float(default)
+
+
+def _compute_tick_anchor(stream_state) -> float:
+    anchor = stream_state.max_seen_time_end or 0.0
+    if stream_state.last_partial_chunk:
+        anchor = max(anchor, stream_state.last_partial_chunk.time_end)
+    return anchor
 
 
 def _prune_stream_state(stream_state) -> None:
@@ -120,23 +128,35 @@ def _select_window_chunks(stream_state, window_sec: float, include_partial: bool
 def _should_recap_tick(stream_state, now: float) -> bool:
     if stream_state.last_transcript_seq <= stream_state.recap_cursor_seq:
         return False
-    if stream_state.last_recap_tick_at <= 0.0:
-        return False
-    return (now - stream_state.last_recap_tick_at) >= RECAP_TICK_SEC
+    anchor = _compute_tick_anchor(stream_state)
+    return (anchor - stream_state.last_recap_tick_anchor) >= RECAP_TICK_SEC
 
 
 def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[str, Any]]:
     cursor_before = stream_state.recap_cursor_seq
+    anchor = _compute_tick_anchor(stream_state)
     include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
     window_chunks = _select_window_chunks(stream_state, RECAP_WINDOW_SEC, include_partial=include_partial)
     window_text = _build_window_text(window_chunks)
-    if not window_text:
-        stream_state.recap_cursor_seq = stream_state.last_transcript_seq
-        stream_state.last_recap_tick_at = now
-        return None
-
     window_start = window_chunks[0].time_start if window_chunks else 0.0
     window_end = window_chunks[-1].time_end if window_chunks else 0.0
+    window_duration = max(0.0, window_end - window_start)
+    if not window_text or window_duration < RECAP_WINDOW_MIN:
+        stream_state.recap_cursor_seq = stream_state.last_transcript_seq
+        stream_state.last_recap_tick_at = now
+        stream_state.last_recap_tick_anchor = anchor
+        logger.info(
+            "recap_tick_skip session_id=%s cursor=%s->%s window=%.2f-%.2f duration=%.2fs anchor=%.2f",
+            session_id,
+            cursor_before,
+            stream_state.recap_cursor_seq,
+            window_start,
+            window_end,
+            window_duration,
+            anchor,
+        )
+        return None
+
     meta = {
         "current_topic_id": stream_state.current_topic_id,
         "current_topic": stream_state.last_topic_payload,
@@ -178,15 +198,18 @@ def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[
 
     stream_state.recap_cursor_seq = stream_state.last_transcript_seq
     stream_state.last_recap_tick_at = now
+    stream_state.last_recap_tick_anchor = anchor
     _prune_stream_state(stream_state)
 
     logger.info(
-        "recap_tick session_id=%s cursor=%s->%s window=%.2f-%.2f chunks=%s llm_ms=%s parse_ok=%s include_partial=%s",
+        "recap_tick session_id=%s cursor=%s->%s window=%.2f-%.2f duration=%.2fs anchor=%.2f chunks=%s llm_ms=%s parse_ok=%s include_partial=%s",
         session_id,
         cursor_before,
         stream_state.recap_cursor_seq,
         window_start,
         window_end,
+        window_duration,
+        anchor,
         len(window_chunks),
         llm_latency_ms,
         parse_ok,
@@ -219,11 +242,13 @@ def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[
             "window_sec": RECAP_WINDOW_SEC,
             "window_start": window_start,
             "window_end": window_end,
+            "window_duration": window_duration,
             "window_chunks": len(window_chunks),
             "include_partial": include_partial,
             "llm_latency_ms": llm_latency_ms,
             "parse_ok": parse_ok,
             "raw_len": meta.get("raw_len"),
+            "last_recap_tick_anchor": stream_state.last_recap_tick_anchor,
             "last_final_seq": stream_state.last_final_seq,
             "last_transcript_seq": stream_state.last_transcript_seq,
         },
