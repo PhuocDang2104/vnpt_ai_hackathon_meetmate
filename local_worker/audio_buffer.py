@@ -7,6 +7,7 @@ class AudioBuffer:
         self.chunk_size = chunk_sec * sample_rate
         self.step_size = (chunk_sec - overlap_sec) * sample_rate
         self.buffer = np.zeros(0, dtype=np.float32)
+        self.consumed_samples = 0
 
     def push(self, samples: np.ndarray):
         self.buffer = np.concatenate([self.buffer, samples])
@@ -17,4 +18,6 @@ class AudioBuffer:
 
         chunk = self.buffer[: self.chunk_size]
         self.buffer = self.buffer[self.step_size :]
-        return torch.tensor(chunk).unsqueeze(0)
+        start_time = float(self.consumed_samples) / float(self.sr)
+        self.consumed_samples += self.step_size
+        return torch.tensor(chunk).unsqueeze(0), start_time

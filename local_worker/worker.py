@@ -23,9 +23,13 @@ def _get_required_env(name: str, default: str | None = None) -> str:
 HF_TOKEN = _get_required_env("HF_TOKEN")
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000/api/v1")
 SESSION_ID = _get_required_env("SESSION_ID")
+TIME_OFFSET_SEC = float(os.getenv("DIARIZATION_OFFSET_SEC", "0.0"))
 
 print(f"Loaded env from {DOTENV_PATH}")
-print(f"SESSION_ID={SESSION_ID} | BACKEND_BASE_URL={BACKEND_BASE_URL} | HF_TOKEN_present={bool(HF_TOKEN)}")
+print(
+    f"SESSION_ID={SESSION_ID} | BACKEND_BASE_URL={BACKEND_BASE_URL} | "
+    f"HF_TOKEN_present={bool(HF_TOKEN)} | DIARIZATION_OFFSET_SEC={TIME_OFFSET_SEC}"
+)
 
 try:
     print("Loading diarization model pyannote/speaker-diarization ...")
@@ -47,9 +51,14 @@ def audio_callback(indata, frames, time, status):
     samples = indata[:, 0].astype(np.float32)
     buffer.push(samples)
 
-    chunk = buffer.pop_chunk()
-    if chunk is None:
+    popped = buffer.pop_chunk()
+    if popped is None:
         return
+
+    chunk, chunk_start = popped
+    base_time = float(chunk_start)
+    if base_time < 0:
+        base_time = 0.0
 
     diarization = pipeline(
         {
@@ -63,8 +72,8 @@ def audio_callback(indata, frames, time, status):
         segments.append(
             {
                 "speaker": speaker,
-                "start": float(segment.start),
-                "end": float(segment.end),
+                "start": float(segment.start + base_time + TIME_OFFSET_SEC),
+                "end": float(segment.end + base_time + TIME_OFFSET_SEC),
                 "confidence": 1.0,
             }
         )

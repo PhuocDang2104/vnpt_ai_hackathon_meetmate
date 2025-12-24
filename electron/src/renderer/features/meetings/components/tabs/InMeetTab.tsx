@@ -412,6 +412,7 @@ export const InMeetTab = ({
             livePartial={livePartial}
             liveFinal={liveFinal}
             finalTranscriptCount={finalTranscript.length}
+            finalTranscript={finalTranscript}
             liveRecap={liveRecap}
             semanticIntent={semanticIntent}
             currentTopicTitle={currentTopicTitle}
@@ -449,6 +450,7 @@ interface TranscriptPanelProps {
   livePartial: { speaker: string; text: string; time: number } | null;
   liveFinal: { speaker: string; text: string; time: number } | null;
   finalTranscriptCount: number;
+  finalTranscript: { id: string; speaker: string; text: string; time: number }[];
   liveRecap: string | null;
   semanticIntent: string;
   currentTopicTitle: string;
@@ -522,6 +524,7 @@ const LiveTranscriptPanel = ({
   livePartial,
   liveFinal,
   finalTranscriptCount,
+  finalTranscript,
   liveRecap,
   semanticIntent,
   currentTopicTitle,
@@ -538,6 +541,29 @@ const LiveTranscriptPanel = ({
   onFetchAudioToken,
   onReconnect,
 }: TranscriptPanelProps) => {
+  const speakerPalette = useMemo(
+    () => ['#5b8def', '#e66b6b', '#5cc28a', '#f0a35a', '#9c6ade', '#4fb3d4'],
+    [],
+  );
+  const speakerColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    let idx = 0;
+    finalTranscript.forEach(item => {
+      if (!map[item.speaker]) {
+        map[item.speaker] = speakerPalette[idx % speakerPalette.length];
+        idx += 1;
+      }
+    });
+    if (livePartial?.speaker && !map[livePartial.speaker]) {
+      map[livePartial.speaker] = speakerPalette[idx % speakerPalette.length];
+    }
+    if (liveFinal?.speaker && !map[liveFinal.speaker]) {
+      map[liveFinal.speaker] = speakerPalette[(idx + 1) % speakerPalette.length];
+    }
+    return map;
+  }, [finalTranscript, liveFinal, livePartial, speakerPalette]);
+
+  const recentFinal = useMemo(() => finalTranscript.slice(-10).reverse(), [finalTranscript]);
   const lastFrameLabel = useMemo(() => {
     if (feedStatus === 'error') return 'Frontend WS lỗi - thử kết nối lại';
     if (feedStatus === 'connecting' || feedStatus === 'idle') return 'Đang chờ bắt tay WebSocket';
@@ -666,7 +692,9 @@ const LiveTranscriptPanel = ({
                   <div className="transcript-live-line__header">
                     <span className="transcript-live-line__tag">Partial</span>
                     <div className="transcript-live-line__meta">
-                      <span>{livePartial ? livePartial.speaker : '—'}</span>
+                      <span style={{ color: livePartial ? speakerColors[livePartial.speaker] : undefined }}>
+                        {livePartial ? livePartial.speaker : '—'}
+                      </span>
                       {livePartial && <span>{formatDuration(livePartial.time || 0)}</span>}
                     </div>
                   </div>
@@ -676,7 +704,9 @@ const LiveTranscriptPanel = ({
                   <div className="transcript-live-line__header">
                     <span className="transcript-live-line__tag">Last final transcript</span>
                     <div className="transcript-live-line__meta">
-                      <span>{liveFinal ? liveFinal.speaker : '—'}</span>
+                      <span style={{ color: liveFinal ? speakerColors[liveFinal.speaker] : undefined }}>
+                        {liveFinal ? liveFinal.speaker : '—'}
+                      </span>
                       {liveFinal && <span>{formatDuration(liveFinal.time || 0)}</span>}
                     </div>
                   </div>
@@ -690,6 +720,29 @@ const LiveTranscriptPanel = ({
                 Frontend WS · {feedStatus}
               </span>
               <span className="transcript-mini-status__meta">{lastFrameLabel}</span>
+            </div>
+
+            <div className="transcript-live-card__section">
+              <div className="live-signal-label">Recent utterances</div>
+              <div className="topic-log">
+                {recentFinal.length === 0 ? (
+                  <div className="empty-state empty-state--inline">Chưa có câu final nào.</div>
+                ) : (
+                  recentFinal.map(item => (
+                    <div key={item.id} className="topic-log__item">
+                      <span
+                        className="topic-log__time"
+                        style={{ color: speakerColors[item.speaker] || undefined, minWidth: 80 }}
+                      >
+                        {item.speaker}
+                      </span>
+                      <span className="topic-log__text">
+                        [{formatDuration(item.time || 0)}] {item.text}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
