@@ -15,6 +15,9 @@ env/
 .Python
 pip-log.txt
 pip-delete-this-directory.txt
+pyannote-env/
+notebook/
+
 
 # Backend virtual environment
 backend/venv/

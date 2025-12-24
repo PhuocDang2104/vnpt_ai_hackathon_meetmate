@@ -52,6 +52,7 @@ class FinalTranscriptChunk:
 class InMeetingStreamState:
     final_stream: List[FinalTranscriptChunk] = field(default_factory=list)
     final_by_seq: Dict[int, FinalTranscriptChunk] = field(default_factory=dict)
+    speaker_segments: List[Dict[str, Any]] = field(default_factory=list)
     rolling_window: Deque[FinalTranscriptChunk] = field(default_factory=deque)
     last_final_seq: int = 0
     last_transcript_seq: int = 0

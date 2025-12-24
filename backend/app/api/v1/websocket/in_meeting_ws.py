@@ -58,6 +58,22 @@ def _coerce_float(value: Any, default: float) -> float:
         return float(default)
 
 
+def _match_speaker_by_time(segments, t_start: float, t_end: float):
+    best = None
+    best_overlap = 0.0
+
+    for seg in segments:
+        overlap = min(t_end, seg["end"]) - max(t_start, seg["start"])
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best = seg
+
+    if best_overlap <= 0:
+        return None
+
+    return best
+
+
 def _prune_stream_state(stream_state) -> None:
     cutoff = stream_state.max_seen_time_end - ROLLING_RETENTION_SEC
     if cutoff <= 0:
@@ -262,11 +278,19 @@ async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
                 seq = 0
 
             confidence = payload.get("confidence")
+            time_start = float(payload.get("time_start") or 0.0)
+            time_end = float(payload.get("time_end") or 0.0)
+            speaker = payload.get("speaker") or "SPEAKER_01"
+
+            aligned = _match_speaker_by_time(stream_state.speaker_segments, time_start, time_end)
+            if aligned:
+                speaker = aligned.get("speaker", speaker)
+
             chunk = FinalTranscriptChunk(
                 seq=seq,
-                time_start=float(payload.get("time_start") or 0.0),
-                time_end=float(payload.get("time_end") or 0.0),
-                speaker=payload.get("speaker") or "SPEAKER_01",
+                time_start=time_start,
+                time_end=time_end,
+                speaker=speaker,
                 lang=payload.get("lang") or "vi",
                 confidence=float(1.0 if confidence is None else confidence),
                 text=payload.get("chunk") or payload.get("text") or "",

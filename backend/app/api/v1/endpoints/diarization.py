@@ -1,0 +1,38 @@
+from typing import Any, Dict, List
+
+from fastapi import APIRouter
+
+from app.services.realtime_session_store import session_store
+
+router = APIRouter()
+
+
+@router.post("/diarization/{session_id}")
+async def ingest_diarization(session_id: str, payload: Dict[str, Any]):
+    session = session_store.get(session_id)
+    if not session:
+        return {"status": "error", "reason": "session_not_found"}
+
+    segments: List[Dict[str, Any]] = payload.get("segments") or []
+    if not segments:
+        return {"status": "ok"}
+
+    stream_state = session.stream_state
+    for seg in segments:
+        try:
+            speaker = seg["speaker"]
+            start = float(seg["start"])
+            end = float(seg["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        confidence = seg.get("confidence", 1.0)
+        stream_state.speaker_segments.append(
+            {
+                "speaker": speaker,
+                "start": start,
+                "end": end,
+                "confidence": float(confidence if confidence is not None else 1.0),
+            }
+        )
+
+    return {"status": "ok"}
