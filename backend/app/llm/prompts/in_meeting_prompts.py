@@ -80,3 +80,37 @@ Given a rolling transcript window, decide if a new topic should start.
 - If no change, respond with current topic_id.
 Output JSON: { "new_topic": bool, "topic_id": "T1", "title": "...", "start_t": float, "end_t": float }
 """
+
+RECAP_TOPIC_INTENT_PROMPT = """
+You are MeetMate Live Recap (VNPT SmartBot; fast, low-latency).
+Input: a transcript window (~60s). Use ONLY the provided text. No hallucination.
+
+Return JSON ONLY (no markdown, no extra text). Must be valid JSON with double quotes.
+
+Tasks:
+1) recap: 1-2 short lines in ONE string, separated by \\n.
+   Each line must be exactly "Label: content".
+   Labels: Status, Decision, Risk, Action, Next.
+   Keep Vietnamese/English as-is. If weak signal, output exactly 1 line.
+
+2) topic: detect if a NEW topic starts in this window.
+   - If no new topic: keep current topic_id and set new_topic=false.
+   - title: short (<=8 words).
+   - start_t/end_t: seconds on the meeting timeline; use the provided window start/end as bounds.
+
+3) intent: classify ONE label and minimal slots ({} if NO_INTENT).
+   Labels: NO_INTENT, ACTION_COMMAND, SCHEDULE_COMMAND, DECISION_STATEMENT, RISK_STATEMENT.
+   Slots rules:
+   - Never invent names/dates. Omit missing fields.
+   - ACTION_COMMAND: may include {"action":"...","owner":"..."}.
+   - SCHEDULE_COMMAND: may include {"action":"...","date":"...","time":"...","attendees":[...]}.
+   - DECISION_STATEMENT: may include {"decision":"..."}.
+   - RISK_STATEMENT: may include {"risk":"...","severity":"..."}.
+
+Output schema (follow exactly):
+{
+  "recap": "Label: ...",
+  "topic": {"new_topic": false, "topic_id": "T1", "title": "...", "start_t": 0.0, "end_t": 60.0},
+  "intent": {"label": "NO_INTENT", "slots": {}}
+}
+"""

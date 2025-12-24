@@ -53,23 +53,22 @@ class InMeetingStreamState:
     final_stream: List[FinalTranscriptChunk] = field(default_factory=list)
     final_by_seq: Dict[int, FinalTranscriptChunk] = field(default_factory=dict)
     rolling_window: Deque[FinalTranscriptChunk] = field(default_factory=deque)
-    recap_batch: List[int] = field(default_factory=list)
     last_final_seq: int = 0
     last_transcript_seq: int = 0
     last_transcript_chunk: Optional[FinalTranscriptChunk] = None
     last_transcript_is_final: bool = True
     last_partial_seq: int = 0
     last_partial_chunk: Optional[FinalTranscriptChunk] = None
-    intent_cursor_seq: int = 0
     recap_cursor_seq: int = 0
-    speech_ms_since_intent: float = 0.0
-    speech_ms_since_recap: float = 0.0
-    last_intent_tick_at: float = 0.0
     last_recap_tick_at: float = 0.0
     max_seen_time_end: float = 0.0
     current_topic_id: Optional[str] = None
     semantic_intent_label: Optional[str] = None
+    semantic_intent_slots: Dict[str, Any] = field(default_factory=dict)
     last_live_recap: Optional[str] = None
+    last_recap: Optional[str] = None
+    last_topic_payload: Dict[str, Any] = field(default_factory=dict)
+    last_intent_payload: Dict[str, Any] = field(default_factory=dict)
     topic_segments: List[Dict[str, Any]] = field(default_factory=list)
     actions: List[Dict[str, Any]] = field(default_factory=list)
     decisions: List[Dict[str, Any]] = field(default_factory=list)

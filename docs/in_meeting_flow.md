@@ -209,7 +209,11 @@ Endpoint: `wss://<host>/api/v1/ws/frontend/{session_id}`
   "seq": 132,
   "version": 7,
   "payload": {
+    "recap": "Short recap ...",
     "live_recap": "Short recap ...",
+    "topic": { "new_topic": false, "topic_id": "T1", "title": "...", "start_t": 0.0, "end_t": 0.0 },
+    "intent_payload": { "label": "NO_INTENT", "slots": {} },
+    "transcript_window": "[SPEAKER_01 0.00-12.30] ...",
     "actions": [],
     "new_actions": [],
     "decisions": [],
@@ -247,4 +251,5 @@ Minimal RecognitionConfig (tham khảo):
 ## 5) Operational notes
 - **Partial vs Final**: UI hiển thị `is_final=false` dạng typing; `is_final=true` commit timeline. LangGraph worker ưu tiên tick trên final (và question-trigger).
 - **Transcript window**: backend giữ buffer ~4000 ký tự/session cho graph context.
+- **Realtime tick**: 30s/tick, dùng rolling window 60s (có thể include partial mới nhất nếu chưa final).
 - **Persistence**: best-effort; để persist vào DB đầy đủ, khuyến nghị dùng `session_id = meeting.id` (UUID có Meeting record).

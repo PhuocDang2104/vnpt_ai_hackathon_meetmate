@@ -8,8 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.realtime_security import verify_audio_ingest_token
-from app.llm.chains.in_meeting_chain import extract_adr, segment_topic, summarize_transcript
-from app.llm.tools.smartbot_intent_tool import predict_intent
+from app.llm.chains.in_meeting_chain import summarize_and_classify
 from app.schemas.realtime import AudioStartMessage
 from app.services.realtime_bus import session_bus
 from app.services.realtime_ingest import ingestTranscript
@@ -20,14 +19,9 @@ router = APIRouter()
 stream_workers: Dict[str, asyncio.Task] = {}
 logger = logging.getLogger(__name__)
 
-INTENT_WINDOW_SEC = 30.0
+RECAP_WINDOW_SEC = 60.0
 ROLLING_RETENTION_SEC = 120.0
-RECAP_MAX_WINDOW_SEC = 120.0
-INTENT_SPEECH_MS = 20_000.0
-INTENT_GUARD_SEC = 20.0
-RECAP_SPEECH_MS = 45_000.0
-RECAP_GUARD_SEC = 45.0
-RECAP_DELAY_SEC = 1.5
+RECAP_TICK_SEC = 30.0
 
 
 class _AudioClock:
@@ -57,98 +51,11 @@ def _build_window_text(chunks: List[FinalTranscriptChunk]) -> str:
     return "\n".join(_format_chunk_line(chunk) for chunk in chunks if chunk.text)
 
 
-def _merge_list(existing: List[Dict[str, Any]], new_items: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
-    seen = set()
-    merged = []
-    for item in (existing or []) + (new_items or []):
-        value = item.get(key)
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        merged.append(item)
-    return merged
-
-
-def _clean_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _intent_to_adr(intent_label: str, intent_slots: Dict[str, Any], fallback_text: str) -> Dict[str, List[Dict[str, Any]]]:
-    source_text = _clean_text(
-        intent_slots.get("source_text")
-        or intent_slots.get("evidence")
-        or intent_slots.get("text")
-        or fallback_text
-    )
-    if not source_text:
-        return {"actions": [], "decisions": [], "risks": []}
-
-    if intent_label == "ACTION_COMMAND":
-        task = _clean_text(intent_slots.get("task") or source_text)
-        if not task:
-            return {"actions": [], "decisions": [], "risks": []}
-        return {
-            "actions": [{
-                "task": task,
-                "owner": intent_slots.get("owner"),
-                "due_date": intent_slots.get("due_date"),
-                "priority": intent_slots.get("priority") or "medium",
-                "source_text": source_text,
-            }],
-            "decisions": [],
-            "risks": [],
-        }
-    if intent_label == "DECISION_STATEMENT":
-        title = _clean_text(intent_slots.get("title") or source_text)
-        if not title:
-            return {"actions": [], "decisions": [], "risks": []}
-        return {
-            "actions": [],
-            "decisions": [{
-                "title": title,
-                "rationale": intent_slots.get("rationale"),
-                "impact": intent_slots.get("impact"),
-                "source_text": source_text,
-            }],
-            "risks": [],
-        }
-    if intent_label == "RISK_STATEMENT":
-        desc = _clean_text(intent_slots.get("risk") or source_text)
-        if not desc:
-            return {"actions": [], "decisions": [], "risks": []}
-        return {
-            "actions": [],
-            "decisions": [],
-            "risks": [{
-                "desc": desc,
-                "severity": intent_slots.get("severity") or "medium",
-                "mitigation": intent_slots.get("mitigation"),
-                "owner": intent_slots.get("owner"),
-                "source_text": source_text,
-            }],
-        }
-    return {"actions": [], "decisions": [], "risks": []}
-
-
-def _build_tool_suggestions(new_actions: List[Dict[str, Any]], new_risks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    suggestions = []
-    for action in new_actions or []:
-        suggestions.append({
-            "suggestion_id": f"task-{len(suggestions)+1}",
-            "type": "task",
-            "action_hash": action.get("task"),
-            "payload": {"task": action.get("task"), "owner": action.get("owner"), "due": action.get("due_date")},
-        })
-    for risk in new_risks or []:
-        suggestions.append({
-            "suggestion_id": f"schedule-{len(suggestions)+1}",
-            "type": "schedule",
-            "action_hash": risk.get("desc"),
-            "payload": {"title": risk.get("desc"), "owner": risk.get("owner")},
-        })
-    return suggestions
+def _coerce_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def _prune_stream_state(stream_state) -> None:
@@ -159,7 +66,6 @@ def _prune_stream_state(stream_state) -> None:
     stream_state.rolling_window.clear()
     stream_state.rolling_window.extend(kept)
     keep_seqs = {chunk.seq for chunk in kept}
-    keep_seqs.update(stream_state.recap_batch)
     for seq in list(stream_state.final_by_seq.keys()):
         if seq not in keep_seqs:
             stream_state.final_by_seq.pop(seq, None)
@@ -169,15 +75,9 @@ def _append_final_chunk(stream_state, chunk: FinalTranscriptChunk, now: float) -
     stream_state.final_stream.append(chunk)
     stream_state.final_by_seq[chunk.seq] = chunk
     stream_state.rolling_window.append(chunk)
-    stream_state.recap_batch.append(chunk.seq)
     stream_state.last_final_seq = max(stream_state.last_final_seq, chunk.seq)
     if chunk.time_end > stream_state.max_seen_time_end:
         stream_state.max_seen_time_end = chunk.time_end
-    duration_ms = max(0.0, chunk.time_end - chunk.time_start) * 1000.0
-    stream_state.speech_ms_since_intent += duration_ms
-    stream_state.speech_ms_since_recap += duration_ms
-    if stream_state.last_intent_tick_at <= 0.0:
-        stream_state.last_intent_tick_at = now
     if stream_state.last_recap_tick_at <= 0.0:
         stream_state.last_recap_tick_at = now
     _prune_stream_state(stream_state)
@@ -190,8 +90,6 @@ def _update_last_transcript(stream_state, chunk: FinalTranscriptChunk, seq: int,
     if not is_final:
         stream_state.last_partial_seq = seq
         stream_state.last_partial_chunk = chunk
-    if stream_state.last_intent_tick_at <= 0.0:
-        stream_state.last_intent_tick_at = now
     if stream_state.last_recap_tick_at <= 0.0:
         stream_state.last_recap_tick_at = now
 
@@ -219,175 +117,113 @@ def _select_window_chunks(stream_state, window_sec: float, include_partial: bool
     return chunks
 
 
-def _select_recap_chunks(stream_state) -> List[FinalTranscriptChunk]:
-    if not stream_state.recap_batch:
-        return []
-    chunks = [stream_state.final_by_seq.get(seq) for seq in stream_state.recap_batch]
-    chunks = [chunk for chunk in chunks if chunk]
-    if not chunks:
-        return []
-    max_end = max(chunk.time_end for chunk in chunks)
-    cutoff = max_end - RECAP_MAX_WINDOW_SEC
-    trimmed = [chunk for chunk in chunks if chunk.time_end >= cutoff]
-    trimmed.sort(key=lambda chunk: (chunk.time_end, chunk.seq))
-    return trimmed
-
-
-def _should_intent_tick(stream_state, now: float) -> bool:
-    if stream_state.last_transcript_seq <= stream_state.intent_cursor_seq:
-        return False
-    if stream_state.speech_ms_since_intent >= INTENT_SPEECH_MS:
-        return True
-    if stream_state.last_intent_tick_at <= 0.0:
-        return False
-    return (now - stream_state.last_intent_tick_at) >= INTENT_GUARD_SEC
-
-
 def _should_recap_tick(stream_state, now: float) -> bool:
     if stream_state.last_transcript_seq <= stream_state.recap_cursor_seq:
         return False
-    if not stream_state.recap_batch and not stream_state.last_partial_chunk:
-        return False
-    if stream_state.speech_ms_since_recap >= RECAP_SPEECH_MS:
-        return True
     if stream_state.last_recap_tick_at <= 0.0:
         return False
-    return (now - stream_state.last_recap_tick_at) >= RECAP_GUARD_SEC
-
-
-def _run_intent_tick(
-    session_id: str,
-    stream_state,
-    last_chunk: FinalTranscriptChunk,
-    last_chunk_is_final: bool,
-    now: float,
-) -> Dict[str, Any]:
-    include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
-    window_chunks = _select_window_chunks(stream_state, INTENT_WINDOW_SEC, include_partial=include_partial)
-    window_text = _build_window_text(window_chunks)
-    intent_label, intent_slots = predict_intent(window_text, lang=last_chunk.lang)
-
-    topic_payload = segment_topic(
-        transcript_window=window_text,
-        current_topic_id=stream_state.current_topic_id,
-    )
-    if topic_payload.get("new_topic") or not stream_state.topic_segments:
-        stream_state.topic_segments.append({
-            "topic_id": topic_payload.get("topic_id") or "T0",
-            "title": topic_payload.get("title") or "General",
-            "start_t": topic_payload.get("start_t", last_chunk.time_start),
-            "end_t": topic_payload.get("end_t", last_chunk.time_end),
-        })
-    stream_state.current_topic_id = topic_payload.get("topic_id") or stream_state.current_topic_id or "T0"
-
-    adr = extract_adr(transcript_window=window_text, topic_id=stream_state.current_topic_id)
-    new_actions = adr.get("actions", [])
-    new_decisions = adr.get("decisions", [])
-    new_risks = adr.get("risks", [])
-
-    intent_adr = _intent_to_adr(intent_label, intent_slots, last_chunk.text)
-    if intent_adr.get("actions"):
-        new_actions = _merge_list(new_actions, intent_adr.get("actions", []), key="task")
-    if intent_adr.get("decisions"):
-        new_decisions = _merge_list(new_decisions, intent_adr.get("decisions", []), key="title")
-    if intent_adr.get("risks"):
-        new_risks = _merge_list(new_risks, intent_adr.get("risks", []), key="desc")
-
-    stream_state.actions = _merge_list(stream_state.actions, new_actions, key="task")
-    stream_state.decisions = _merge_list(stream_state.decisions, new_decisions, key="title")
-    stream_state.risks = _merge_list(stream_state.risks, new_risks, key="desc")
-    tool_suggestions = _build_tool_suggestions(new_actions, new_risks)
-
-    speech_ms_before = stream_state.speech_ms_since_intent
-    stream_state.intent_cursor_seq = stream_state.last_transcript_seq
-    stream_state.speech_ms_since_intent = 0.0
-    stream_state.last_intent_tick_at = now
-    stream_state.semantic_intent_label = intent_label
-
-    return {
-        "meeting_id": session_id,
-        "stage": "in",
-        "intent": "tick",
-        "sla": "realtime",
-        "live_recap": stream_state.last_live_recap,
-        "vnpt_segment": {
-            "text": last_chunk.text,
-            "time_start": last_chunk.time_start,
-            "time_end": last_chunk.time_end,
-            "speaker": last_chunk.speaker,
-            "is_final": last_chunk_is_final,
-            "confidence": last_chunk.confidence,
-            "lang": last_chunk.lang,
-        },
-        "transcript_window": window_text,
-        "semantic_intent_label": intent_label,
-        "semantic_intent_slots": intent_slots,
-        "actions": stream_state.actions,
-        "new_actions": new_actions,
-        "decisions": stream_state.decisions,
-        "new_decisions": new_decisions,
-        "risks": stream_state.risks,
-        "new_risks": new_risks,
-        "tool_suggestions": tool_suggestions,
-        "topic_segments": stream_state.topic_segments,
-        "current_topic_id": stream_state.current_topic_id,
-        "debug_info": {
-            "intent_cursor_seq": stream_state.intent_cursor_seq,
-            "recap_cursor_seq": stream_state.recap_cursor_seq,
-            "speech_ms_before": speech_ms_before,
-            "window_sec": INTENT_WINDOW_SEC,
-            "window_chunks": len(window_chunks),
-            "last_final_seq": stream_state.last_final_seq,
-            "last_transcript_seq": stream_state.last_transcript_seq,
-        },
-    }
+    return (now - stream_state.last_recap_tick_at) >= RECAP_TICK_SEC
 
 
 def _run_recap_tick(session_id: str, stream_state, now: float) -> Optional[Dict[str, Any]]:
-    batch_seqs = list(stream_state.recap_batch)
-    recap_chunks = _select_recap_chunks(stream_state)
-    if not recap_chunks:
-        include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
-        recap_chunks = _select_window_chunks(stream_state, RECAP_MAX_WINDOW_SEC, include_partial=include_partial)
-    recap_text = _build_window_text(recap_chunks)
-    if not recap_text:
-        stream_state.recap_batch.clear()
+    cursor_before = stream_state.recap_cursor_seq
+    include_partial = stream_state.last_partial_chunk is not None and stream_state.last_partial_seq >= stream_state.last_final_seq
+    window_chunks = _select_window_chunks(stream_state, RECAP_WINDOW_SEC, include_partial=include_partial)
+    window_text = _build_window_text(window_chunks)
+    if not window_text:
         stream_state.recap_cursor_seq = stream_state.last_transcript_seq
-        stream_state.speech_ms_since_recap = 0.0
         stream_state.last_recap_tick_at = now
         return None
 
-    live_recap = summarize_transcript(
-        transcript_window=recap_text,
-        topic=stream_state.current_topic_id,
-        intent=stream_state.semantic_intent_label,
-    )
-    stream_state.last_live_recap = live_recap
+    window_start = window_chunks[0].time_start if window_chunks else 0.0
+    window_end = window_chunks[-1].time_end if window_chunks else 0.0
+    meta = {
+        "current_topic_id": stream_state.current_topic_id,
+        "current_topic": stream_state.last_topic_payload,
+        "window_start": window_start,
+        "window_end": window_end,
+    }
+    llm_start = time.time()
+    result = summarize_and_classify(window_text, meta=meta)
+    llm_latency_ms = int((time.time() - llm_start) * 1000)
+    parse_ok = bool(meta.get("parse_ok"))
 
-    speech_ms_before = stream_state.speech_ms_since_recap
+    recap = result.get("recap") or ""
+    topic_payload = result.get("topic") or {}
+    intent_payload = result.get("intent") or {}
+
+    topic_id = topic_payload.get("topic_id") if isinstance(topic_payload.get("topic_id"), str) else None
+    if not topic_id:
+        topic_id = stream_state.current_topic_id or "T0"
+    topic_title = topic_payload.get("title") if isinstance(topic_payload.get("title"), str) else "General"
+    topic_start = _coerce_float(topic_payload.get("start_t"), window_start)
+    topic_end = _coerce_float(topic_payload.get("end_t"), window_end)
+    if topic_end < topic_start:
+        topic_end = topic_start
+
+    if topic_payload.get("new_topic") or not stream_state.topic_segments:
+        stream_state.topic_segments.append({
+            "topic_id": topic_id,
+            "title": topic_title,
+            "start_t": topic_start,
+            "end_t": topic_end,
+        })
+    stream_state.current_topic_id = topic_id
+    stream_state.last_topic_payload = topic_payload
+    stream_state.last_intent_payload = intent_payload
+    stream_state.semantic_intent_label = intent_payload.get("label") or "NO_INTENT"
+    stream_state.semantic_intent_slots = intent_payload.get("slots") or {}
+    stream_state.last_live_recap = recap
+    stream_state.last_recap = recap
+
     stream_state.recap_cursor_seq = stream_state.last_transcript_seq
-    stream_state.recap_batch.clear()
-    stream_state.speech_ms_since_recap = 0.0
     stream_state.last_recap_tick_at = now
     _prune_stream_state(stream_state)
+
+    logger.info(
+        "recap_tick session_id=%s cursor=%s->%s window=%.2f-%.2f chunks=%s llm_ms=%s parse_ok=%s include_partial=%s",
+        session_id,
+        cursor_before,
+        stream_state.recap_cursor_seq,
+        window_start,
+        window_end,
+        len(window_chunks),
+        llm_latency_ms,
+        parse_ok,
+        include_partial,
+    )
 
     return {
         "meeting_id": session_id,
         "stage": "in",
         "intent": "tick",
         "sla": "near_realtime",
-        "live_recap": live_recap,
+        "live_recap": recap,
+        "recap": recap,
+        "topic": topic_payload,
+        "intent_payload": intent_payload,
+        "transcript_window": window_text,
+        "semantic_intent_label": stream_state.semantic_intent_label,
+        "semantic_intent_slots": stream_state.semantic_intent_slots,
+        "topic_segments": stream_state.topic_segments,
+        "current_topic_id": stream_state.current_topic_id,
+        # Deprecated: ADR extraction removed; keep empty lists for compatibility.
         "actions": stream_state.actions,
         "decisions": stream_state.decisions,
         "risks": stream_state.risks,
-        "topic_segments": stream_state.topic_segments,
-        "current_topic_id": stream_state.current_topic_id,
+        # Deprecated in realtime tick; kept for backward-compatible payload shape.
+        "tool_suggestions": [],
         "debug_info": {
-            "intent_cursor_seq": stream_state.intent_cursor_seq,
+            "recap_cursor_before": cursor_before,
             "recap_cursor_seq": stream_state.recap_cursor_seq,
-            "speech_ms_before": speech_ms_before,
-            "recap_window_sec": RECAP_MAX_WINDOW_SEC,
-            "recap_chunks": len(recap_chunks),
+            "window_sec": RECAP_WINDOW_SEC,
+            "window_start": window_start,
+            "window_end": window_end,
+            "window_chunks": len(window_chunks),
+            "include_partial": include_partial,
+            "llm_latency_ms": llm_latency_ms,
+            "parse_ok": parse_ok,
+            "raw_len": meta.get("raw_len"),
             "last_final_seq": stream_state.last_final_seq,
             "last_transcript_seq": stream_state.last_transcript_seq,
         },
@@ -440,19 +276,9 @@ async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
             if is_final:
                 _append_final_chunk(stream_state, chunk, now)
 
-            intent_due = _should_intent_tick(stream_state, now)
             recap_due = _should_recap_tick(stream_state, now)
 
-            if intent_due:
-                try:
-                    intent_state = _run_intent_tick(session_id, stream_state, chunk, is_final, now)
-                    await _publish_state_event(session_id, intent_state)
-                except Exception:
-                    pass
-
             if recap_due:
-                if intent_due:
-                    await asyncio.sleep(RECAP_DELAY_SEC)
                 try:
                     recap_state = _run_recap_tick(session_id, stream_state, now)
                     if recap_state:

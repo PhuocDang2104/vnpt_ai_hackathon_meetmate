@@ -1,9 +1,11 @@
+import json
 from typing import Any, Dict, List
 from app.llm.prompts.in_meeting_prompts import (
     RECW_PROMPT,
     ADR_PROMPT,
     QA_PROMPT,
     TOPIC_SEGMENT_PROMPT,
+    RECAP_TOPIC_INTENT_PROMPT,
 )
 from app.llm.gemini_client import GeminiChat, get_gemini_client
 from app.core.config import get_settings
@@ -136,3 +138,119 @@ def segment_topic(transcript_window: str, current_topic_id: str | None) -> Dict[
         title = " ".join(tokens[:6]) if tokens else "New topic"
         payload.update({"new_topic": True, "topic_id": f"T{abs(hash(title)) % 100}", "title": title})
     return payload
+
+
+def _as_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _fallback_recap(transcript_window: str) -> str:
+    body = (transcript_window or "").strip()
+    if len(body) > 200:
+        body = body[:200] + "..."
+    return f"Status: {body or 'No transcript in window'}"
+
+
+def _coerce_topic_payload(
+    raw_topic: Dict[str, Any],
+    current_topic_id: str,
+    current_title: str,
+    window_start: float,
+    window_end: float,
+) -> Dict[str, Any]:
+    new_topic = raw_topic.get("new_topic")
+    if not isinstance(new_topic, bool):
+        new_topic = False
+    topic_id = raw_topic.get("topic_id")
+    if not isinstance(topic_id, str) or not topic_id.strip():
+        topic_id = current_topic_id
+    title = raw_topic.get("title")
+    if not isinstance(title, str) or not title.strip():
+        title = current_title or "General"
+    start_t = _as_float(raw_topic.get("start_t"), window_start)
+    end_t = _as_float(raw_topic.get("end_t"), window_end)
+    if end_t < start_t:
+        end_t = start_t
+    return {
+        "new_topic": new_topic,
+        "topic_id": topic_id,
+        "title": title,
+        "start_t": start_t,
+        "end_t": end_t,
+    }
+
+
+def _coerce_intent_payload(raw_intent: Dict[str, Any]) -> Dict[str, Any]:
+    allowed_labels = {
+        "NO_INTENT",
+        "ACTION_COMMAND",
+        "SCHEDULE_COMMAND",
+        "DECISION_STATEMENT",
+        "RISK_STATEMENT",
+    }
+    label = raw_intent.get("label")
+    if not isinstance(label, str) or label not in allowed_labels:
+        label = "NO_INTENT"
+    slots = raw_intent.get("slots")
+    if not isinstance(slots, dict):
+        slots = {}
+    if label == "NO_INTENT":
+        slots = {}
+    return {"label": label, "slots": slots}
+
+
+def summarize_and_classify(transcript_window: str, meta: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    meta = meta or {}
+    body = (transcript_window or "").strip()
+    current_topic = meta.get("current_topic") or {}
+    current_topic_id = meta.get("current_topic_id") or current_topic.get("topic_id") or "T0"
+    current_title = current_topic.get("title") or "General"
+    window_start = _as_float(meta.get("window_start"), 0.0)
+    window_end = _as_float(meta.get("window_end"), 0.0)
+
+    prompt = (
+        RECAP_TOPIC_INTENT_PROMPT
+        + f"\n\nCurrent topic: {current_topic_id}\nWindow: {window_start:.2f}-{window_end:.2f}\nTranscript window:\n{body}"
+    )
+    raw = _call_gemini(prompt)
+
+    parse_ok = False
+    recap = ""
+    topic_payload = _coerce_topic_payload({}, current_topic_id, current_title, window_start, window_end)
+    intent_payload = {"label": "NO_INTENT", "slots": {}}
+
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                recap_value = parsed.get("recap")
+                if isinstance(recap_value, str):
+                    recap = recap_value.strip()
+                raw_topic = parsed.get("topic")
+                if isinstance(raw_topic, dict):
+                    topic_payload = _coerce_topic_payload(
+                        raw_topic,
+                        current_topic_id,
+                        current_title,
+                        window_start,
+                        window_end,
+                    )
+                raw_intent = parsed.get("intent")
+                if isinstance(raw_intent, dict):
+                    intent_payload = _coerce_intent_payload(raw_intent)
+                parse_ok = True
+        except Exception:
+            parse_ok = False
+
+    if not recap:
+        recap = _fallback_recap(body)
+    if not parse_ok:
+        topic_payload = _coerce_topic_payload({}, current_topic_id, current_title, window_start, window_end)
+        intent_payload = {"label": "NO_INTENT", "slots": {}}
+
+    meta["parse_ok"] = parse_ok
+    meta["raw_len"] = len(raw or "")
+    return {"recap": recap, "topic": topic_payload, "intent": intent_payload}

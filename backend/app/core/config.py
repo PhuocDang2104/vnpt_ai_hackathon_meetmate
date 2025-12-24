@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     gomeet_timeout_seconds: int = 15
     
     # AI Model settings
-    groq_model: str = 'llama-3.3-70b-versatile'
+    groq_model: str = 'llama-3.1-8b-instant'
     ai_temperature: float = 0.7
     ai_max_tokens: int = 2048
     

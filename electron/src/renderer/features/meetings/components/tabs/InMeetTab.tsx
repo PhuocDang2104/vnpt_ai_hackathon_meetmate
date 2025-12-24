@@ -296,24 +296,46 @@ export const InMeetTab = ({
           }
         } else if (data?.event === 'state') {
           const p = data.payload || {};
-          if (typeof p.semantic_intent_label === 'string') {
-            setSemanticIntent(p.semantic_intent_label || 'NO_INTENT');
+          const intentLabel =
+            typeof p.intent_payload?.label === 'string'
+              ? p.intent_payload.label
+              : typeof p.semantic_intent_label === 'string'
+                ? p.semantic_intent_label
+                : undefined;
+          if (intentLabel) {
+            setSemanticIntent(intentLabel || 'NO_INTENT');
           }
-          if (typeof p.current_topic_id === 'string' && p.current_topic_id) {
-            setCurrentTopicId(p.current_topic_id);
+
+          const topicId =
+            typeof p.topic?.topic_id === 'string'
+              ? p.topic.topic_id
+              : typeof p.current_topic_id === 'string'
+                ? p.current_topic_id
+                : undefined;
+          if (topicId) {
+            setCurrentTopicId(topicId);
           }
           if (Array.isArray(p.topic_segments)) {
             setTopicSegments(p.topic_segments);
           }
-          if (typeof p.live_recap === 'string' && p.live_recap.trim()) {
-            const recapText = p.live_recap.trim();
+          const recapValue =
+            typeof p.recap === 'string'
+              ? p.recap
+              : typeof p.live_recap === 'string'
+                ? p.live_recap
+                : '';
+          if (recapValue && recapValue.trim()) {
+            const recapText = recapValue.trim();
             setLiveRecap(recapText);
             setRecapItems(prev => {
               if (prev.length && prev[prev.length - 1].text === recapText) {
                 return prev;
               }
               const nextTopicId =
-                (typeof p.current_topic_id === 'string' && p.current_topic_id) || currentTopicId || 'T0';
+                (typeof p.topic?.topic_id === 'string' && p.topic.topic_id) ||
+                (typeof p.current_topic_id === 'string' && p.current_topic_id) ||
+                currentTopicId ||
+                'T0';
               const nextSegments = Array.isArray(p.topic_segments) ? p.topic_segments : topicSegments;
               const topicTitle =
                 nextSegments.find((seg: TopicSegmentState) => seg.topic_id === nextTopicId)?.title || nextTopicId;
@@ -551,7 +573,7 @@ const LiveTranscriptPanel = ({
                 <div className="transcript-title__label">Live Transcript</div>
                 <div className="transcript-title__sub">
                   <Clock size={12} />
-                  Context cửa sổ 30s
+                  Context cửa sổ 60s
                 </div>
               </div>
             </div>

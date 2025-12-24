@@ -58,7 +58,7 @@ SAAR (Self-aware Adaptive Agentic RAG) là xương sống AI của MeetMate:
 | Stage | SLA | Model Profile | Tools | Notes |
 | --- | --- | --- | --- | --- |
 | Pre-Meeting | Near-realtime/BATCH | Strong (long-context) | calendar, rag_search, send_pre_read | History-aware RAG, citations bắt buộc |
-| In-Meeting | Realtime | Fast streaming | create_task, schedule, attach_doc, poll_vote | Tick scheduler + rolling window |
+| In-Meeting | Realtime | Fast streaming | create_task, schedule, attach_doc, poll_vote | Tick every 30s, rolling 60s window |
 | Post-Meeting | Batch | Strong (long-context) | generate_minutes, sync_task, render_highlights | Map-reduce, compliance archive |
 
 ## System Architecture (5 Layers)
