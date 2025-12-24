@@ -84,7 +84,8 @@ def _compute_tick_anchor(stream_state) -> float:
 
 
 def _prune_stream_state(stream_state) -> None:
-    cutoff = stream_state.max_seen_time_end - ROLLING_RETENTION_SEC
+    cutoff = stream_state.max_see
+    n_time_end - ROLLING_RETENTION_SEC
     if cutoff <= 0:
         return
     kept = [chunk for chunk in stream_state.rolling_window if chunk.time_end >= cutoff]

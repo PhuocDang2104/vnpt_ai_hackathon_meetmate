@@ -1,25 +1,40 @@
 import os
 import sys
+from pathlib import Path
 import numpy as np
 import sounddevice as sd
+from dotenv import load_dotenv
 from pyannote.audio import Pipeline
 
 from audio_buffer import AudioBuffer
 from api_client import APIClient
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-if not HF_TOKEN:
-    sys.exit("HF_TOKEN is required for pyannote diarization")
+DOTENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=DOTENV_PATH, override=True)
 
+
+def _get_required_env(name: str, default: str | None = None) -> str:
+    value = os.getenv(name, default)
+    if not value:
+        sys.exit(f"{name} is required (checked env and {DOTENV_PATH})")
+    return value
+
+
+HF_TOKEN = _get_required_env("HF_TOKEN")
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000/api/v1")
-SESSION_ID = os.getenv("SESSION_ID")
-if not SESSION_ID:
-    sys.exit("SESSION_ID env var required")
+SESSION_ID = _get_required_env("SESSION_ID")
 
-pipeline = Pipeline.from_pretrained(
-    "pyannote/speaker-diarization",
-    use_auth_token=HF_TOKEN,
-)
+print(f"Loaded env from {DOTENV_PATH}")
+print(f"SESSION_ID={SESSION_ID} | BACKEND_BASE_URL={BACKEND_BASE_URL} | HF_TOKEN_present={bool(HF_TOKEN)}")
+
+try:
+    print("Loading diarization model pyannote/speaker-diarization ...")
+    pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization",
+        use_auth_token=HF_TOKEN,
+    )
+except Exception as exc:
+    sys.exit(f"Failed to load diarization model: {exc}")
 
 buffer = AudioBuffer()
 api = APIClient(

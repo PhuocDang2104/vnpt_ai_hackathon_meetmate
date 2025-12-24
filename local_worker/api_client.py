@@ -10,8 +10,15 @@ class APIClient:
         payload = {
             "segments": segments,
         }
-        requests.post(
-            f"{self.base_url}/diarization/{self.session_id}",
-            json=payload,
-            timeout=3,
-        )
+        try:
+            url = f"{self.base_url}/diarization/{self.session_id}"
+            print(f"[API] POST {url}")
+            resp = requests.post(
+                url,
+                json=payload,
+                timeout=3,
+            )
+            print(f"[API] diarization {resp.status_code} -> {resp.text[:200]}")
+            resp.raise_for_status()
+        except Exception as exc:
+            print(f"[API] diarization request failed: {exc}")

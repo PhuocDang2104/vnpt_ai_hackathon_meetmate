@@ -3,8 +3,10 @@ from typing import Any, Dict, List
 from fastapi import APIRouter
 
 from app.services.realtime_session_store import session_store
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/diarization/{session_id}")
@@ -35,4 +37,5 @@ async def ingest_diarization(session_id: str, payload: Dict[str, Any]):
             }
         )
 
+    logger.info("diarization_ingested session_id=%s segments=%s", session_id, len(stream_state.speaker_segments))
     return {"status": "ok"}
