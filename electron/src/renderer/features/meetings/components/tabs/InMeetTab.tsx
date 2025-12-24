@@ -18,7 +18,7 @@ import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { actionItems, decisions, formatDuration, risks } from '../../../../store/mockData';
 import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
-import { sessionsApi } from '../../../../lib/api/sessions';
+import { sessionsApi, diarizationApi } from '../../../../lib/api';
 
 type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
 interface InMeetTabProps {
@@ -157,6 +157,9 @@ export const InMeetTab = ({
   const [currentTopicId, setCurrentTopicId] = useState('T0');
   const [topicSegments, setTopicSegments] = useState<TopicSegmentState[]>([]);
   const [recapItems, setRecapItems] = useState<RecapItem[]>([]);
+  const [diarizationSegments, setDiarizationSegments] = useState<
+    { speaker: string; start: number; end: number; confidence?: number }[]
+  >([]);
   const [liveActions, setLiveActions] = useState<AdrAction[]>([]);
   const [liveDecisions, setLiveDecisions] = useState<AdrDecision[]>([]);
   const [liveRisks, setLiveRisks] = useState<AdrRisk[]>([]);
@@ -178,6 +181,27 @@ export const InMeetTab = ({
   }, []);
   const sessionIdForStream = streamSessionId || meeting.id;
   const feedEndpoint = useMemo(() => `${wsBase}/api/v1/ws/frontend/${sessionIdForStream}`, [wsBase, sessionIdForStream]);
+
+  useEffect(() => {
+    if (!USE_API || !sessionIdForStream) return;
+    let stop = false;
+    const fetchDiarization = async () => {
+      try {
+        const res = await diarizationApi.list(sessionIdForStream);
+        if (!stop && Array.isArray(res?.segments)) {
+          setDiarizationSegments(res.segments);
+        }
+      } catch (_err) {
+        // swallow polling errors
+      }
+    };
+    fetchDiarization();
+    const id = window.setInterval(fetchDiarization, 7000);
+    return () => {
+      stop = true;
+      window.clearInterval(id);
+    };
+  }, [sessionIdForStream]);
 
   const actions = useMemo<AdrAction[]>(() => {
     const scoped = actionItems.filter(a => a.meetingId === meeting.id).slice(0, 4);
@@ -412,6 +436,8 @@ export const InMeetTab = ({
             livePartial={livePartial}
             liveFinal={liveFinal}
             finalTranscriptCount={finalTranscript.length}
+            finalTranscript={finalTranscript}
+            diarizationSegments={diarizationSegments}
             liveRecap={liveRecap}
             semanticIntent={semanticIntent}
             currentTopicTitle={currentTopicTitle}
@@ -449,6 +475,8 @@ interface TranscriptPanelProps {
   livePartial: { speaker: string; text: string; time: number } | null;
   liveFinal: { speaker: string; text: string; time: number } | null;
   finalTranscriptCount: number;
+  finalTranscript: { id: string; speaker: string; text: string; time: number }[];
+  diarizationSegments: { speaker: string; start: number; end: number; confidence?: number }[];
   liveRecap: string | null;
   semanticIntent: string;
   currentTopicTitle: string;
@@ -522,6 +550,8 @@ const LiveTranscriptPanel = ({
   livePartial,
   liveFinal,
   finalTranscriptCount,
+  finalTranscript,
+  diarizationSegments,
   liveRecap,
   semanticIntent,
   currentTopicTitle,
@@ -538,6 +568,30 @@ const LiveTranscriptPanel = ({
   onFetchAudioToken,
   onReconnect,
 }: TranscriptPanelProps) => {
+  const speakerPalette = useMemo(
+    () => ['#5b8def', '#e66b6b', '#5cc28a', '#f0a35a', '#9c6ade', '#4fb3d4'],
+    [],
+  );
+  const speakerColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    let idx = 0;
+    finalTranscript.forEach(item => {
+      if (!map[item.speaker]) {
+        map[item.speaker] = speakerPalette[idx % speakerPalette.length];
+        idx += 1;
+      }
+    });
+    if (livePartial?.speaker && !map[livePartial.speaker]) {
+      map[livePartial.speaker] = speakerPalette[idx % speakerPalette.length];
+    }
+    if (liveFinal?.speaker && !map[liveFinal.speaker]) {
+      map[liveFinal.speaker] = speakerPalette[(idx + 1) % speakerPalette.length];
+    }
+    return map;
+  }, [finalTranscript, liveFinal, livePartial, speakerPalette]);
+
+  const recentFinal = useMemo(() => finalTranscript.slice(-10).reverse(), [finalTranscript]);
+  const recentDiarization = useMemo(() => diarizationSegments.slice(-8).reverse(), [diarizationSegments]);
   const lastFrameLabel = useMemo(() => {
     if (feedStatus === 'error') return 'Frontend WS lỗi - thử kết nối lại';
     if (feedStatus === 'connecting' || feedStatus === 'idle') return 'Đang chờ bắt tay WebSocket';
@@ -682,14 +736,46 @@ const LiveTranscriptPanel = ({
                   </div>
                   <div className="transcript-live-line__text">{finalText}</div>
                 </div>
+            </div>
+          </div>
+
+          <div className="transcript-live-card" style={{ marginTop: 12 }}>
+            <div className="transcript-live-card__header">
+              <div className="transcript-live-card__title">
+                <div className="pill pill--ghost">Diarization timeline</div>
+                <span className="pill pill--accent">async</span>
               </div>
             </div>
+            <div className="topic-log">
+              {recentDiarization.length === 0 ? (
+                <div className="empty-state empty-state--inline">Chưa có segment nào.</div>
+              ) : (
+                recentDiarization.map((item, idx) => (
+                  <div key={`${item.speaker}-${idx}`} className="topic-log__item">
+                    <span
+                      className="topic-log__time"
+                      style={{
+                        color: speakerColors[item.speaker] || undefined,
+                        minWidth: 90,
+                      }}
+                    >
+                      {item.speaker}
+                    </span>
+                    <span className="topic-log__text">
+                      [{formatDuration(item.start || 0)} - {formatDuration(item.end || 0)}]{' '}
+                      conf={(item.confidence ?? 1).toFixed(2)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
-            <div className="transcript-mini-status">
-              <span className={`pill ws-chip ws-chip--${feedStatus}`}>
-                Frontend WS · {feedStatus}
-              </span>
-              <span className="transcript-mini-status__meta">{lastFrameLabel}</span>
+          <div className="transcript-mini-status">
+            <span className={`pill ws-chip ws-chip--${feedStatus}`}>
+              Frontend WS · {feedStatus}
+            </span>
+            <span className="transcript-mini-status__meta">{lastFrameLabel}</span>
             </div>
           </div>
         </div>
