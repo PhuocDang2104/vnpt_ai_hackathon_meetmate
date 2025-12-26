@@ -263,6 +263,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         selectedTemplateId={selectedTemplateId}
         onSelectTemplate={setSelectedTemplateId}
         defaultTemplate={defaultTemplate}
+        templatesLoading={templatesLoading}
       />
 
       {/* Right - Transcript */}
@@ -417,6 +418,7 @@ interface CenterPanelProps {
   selectedTemplateId: string | null;
   onSelectTemplate: (templateId: string | null) => void;
   defaultTemplate: MinutesTemplate | null;
+  templatesLoading: boolean;
 }
 
 const CenterPanel = ({
@@ -437,6 +439,7 @@ const CenterPanel = ({
   selectedTemplateId,
   onSelectTemplate,
   defaultTemplate,
+  templatesLoading,
 }: CenterPanelProps) => {
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');

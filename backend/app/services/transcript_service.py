@@ -38,9 +38,11 @@ def list_transcript_chunks(
     query = text(f"""
         SELECT 
             tc.id::text, tc.meeting_id::text, tc.chunk_index,
-            tc.start_time, tc.end_time, tc.speaker,
+            COALESCE(tc.start_time, tc.time_start, 0.0) as start_time,
+            COALESCE(tc.end_time, tc.time_end, 0.0) as end_time,
+            tc.speaker,
             tc.speaker_user_id::text, tc.text, tc.confidence,
-            tc.language, tc.created_at,
+            COALESCE(tc.language, tc.lang, 'vi') as language, tc.created_at,
             u.display_name as speaker_name
         FROM transcript_chunk tc
         LEFT JOIN user_account u ON tc.speaker_user_id = u.id
@@ -98,6 +100,9 @@ def create_transcript_chunk(db: Session, data: TranscriptChunkCreate) -> Transcr
     chunk_id = str(uuid4())
     now = datetime.utcnow()
     
+    # Insert into primary columns (start_time, end_time, language)
+    # Database may also have time_start, time_end, lang, is_final columns
+    # We'll use the primary columns and let the database handle defaults if needed
     query = text("""
         INSERT INTO transcript_chunk (
             id, meeting_id, chunk_index, start_time, end_time,
@@ -183,8 +188,11 @@ def update_transcript_chunk(
         SET {', '.join(updates)}
         WHERE id = :chunk_id
         RETURNING id::text, meeting_id::text, chunk_index,
-            start_time, end_time, speaker, speaker_user_id::text,
-            text, confidence, language, created_at
+            COALESCE(start_time, time_start, 0.0) as start_time,
+            COALESCE(end_time, time_end, 0.0) as end_time,
+            speaker, speaker_user_id::text,
+            text, confidence,
+            COALESCE(language, lang, 'vi') as language, created_at
     """)
     
     result = db.execute(query, params)
