@@ -61,7 +61,7 @@ const Sidebar = () => {
       {/* Logo */}
       <div className="sidebar__header">
         <div className="sidebar__logo">
-          <div className="sidebar__logo-icon" style={{ padding: 0, background: 'transparent' }}>
+          <div className="sidebar__logo-icon" style={{ padding: 0 }}>
             <img
               src="/favicon.svg"
               alt="MeetMate"
@@ -88,7 +88,7 @@ const Sidebar = () => {
                   end={item.path === '/app'}
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{t(item.labelKey)}</span>
+                  <span className="sidebar__nav-label">{t(item.labelKey)}</span>
                   {item.badge && item.badge > 0 && (
                     <span className="sidebar__nav-badge">{item.badge}</span>
                   )}
@@ -111,7 +111,7 @@ const Sidebar = () => {
                   }
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{t(item.labelKey)}</span>
+                  <span className="sidebar__nav-label">{t(item.labelKey)}</span>
                   {item.badge && item.badge > 0 && (
                     <span className="sidebar__nav-badge">{item.badge}</span>
                   )}
@@ -134,7 +134,7 @@ const Sidebar = () => {
                   }
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>
-                  <span>{t(item.labelKey)}</span>
+                  <span className="sidebar__nav-label">{t(item.labelKey)}</span>
                 </NavLink>
               </li>
             ))}

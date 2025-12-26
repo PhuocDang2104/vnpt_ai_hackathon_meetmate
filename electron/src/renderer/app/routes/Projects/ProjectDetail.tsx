@@ -558,18 +558,16 @@ const ProjectDetail = () => {
             minHeight: 320,
             padding: 0,
             overflow: 'hidden',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
           }}
         >
           <div
             style={{
               padding: '16px 20px',
-              background: 'linear-gradient(90deg, #5b5fc7 0%, #7c3aed 50%, #5b5fc7 100%)',
+              background: 'var(--cta-gradient)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              color: '#fff',
+              color: 'var(--text-on-accent)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -618,13 +616,13 @@ const ProjectDetail = () => {
                   width: 64,
                   height: 64,
                   borderRadius: '50%',
-                  background: 'rgba(91,95,199,0.12)',
+                  background: 'rgba(247,167,69,0.18)',
                   margin: '0 auto 10px auto',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 26,
-                  color: '#8ab4ff',
+                  color: 'var(--accent)',
                 }}
               >
                 🤖
