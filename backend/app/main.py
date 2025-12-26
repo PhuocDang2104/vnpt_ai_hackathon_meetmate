@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     transcripts,
     participants,
     minutes,
+    minutes_template,
     tools,
 )
 from app.api.v1.websocket import in_meeting_ws
@@ -75,6 +76,7 @@ app.include_router(action_items.router, prefix=f"{settings.api_v1_prefix}/items"
 app.include_router(transcripts.router, prefix=f"{settings.api_v1_prefix}/transcripts", tags=['transcripts'])
 app.include_router(participants.router, prefix=f"{settings.api_v1_prefix}/participants", tags=['participants'])
 app.include_router(minutes.router, prefix=f"{settings.api_v1_prefix}/minutes", tags=['minutes'])
+app.include_router(minutes_template.router, prefix=f"{settings.api_v1_prefix}/minutes-templates", tags=['minutes-templates'])
 app.include_router(tools.router, prefix=f"{settings.api_v1_prefix}/tools", tags=['tools'])
 app.include_router(in_meeting_ws.router, prefix=f"{settings.api_v1_prefix}/ws", tags=['ws'])
 

@@ -29,6 +29,7 @@ export interface MeetingMinutesList {
 
 export interface GenerateMinutesRequest {
   meeting_id: string;
+  template_id?: string; // Template ID to use for generation
   include_transcript?: boolean;
   include_actions?: boolean;
   include_decisions?: boolean;

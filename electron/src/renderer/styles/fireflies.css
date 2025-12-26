@@ -504,7 +504,57 @@
   color: var(--text-primary);
 }
 
-/* Threads */
+/* Template Selector */
+.fireflies-template-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.fireflies-template-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fireflies-template-select {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+}
+
+.fireflies-template-select:hover {
+  border-color: var(--border-hover);
+}
+
+.fireflies-template-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.fireflies-template-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fireflies-template-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Threads (deprecated - keeping for backward compatibility) */
 .fireflies-threads {
   display: flex;
   border-bottom: 1px solid var(--border-default);

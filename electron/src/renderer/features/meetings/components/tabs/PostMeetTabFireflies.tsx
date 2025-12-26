@@ -33,6 +33,7 @@ import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
 import { transcriptsApi } from '../../../../lib/api/transcripts';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
 import { meetingsApi } from '../../../../lib/api/meetings';
+import { minutesTemplateApi, type MinutesTemplate } from '../../../../lib/api/minutes_template';
 
 interface PostMeetTabFirefliesProps {
   meeting: MeetingWithParticipants;
@@ -78,6 +79,10 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isProcessingVideo, setIsProcessingVideo] = useState(false);
   
+  const [templates, setTemplates] = useState<MinutesTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [defaultTemplate, setDefaultTemplate] = useState<MinutesTemplate | null>(null);
+  
   const [filters, setFilters] = useState<FilterState>({
     questions: false,
     dates: false,
@@ -93,7 +98,27 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
 
   useEffect(() => {
     loadAllData();
+    loadTemplates();
   }, [meeting.id]);
+  
+  const loadTemplates = async () => {
+    try {
+      const [templatesList, defaultTmpl] = await Promise.all([
+        minutesTemplateApi.list({ is_active: true }),
+        minutesTemplateApi.getDefault().catch(() => null),
+      ]);
+      
+      setTemplates(templatesList.templates);
+      if (defaultTmpl) {
+        setDefaultTemplate(defaultTmpl);
+        setSelectedTemplateId(defaultTmpl.id);
+      } else if (templatesList.templates.length > 0) {
+        setSelectedTemplateId(templatesList.templates[0].id);
+      }
+    } catch (err) {
+      console.error('Load templates failed:', err);
+    }
+  };
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -156,6 +181,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     try {
       const generated = await minutesApi.generate({
         meeting_id: meeting.id,
+        template_id: selectedTemplateId || undefined,
         include_transcript: true,
         include_actions: true,
         include_decisions: true,
@@ -208,6 +234,10 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         isProcessingVideo={isProcessingVideo}
         setIsProcessingVideo={setIsProcessingVideo}
         onRefresh={onRefresh}
+        templates={templates}
+        selectedTemplateId={selectedTemplateId}
+        onSelectTemplate={setSelectedTemplateId}
+        defaultTemplate={defaultTemplate}
       />
 
       {/* Right - Transcript */}
@@ -358,6 +388,10 @@ interface CenterPanelProps {
   isProcessingVideo: boolean;
   setIsProcessingVideo: (value: boolean) => void;
   onRefresh: () => void;
+  templates: MinutesTemplate[];
+  selectedTemplateId: string | null;
+  onSelectTemplate: (templateId: string | null) => void;
+  defaultTemplate: MinutesTemplate | null;
 }
 
 const CenterPanel = ({
@@ -374,17 +408,14 @@ const CenterPanel = ({
   isProcessingVideo,
   setIsProcessingVideo,
   onRefresh,
+  templates,
+  selectedTemplateId,
+  onSelectTemplate,
+  defaultTemplate,
 }: CenterPanelProps) => {
-  const [activeThread, setActiveThread] = useState<'summary' | 'actions' | 'decisions'>('summary');
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [dragActive, setDragActive] = useState(false);
-
-  const threads = [
-    { id: 'summary' as const, label: 'AI Meeting Summary', count: null },
-    { id: 'actions' as const, label: 'Action Items', count: actionItems.length },
-    { id: 'decisions' as const, label: 'Decisions', count: decisions.length },
-  ];
 
   const handleSaveSummary = async () => {
     if (!minutes) return;
@@ -525,18 +556,28 @@ const CenterPanel = ({
         </div>
       </div>
 
-      {/* Threads */}
-      <div className="fireflies-threads">
-        {threads.map((thread) => (
-          <button
-            key={thread.id}
-            className={`fireflies-thread-tab ${activeThread === thread.id ? 'active' : ''}`}
-            onClick={() => setActiveThread(thread.id)}
-          >
-            {thread.label}
-            {thread.count !== null && <span className="fireflies-thread-count">{thread.count}</span>}
-          </button>
-        ))}
+      {/* Template Selector */}
+      <div className="fireflies-template-selector">
+        <label className="fireflies-template-label">
+          <span>Template biên bản:</span>
+        </label>
+        <select
+          className="fireflies-template-select"
+          value={selectedTemplateId || ''}
+          onChange={(e) => onSelectTemplate(e.target.value || null)}
+          disabled={isGenerating}
+        >
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.name} {template.is_default ? '(Mặc định)' : ''}
+            </option>
+          ))}
+        </select>
+        {selectedTemplateId && (
+          <span className="fireflies-template-description">
+            {templates.find((t) => t.id === selectedTemplateId)?.description || ''}
+          </span>
+        )}
       </div>
 
       {/* Content */}
@@ -544,22 +585,14 @@ const CenterPanel = ({
         {!minutes ? (
           <EmptyAIContent onGenerate={onGenerate} isGenerating={isGenerating} />
         ) : (
-          <>
-            {activeThread === 'summary' && (
-              <SummaryContent
-                minutes={minutes}
-                isEditing={isEditingSummary}
-                editContent={editContent}
-                setEditContent={setEditContent}
-                onSave={handleSaveSummary}
-                onCancel={() => setIsEditingSummary(false)}
-              />
-            )}
-
-            {activeThread === 'actions' && <ActionItemsContent items={actionItems} />}
-
-            {activeThread === 'decisions' && <DecisionsContent items={decisions} risks={risks} />}
-          </>
+          <SummaryContent
+            minutes={minutes}
+            isEditing={isEditingSummary}
+            editContent={editContent}
+            setEditContent={setEditContent}
+            onSave={handleSaveSummary}
+            onCancel={() => setIsEditingSummary(false)}
+          />
         )}
       </div>
     </div>
