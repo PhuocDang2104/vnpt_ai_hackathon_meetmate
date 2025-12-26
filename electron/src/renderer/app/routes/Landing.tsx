@@ -1,27 +1,55 @@
 /**
  * Landing Page - Welcome to MeetMate
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Calendar, 
   MessageSquare, 
   FileText, 
   CheckSquare,
-  Zap,
-  Shield,
-  Users,
   ArrowRight,
-  Sparkles
 } from 'lucide-react';
+import BackgroundRippleEffect from '../../components/ui/background-ripple-effect';
 
 export const Landing: React.FC = () => {
+  useEffect(() => {
+    const root = document.querySelector('.landing-page');
+    if (!root) return;
+    const elements = Array.from(root.querySelectorAll<HTMLElement>('.reveal-on-scroll'));
+    if (elements.length === 0) return;
+
+    if (!('IntersectionObserver' in window)) {
+      elements.forEach((el) => el.classList.add('is-visible'));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -10% 0px' },
+    );
+
+    elements.forEach((el, index) => {
+      const delay = (index % 6) * 90;
+      el.style.setProperty('--reveal-delay', `${delay}ms`);
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="landing-page">
       {/* Header */}
       <header className="landing-header">
         <div className="logo">
-          <Sparkles size={28} />
+          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
           <span>MeetMate</span>
         </div>
         <nav className="landing-nav">
@@ -31,42 +59,25 @@ export const Landing: React.FC = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-content">
-          <h1>
-            Cuộc họp hiệu quả hơn với
-            <span className="gradient-text"> AI Assistant</span>
-          </h1>
-          <p className="hero-subtitle">
-            MeetMate giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động. 
-            Tiết kiệm thời gian, không bỏ lỡ action items quan trọng.
-          </p>
-          <div className="hero-actions">
-          <Link to="/about" className="btn btn-primary btn-lg">
-              Tìm hiểu về chúng tôi
-              <ArrowRight size={20} />
-            </Link>
-            <Link to="/login" className="btn btn-outline btn-lg">
-              Đăng nhập
-            </Link>
-          </div>
-        </div>
-        <div className="hero-visual">
-          <div className="hero-card">
-            <div className="card-header">
-              <span className="dot red"></span>
-              <span className="dot yellow"></span>
-              <span className="dot green"></span>
-            </div>
-            <div className="card-content">
-              <div className="mock-meeting">
-                <div className="meeting-title">Steering Committee Q4</div>
-                <div className="meeting-meta">14:00 - 15:30 • 8 người tham gia</div>
-                <div className="ai-badge">
-                  <Sparkles size={14} />
-                  AI đang ghi chép...
-                </div>
-              </div>
+      <section className="hero reveal-on-scroll">
+        <div className="hero-stage reveal-on-scroll">
+          <BackgroundRippleEffect rows={14} cols={30} cellSize={48} />
+          <div className="hero-stage__content">
+            <h1 className="hero-title">
+              Cuộc họp hiệu quả hơn với <span className="gradient-text">AI Assistant</span>
+            </h1>
+            <p className="hero-subtitle">
+              MeetMate giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động. 
+              Tiết kiệm thời gian, không bỏ lỡ action items quan trọng.
+            </p>
+            <div className="hero-actions">
+              <Link to="/about" className="btn btn-outline btn-lg hero-cta hero-cta--ghost">
+                Tìm hiểu về chúng tôi
+                <ArrowRight size={18} />
+              </Link>
+              <Link to="/login" className="btn btn-primary btn-lg hero-cta hero-cta--primary hero-login">
+                Đăng nhập
+              </Link>
             </div>
           </div>
         </div>
@@ -74,78 +85,203 @@ export const Landing: React.FC = () => {
 
       {/* Features Section */}
       <section className="features">
-        <h2>Tính năng nổi bật</h2>
+        <h2 className="reveal-on-scroll">Tính năng nổi bật</h2>
         <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon">
-              <Calendar />
+          <div className="feature-card reveal-on-scroll">
+            <div className="feature-card__header">
+              <div className="feature-icon">
+                <Calendar />
+              </div>
+              <h3>Pre-Meeting</h3>
+              <p className="feature-card__summary">
+                AI tự động tạo agenda, gợi ý tài liệu pre-read và người cần mời.
+              </p>
             </div>
-            <h3>Pre-meeting</h3>
-            <p>AI tự động tạo agenda, gợi ý tài liệu pre-read và người cần mời</p>
+            <div className="feature-card__expanded">
+              <div className="feature-card__details">
+                <p className="feature-card__desc">
+                  MeetMate đồng bộ lịch từ Outlook, Teams, VNPT..., nhận diện chủ đề và đơn vị tham gia,
+                  rồi dùng RAG để tra cứu kho tài liệu nội bộ, chọn đúng policy, proposal và biên bản liên
+                  quan. Tất cả được đóng gói thành pre-read pack kèm agenda gợi ý.
+                </p>
+                <ul className="feature-card__list">
+                  <li>Đồng bộ lịch và nhận diện bối cảnh cuộc họp</li>
+                  <li>Tra cứu policy/proposal/biên bản liên quan bằng RAG</li>
+                  <li>Tạo pre-read pack và agenda gửi trước</li>
+                  <li>Gợi ý câu hỏi trọng tâm cho người tham dự</li>
+                </ul>
+              </div>
+              <div className="feature-card__media">
+                <img src="/meetmate_ai.png" alt="Pre-meeting overview" />
+              </div>
+            </div>
           </div>
-          <div className="feature-card">
-            <div className="feature-icon">
-              <MessageSquare />
+          <div className="feature-card reveal-on-scroll">
+            <div className="feature-card__header">
+              <div className="feature-icon">
+                <MessageSquare />
+              </div>
+              <h3>In-Meeting</h3>
+              <p className="feature-card__summary">
+                Ghi chép real-time, phát hiện action items, decisions và risks.
+              </p>
             </div>
-            <h3>In-meeting</h3>
-            <p>Ghi chép real-time, phát hiện action items, decisions và risks</p>
+            <div className="feature-card__expanded">
+              <div className="feature-card__details">
+                <p className="feature-card__desc">
+                  Bot MeetMate tham gia như một thành viên, hiển thị Live Notes – Actions – Ask AI. Hệ
+                  thống ghi theo từng người nói, recap liên tục theo timeline, nhận diện Action/Decision/Risk
+                  và gợi ý tạo nhiệm vụ, lịch follow-up, mở tài liệu liên quan. Mọi thao tác đều có một bước
+                  xác nhận.
+                </p>
+                <ul className="feature-card__list">
+                  <li>Live Notes theo từng người nói và recap timeline</li>
+                  <li>Tự động nhận diện Action/Decision/Risk</li>
+                  <li>Gợi ý tạo nhiệm vụ và lịch follow-up</li>
+                  <li>Ask AI dựa trên tài liệu nội bộ có xác nhận</li>
+                </ul>
+              </div>
+              <div className="feature-card__media">
+                <img src="/meetmate_ai.png" alt="In-meeting assistant" />
+              </div>
+            </div>
           </div>
-          <div className="feature-card">
-            <div className="feature-icon">
-              <FileText />
+          <div className="feature-card reveal-on-scroll">
+            <div className="feature-card__header">
+              <div className="feature-icon">
+                <FileText />
+              </div>
+              <h3>Post-Meeting</h3>
+              <p className="feature-card__summary">
+                Tự động tạo biên bản, sync tasks với Jira/Planner, gửi MoM.
+              </p>
             </div>
-            <h3>Post-meeting</h3>
-            <p>Tự động tạo biên bản, sync tasks với Jira/Planner, gửi MoM</p>
+            <div className="feature-card__expanded">
+              <div className="feature-card__details">
+                <p className="feature-card__desc">
+                  Sau khi kết thúc, MeetMate tạo biên bản chuẩn với mục tiêu, nội dung chính, quyết định,
+                  hành động và rủi ro kèm timecode. Các đầu việc đồng bộ sang Planner/Jira/Work hoặc hệ
+                  thống nội bộ, gán đúng owner và deadline.
+                </p>
+                <ul className="feature-card__list">
+                  <li>Biên bản chuẩn có timecode</li>
+                  <li>Action/Decision với owner và deadline</li>
+                  <li>Đồng bộ Planner/Jira/Work</li>
+                  <li>Tra cứu lại quyết định theo cuộc họp</li>
+                </ul>
+              </div>
+              <div className="feature-card__media">
+                <img src="/meetmate_ai.png" alt="Post-meeting summary" />
+              </div>
+            </div>
           </div>
-          <div className="feature-card">
-            <div className="feature-icon">
-              <CheckSquare />
+          <div className="feature-card reveal-on-scroll">
+            <div className="feature-card__header">
+              <div className="feature-icon">
+                <CheckSquare />
+              </div>
+              <h3>RAG Q&A</h3>
+              <p className="feature-card__summary">
+                Hỏi đáp documents, policies với AI và citations chính xác.
+              </p>
             </div>
-            <h3>RAG Q&A</h3>
-            <p>Hỏi đáp documents, policies với AI - citations chính xác</p>
+            <div className="feature-card__expanded">
+              <div className="feature-card__details">
+                <p className="feature-card__desc">
+                  Hỏi đáp nhanh policy, số liệu, tài liệu nội bộ theo ngữ cảnh dự án. Câu trả lời có trích
+                  dẫn nguồn, gợi ý câu hỏi tiếp theo và tuân thủ quyền truy cập.
+                </p>
+                <ul className="feature-card__list">
+                  <li>Tìm đúng tài liệu theo ngữ cảnh dự án</li>
+                  <li>Câu trả lời có trích dẫn nguồn</li>
+                  <li>Gợi ý câu hỏi tiếp theo</li>
+                  <li>Tuân thủ quyền truy cập tài liệu</li>
+                </ul>
+              </div>
+              <div className="feature-card__media">
+                <img src="/meetmate_ai.png" alt="RAG Q&A" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Benefits Section */}
       <section className="benefits">
-        <div className="benefit">
-          <Zap className="benefit-icon" />
-          <div>
-            <h4>Tiết kiệm 70% thời gian</h4>
-            <p>Không cần ghi chép thủ công, AI làm hết</p>
+        <div className="benefits-rail">
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">24/7</div>
+            <p className="benefit-desc">
+              Sẵn sàng tham gia mọi cuộc họp, từ call đột xuất tới phiên họp ủy ban định kỳ
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">90%</div>
+            <p className="benefit-desc">
+              Khối lượng ghi chép và soạn biên bản thủ công có thể được tự động hóa
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">2×</div>
+            <p className="benefit-desc">
+              Tốc độ chốt quyết định và giao việc sau họp được đẩy nhanh gấp đôi nhờ RAG và AI Agents
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">0 thông tin bị bỏ lỡ</div>
+            <p className="benefit-desc">
+              Mỗi quyết định đều được ghi lại, gắn người chịu trách nhiệm và dễ dàng truy vết khi cần
+            </p>
           </div>
         </div>
-        <div className="benefit">
-          <Shield className="benefit-icon" />
-          <div>
-            <h4>Không bỏ sót action items</h4>
-            <p>AI phát hiện và nhắc nhở deadline</p>
-          </div>
+      </section>
+
+      {/* Comparison Section */}
+      <section className="comparison">
+        <div className="comparison__header reveal-on-scroll">
+          <h2>Trước và sau khi có MeetMate</h2>
         </div>
-        <div className="benefit">
-          <Users className="benefit-icon" />
-          <div>
-            <h4>Dành cho Enterprise</h4>
-            <p>Tích hợp Microsoft 365, Jira, SharePoint</p>
+        <div className="comparison-shell">
+          <div className="comparison-panel comparison-panel--without reveal-on-scroll">
+            <h3 className="comparison-title">Không dùng MeetMate</h3>
+            <ul className="comparison-list comparison-list--without">
+              <li>Tồn đọng biên bản và các đầu việc follow-up sau họp.</li>
+              <li>Quyết định quan trọng chỉ nằm trong trí nhớ từng người.</li>
+              <li>Ghi chép, tổng hợp thủ công, tốn nhiều giờ làm việc giá trị thấp.</li>
+              <li>Khó truy vết: “Cuộc họp nào đã chốt điều này? Ai chịu trách nhiệm?”</li>
+              <li>Áp lực lên thư ký, PM, RM; rủi ro miss việc, miss deadline.</li>
+            </ul>
+          </div>
+          <div className="comparison-divider">
+            <span>VS</span>
+          </div>
+          <div className="comparison-panel comparison-panel--with reveal-on-scroll">
+            <h3 className="comparison-title">Khi có MeetMate</h3>
+            <ul className="comparison-list comparison-list--with">
+              <li>Nền tảng AI khép kín Pre – In – Post cho mọi cuộc họp.</li>
+              <li>Biên bản, quyết định và hành động được tự động hóa, chuẩn hóa.</li>
+              <li>Nhiều thời gian hơn cho phân tích, phục vụ khách hàng và ra quyết định.</li>
+              <li>Lịch sử họp và quyết định minh bạch, truy vết được cho audit và quản trị rủi ro.</li>
+              <li>Quy trình follow-up, giao việc sau họp vận hành mượt mà, không bỏ sót.</li>
+            </ul>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="cta">
+      <section className="cta reveal-on-scroll">
         <h2>Sẵn sàng nâng cấp cuộc họp?</h2>
         <p>Đăng ký ngay để trải nghiệm MeetMate miễn phí</p>
-        <Link to="/register" className="btn btn-primary btn-lg">
-          Tạo tài khoản
+        <Link to="/login" className="btn btn-primary btn-lg cta-button">
+          Bắt đầu
           <ArrowRight size={20} />
         </Link>
       </section>
 
       {/* Footer */}
-      <footer className="landing-footer">
+      <footer className="landing-footer reveal-on-scroll">
         <div className="footer-brand">
-          <Sparkles size={20} />
+          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
           <span>MeetMate</span>
         </div>
         <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
@@ -163,7 +299,7 @@ export const Landing: React.FC = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: var(--space-md) var(--space-xl);
+          padding: var(--space-sm) var(--space-xl);
           max-width: 1200px;
           margin: 0 auto;
         }
@@ -178,6 +314,18 @@ export const Landing: React.FC = () => {
           color: var(--accent);
         }
 
+        .landing-logo__icon {
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
+          filter: drop-shadow(0 8px 16px rgba(247, 167, 69, 0.35));
+        }
+
+        .landing-logo__icon--sm {
+          width: 22px;
+          height: 22px;
+        }
+
         .landing-nav {
           display: flex;
           gap: var(--space-sm);
@@ -185,25 +333,47 @@ export const Landing: React.FC = () => {
 
         /* Hero */
         .hero {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: var(--space-2xl);
-          align-items: center;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: var(--space-2xl) var(--space-xl);
+          padding: var(--space-lg) 0;
         }
 
-        .hero h1 {
+        .hero-stage {
+          width: 100%;
+          aspect-ratio: 24 / 9;
+          border-radius: 0;
+          border: 1px solid var(--border);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 247, 247, 0.9));
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.15);
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0;
+        }
+
+        .hero-stage__content {
+          position: relative;
+          z-index: 4;
+          text-align: center;
+          max-width: 720px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: var(--space-md);
+          padding: var(--space-xl) 0;
+          pointer-events: none;
+        }
+
+        .hero-title {
           font-family: var(--font-heading);
           font-size: 3rem;
           font-weight: 700;
-          line-height: 1.2;
-          margin: 0 0 var(--space-md);
+          line-height: 1.15;
+          margin: 0;
         }
 
         .gradient-text {
-          background: linear-gradient(135deg, var(--accent), #f59e0b);
+          background: linear-gradient(135deg, var(--accent), #d9822b);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -213,82 +383,56 @@ export const Landing: React.FC = () => {
           font-size: 1.25rem;
           color: var(--text-secondary);
           line-height: 1.6;
-          margin-bottom: var(--space-lg);
+          margin: 0;
+          max-width: 620px;
         }
 
         .hero-actions {
           display: flex;
-          gap: var(--space-md);
-        }
-
-        .hero-visual {
-          display: flex;
-          justify-content: center;
-        }
-
-        .hero-card {
-          background: var(--bg-elevated);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          overflow: hidden;
-          width: 100%;
-          max-width: 400px;
-        }
-
-        .card-header {
-          display: flex;
-          gap: 6px;
-          padding: var(--space-sm);
-          background: var(--bg-surface);
-          border-bottom: 1px solid var(--border);
-        }
-
-        .dot {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-        }
-        .dot.red { background: #ef4444; }
-        .dot.yellow { background: #f59e0b; }
-        .dot.green { background: #22c55e; }
-
-        .card-content {
-          padding: var(--space-lg);
-        }
-
-        .mock-meeting {
-          text-align: center;
-        }
-
-        .meeting-title {
-          font-family: var(--font-heading);
-          font-size: 1.25rem;
-          font-weight: 600;
-          margin-bottom: var(--space-xs);
-        }
-
-        .meeting-meta {
-          font-size: 0.875rem;
-          color: var(--text-secondary);
-          margin-bottom: var(--space-md);
-        }
-
-        .ai-badge {
-          display: inline-flex;
+          flex-direction: row;
           align-items: center;
-          gap: var(--space-xs);
-          padding: var(--space-xs) var(--space-sm);
-          background: rgba(234, 179, 8, 0.1);
-          border: 1px solid rgba(234, 179, 8, 0.3);
-          border-radius: var(--radius-sm);
-          color: var(--accent);
-          font-size: 0.875rem;
-          animation: pulse 2s infinite;
+          gap: var(--space-sm);
+          margin-top: var(--space-sm);
+          flex-wrap: wrap;
+          justify-content: center;
+          pointer-events: auto;
         }
 
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
+        .hero-login {
+          min-width: 200px;
+        }
+
+        .hero-cta {
+          position: relative;
+          border-radius: 999px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          padding: 14px 26px;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .hero-cta--primary {
+          background: var(--cta-gradient);
+          color: var(--text-on-accent);
+          border: 1px solid rgba(247, 167, 69, 0.5);
+          box-shadow: 0 12px 24px rgba(247, 167, 69, 0.35);
+        }
+
+        .hero-cta--primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 32px rgba(247, 167, 69, 0.45);
+        }
+
+        .hero-cta--ghost {
+          border: 1px solid rgba(17, 17, 17, 0.2);
+          background: rgba(255, 255, 255, 0.75);
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .hero-cta--ghost:hover {
+          transform: translateY(-2px);
+          border-color: rgba(247, 167, 69, 0.5);
+          color: var(--accent);
         }
 
         /* Features */
@@ -307,8 +451,11 @@ export const Landing: React.FC = () => {
 
         .features-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: var(--space-lg);
+          align-items: stretch;
+          transition: grid-template-columns 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+            gap 0.4s ease;
         }
 
         .feature-card {
@@ -316,13 +463,56 @@ export const Landing: React.FC = () => {
           border: 1px solid var(--border);
           border-radius: var(--radius-lg);
           padding: var(--space-lg);
-          text-align: center;
-          transition: transform 0.2s, border-color 0.2s;
+          text-align: left;
+          transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+            border-color 0.35s ease,
+            box-shadow 0.35s ease,
+            opacity 0.35s ease,
+            min-height 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-md);
+          min-width: 0;
+          position: relative;
+          overflow: hidden;
+          min-height: 240px;
+          will-change: transform;
         }
 
-        .feature-card:hover {
+        .feature-card__header {
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-xs);
+        }
+
+        .features-grid:hover .feature-card {
+          opacity: 0.7;
+        }
+
+        .features-grid:hover .feature-card:hover {
+          opacity: 1;
           transform: translateY(-4px);
           border-color: var(--accent);
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+          min-height: 380px;
+        }
+
+        @supports selector(:has(*)) {
+          .features-grid:has(.feature-card:nth-child(1):hover) {
+            grid-template-columns: 9fr 1fr 1fr 1fr;
+          }
+
+          .features-grid:has(.feature-card:nth-child(2):hover) {
+            grid-template-columns: 1fr 9fr 1fr 1fr;
+          }
+
+          .features-grid:has(.feature-card:nth-child(3):hover) {
+            grid-template-columns: 1fr 1fr 9fr 1fr;
+          }
+
+          .features-grid:has(.feature-card:nth-child(4):hover) {
+            grid-template-columns: 1fr 1fr 1fr 9fr;
+          }
         }
 
         .feature-icon {
@@ -334,55 +524,391 @@ export const Landing: React.FC = () => {
           background: rgba(234, 179, 8, 0.1);
           border-radius: var(--radius-md);
           color: var(--accent);
-          margin-bottom: var(--space-md);
+          margin-bottom: 0;
         }
 
-        .feature-card h3 {
+        .feature-card__header h3 {
           font-family: var(--font-heading);
           font-size: 1.125rem;
-          margin-bottom: var(--space-sm);
+          margin: 0;
         }
 
-        .feature-card p {
-          font-size: 0.875rem;
+        .feature-card__summary {
+          font-size: 0.9rem;
           color: var(--text-secondary);
           line-height: 1.5;
+          margin: 0;
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .feature-card__expanded {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+          gap: var(--space-md);
+          align-items: center;
+          margin-top: var(--space-sm);
+          opacity: 0;
+          max-height: 0;
+          transform: translateY(8px);
+          transition: max-height 0.6s cubic-bezier(0.22, 0.61, 0.36, 1),
+            opacity 0.35s ease,
+            transform 0.45s ease;
+          overflow: hidden;
+        }
+
+        .feature-card:hover .feature-card__expanded {
+          opacity: 1;
+          max-height: 420px;
+          transform: translateY(0);
+        }
+
+        .feature-card__desc {
+          font-size: 0.9rem;
+          color: var(--text-secondary);
+          line-height: 1.6;
+          margin: 0 0 var(--space-sm);
+        }
+
+        .feature-card__list {
+          margin: 0;
+          padding-left: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          color: var(--text-secondary);
+          font-size: 0.85rem;
+          line-height: 1.5;
+        }
+
+        .feature-card__media {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .feature-card__media img {
+          width: 100%;
+          max-width: 220px;
+          height: auto;
+          object-fit: contain;
+          border-radius: 14px;
+          border: 1px solid var(--border);
+          background: #fff;
+          padding: var(--space-sm);
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
         }
 
         /* Benefits */
         .benefits {
-          display: flex;
-          justify-content: center;
-          gap: var(--space-2xl);
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: var(--space-xl);
-          background: var(--bg-surface);
+          padding: var(--space-2xl) var(--space-xl);
+          background:
+            radial-gradient(circle at 20% -20%, rgba(247, 167, 69, 0.12), transparent 50%),
+            radial-gradient(circle at 80% 120%, rgba(247, 167, 69, 0.1), transparent 55%),
+            var(--bg-surface);
           border-top: 1px solid var(--border);
           border-bottom: 1px solid var(--border);
         }
 
-        .benefit {
-          display: flex;
-          align-items: flex-start;
-          gap: var(--space-md);
+        .benefits-rail {
+          max-width: 1200px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: var(--space-xl);
+          position: relative;
+          padding: var(--space-lg) 0;
         }
 
-        .benefit-icon {
-          color: var(--accent);
-          flex-shrink: 0;
+        .benefits-rail::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 6px;
+          height: 2px;
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(247, 167, 69, 0.35) 20%,
+            rgba(247, 167, 69, 0.7) 50%,
+            rgba(247, 167, 69, 0.35) 80%,
+            transparent 100%
+          );
+          opacity: 0.7;
+          animation: rail-sweep 10s ease-in-out infinite;
         }
 
-        .benefit h4 {
+        .benefits-rail::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 6px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent);
+        }
+
+        .benefit-item {
+          position: relative;
+          padding: var(--space-lg) var(--space-md) var(--space-lg) var(--space-lg);
+          min-height: 160px;
+          transition: transform 0.25s ease, color 0.25s ease;
+        }
+
+        .benefit-item::before {
+          content: '';
+          position: absolute;
+          left: var(--space-sm);
+          top: var(--space-md);
+          bottom: var(--space-md);
+          width: 1px;
+          background: linear-gradient(180deg, transparent, rgba(247, 167, 69, 0.5), transparent);
+          opacity: 0.6;
+        }
+
+        .benefit-item::after {
+          content: '';
+          position: absolute;
+          left: calc(var(--space-sm) - 3px);
+          top: var(--space-md);
+          width: 6px;
+          height: 6px;
+          border-radius: 999px;
+          background: var(--accent);
+          box-shadow: 0 0 0 6px rgba(247, 167, 69, 0.12);
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .benefit-item:hover {
+          transform: translateY(-6px);
+        }
+
+        .benefit-item:hover::after {
+          transform: scale(1.15);
+          box-shadow: 0 0 0 8px rgba(247, 167, 69, 0.2);
+        }
+
+        .benefit-value {
           font-family: var(--font-heading);
-          font-size: 1rem;
-          margin: 0 0 var(--space-xs);
+          font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          margin-bottom: var(--space-sm);
+          color: var(--text-primary);
+          transition: color 0.25s ease;
         }
 
-        .benefit p {
-          font-size: 0.875rem;
+        .benefit-desc {
+          font-size: 0.95rem;
           color: var(--text-secondary);
+          line-height: 1.6;
           margin: 0;
+          transition: color 0.25s ease;
+        }
+
+        .benefit-item:hover .benefit-value {
+          color: var(--accent);
+        }
+
+        @keyframes rail-sweep {
+          0%,
+          100% {
+            opacity: 0.4;
+            transform: translateX(-4%);
+          }
+          50% {
+            opacity: 0.75;
+            transform: translateX(4%);
+          }
+        }
+
+        .reveal-on-scroll {
+          opacity: 0;
+          transform: translateY(18px) scale(0.98);
+          transition: opacity 0.6s ease, transform 0.6s ease;
+          transition-delay: var(--reveal-delay, 0ms);
+          will-change: opacity, transform;
+        }
+
+        .reveal-on-scroll.is-visible {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+
+        /* Comparison */
+        .comparison {
+          padding: var(--space-2xl) var(--space-xl);
+          background: linear-gradient(180deg, #ffffff 0%, #f8f8f8 100%);
+        }
+
+        .comparison__header {
+          max-width: 820px;
+          margin: 0 auto var(--space-xl);
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-sm);
+        }
+
+        .comparison__header h2 {
+          font-family: var(--font-heading);
+          font-size: 2rem;
+          margin: 0;
+        }
+
+        .comparison-shell {
+          max-width: 1200px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
+          gap: var(--space-lg);
+          align-items: stretch;
+        }
+
+        .comparison-panel {
+          position: relative;
+          padding: var(--space-xl);
+          border-radius: 22px;
+          border: 1px solid var(--border);
+          background: #ffffff;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-md);
+          overflow: hidden;
+          transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+        .comparison-panel:hover {
+          transform: translateY(-6px);
+        }
+
+        .comparison-panel::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 4px;
+          opacity: 0.8;
+        }
+
+        .comparison-panel--without {
+          background: linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%);
+        }
+
+        .comparison-panel--without::after {
+          background: linear-gradient(90deg, rgba(239, 68, 68, 0.35), transparent);
+        }
+
+        .comparison-panel--with {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 167, 69, 0.1));
+          border-color: rgba(247, 167, 69, 0.35);
+          box-shadow: 0 24px 50px rgba(247, 167, 69, 0.18);
+        }
+
+        .comparison-panel--with::after {
+          background: linear-gradient(90deg, rgba(34, 197, 94, 0.4), transparent);
+        }
+
+        .comparison-title {
+          font-family: var(--font-heading);
+          font-size: 1.15rem;
+          margin: 0;
+        }
+
+        .comparison-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-sm);
+        }
+
+        .comparison-list li {
+          position: relative;
+          padding-left: 28px;
+          font-size: 0.95rem;
+          color: var(--text-secondary);
+          line-height: 1.6;
+        }
+
+        .comparison-list li::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 6px;
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+        }
+
+        .comparison-list--without li::before {
+          border-color: rgba(239, 68, 68, 0.5);
+          background: rgba(239, 68, 68, 0.08);
+        }
+
+        .comparison-list--without li::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 10px;
+          width: 10px;
+          height: 10px;
+          background:
+            linear-gradient(45deg, transparent 45%, rgba(239, 68, 68, 0.9) 45%, rgba(239, 68, 68, 0.9) 55%, transparent 55%),
+            linear-gradient(-45deg, transparent 45%, rgba(239, 68, 68, 0.9) 45%, rgba(239, 68, 68, 0.9) 55%, transparent 55%);
+        }
+
+        .comparison-list--with li::before {
+          border-color: rgba(34, 197, 94, 0.45);
+          background: rgba(34, 197, 94, 0.08);
+        }
+
+        .comparison-list--with li::after {
+          content: '';
+          position: absolute;
+          left: 5px;
+          top: 11px;
+          width: 8px;
+          height: 4px;
+          border-left: 2px solid rgba(34, 197, 94, 0.9);
+          border-bottom: 2px solid rgba(34, 197, 94, 0.9);
+          transform: rotate(-45deg);
+        }
+
+        .comparison-divider {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .comparison-divider::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.15), transparent);
+        }
+
+        .comparison-divider span {
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          background: #ffffff;
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          padding: 6px 12px;
+          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
         }
 
         /* CTA */
@@ -476,40 +1002,195 @@ export const Landing: React.FC = () => {
           font-size: 1.125rem;
         }
 
+        .cta-button {
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(247, 167, 69, 0.6);
+          background: linear-gradient(135deg, #f9c46a 0%, #f7a745 45%, #c8873b 100%);
+          box-shadow: 0 18px 36px rgba(247, 167, 69, 0.38);
+          transform: translateZ(0);
+          transition: box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .cta-button::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%);
+          transform: translateX(-120%);
+          opacity: 0;
+        }
+
+        .cta-button::after {
+          content: '';
+          position: absolute;
+          inset: -35%;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 60%);
+          opacity: 0;
+          transition: opacity 0.2s ease;
+        }
+
+        .cta-button:hover {
+          box-shadow: 0 26px 48px rgba(247, 167, 69, 0.5), 0 0 0 1px rgba(247, 167, 69, 0.5);
+          filter: saturate(1.08);
+          animation: cta-rumble 0.35s ease-in-out infinite;
+        }
+
+        .cta-button:hover::before {
+          opacity: 1;
+          animation: cta-sheen 0.9s ease infinite;
+        }
+
+        .cta-button:hover::after {
+          opacity: 0.9;
+        }
+
+        @keyframes cta-sheen {
+          0% {
+            transform: translateX(-120%);
+          }
+          60% {
+            transform: translateX(120%);
+          }
+          100% {
+            transform: translateX(120%);
+          }
+        }
+
+        @keyframes cta-rumble {
+          0% {
+            transform: translate(0, -3px) scale(1.02);
+          }
+          25% {
+            transform: translate(-1px, -4px) scale(1.02);
+          }
+          50% {
+            transform: translate(1px, -3px) scale(1.02);
+          }
+          75% {
+            transform: translate(-0.5px, -4px) scale(1.02);
+          }
+          100% {
+            transform: translate(0, -3px) scale(1.02);
+          }
+        }
+
         /* Responsive */
         @media (max-width: 1024px) {
-          .hero {
-            grid-template-columns: 1fr;
-            text-align: center;
-          }
-
-          .hero-actions {
-            justify-content: center;
-          }
-
           .features-grid {
+            display: grid;
             grid-template-columns: repeat(2, 1fr);
+            transition: none;
           }
 
-          .benefits {
-            flex-direction: column;
-            align-items: center;
+          .benefits-rail {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .hero-stage {
+            aspect-ratio: 18 / 9;
+          }
+
+          .features-grid:hover .feature-card {
+            opacity: 1;
+          }
+
+          .features-grid:hover .feature-card:hover {
+            transform: none;
+            min-height: auto;
+          }
+
+          .feature-card__expanded {
+            opacity: 1;
+            max-height: none;
+            transform: none;
+          }
+        }
+
+        @media (max-width: 900px) {
+          .feature-card__expanded {
+            grid-template-columns: 1fr;
+          }
+
+          .comparison-shell {
+            grid-template-columns: 1fr;
+          }
+
+          .comparison-divider {
+            display: none;
           }
         }
 
         @media (max-width: 640px) {
-          .hero h1 {
+          .landing-header {
+            padding: var(--space-md);
+          }
+
+          .hero-title {
             font-size: 2rem;
+          }
+
+          .hero-stage__content {
+            padding: var(--space-lg) 0;
+          }
+
+          .hero {
+            padding: var(--space-md) 0;
           }
 
           .features-grid {
             grid-template-columns: 1fr;
           }
 
+          .hero-stage {
+            aspect-ratio: 16 / 9;
+          }
+
           .hero-actions {
             flex-direction: column;
           }
+
+          .benefits-rail {
+            grid-template-columns: 1fr;
+          }
+
+          .comparison {
+            padding: var(--space-xl) var(--space-md);
+          }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .benefits-rail::before {
+            animation: none;
+          }
+
+          .reveal-on-scroll {
+            opacity: 1;
+            transform: none;
+            transition: none;
+          }
+
+          .benefit-item {
+            transition: none;
+          }
+
+          .benefit-item::after {
+            transition: none;
+          }
+
+          .comparison-panel {
+            transition: none;
+          }
+
+          .cta-button {
+            animation: none;
+          }
+
+          .cta-button:hover::before {
+            animation: none;
+          }
+        }
+
       `}</style>
     </div>
   );

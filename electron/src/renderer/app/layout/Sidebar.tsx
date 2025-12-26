@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard,
+  Home,
   Users,
   BookOpen,
   CheckSquare,
@@ -30,7 +30,7 @@ const Sidebar = () => {
   const isAdmin = (displayUser.role || '').toLowerCase() === 'admin'
 
   const mainNavItems: NavItem[] = [
-    { path: '/app', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
+    { path: '/app', labelKey: 'nav.dashboard', icon: <Home size={20} /> },
     { path: '/app/meetings', labelKey: 'nav.meetings', icon: <Users size={20} /> },
     { path: '/app/projects', labelKey: 'nav.projects', icon: <FolderOpen size={20} /> },
   ]

@@ -29,7 +29,7 @@ export const en = {
 
   // Navigation
   nav: {
-    dashboard: 'Dashboard',
+    dashboard: 'Home',
     meetings: 'Meetings',
     calendar: 'Calendar',
     tasks: 'Tasks',
@@ -45,7 +45,7 @@ export const en = {
 
   // Dashboard
   dashboard: {
-    title: 'Dashboard',
+    title: 'Home',
     welcome: 'Welcome back',
     liveMeeting: 'Live Meeting',
     upcomingMeetings: 'Upcoming Meetings',

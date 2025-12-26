@@ -127,7 +127,6 @@ const Meetings = () => {
         </div>
         <div className="page-header__actions meetings-header__actions">
           <div className="meetings-header__filters">
-            <MeetingsViewToggle />
             <div className="tabs">
               <button 
                 className={`tabs__item ${activeTab === 'all' ? 'tabs__item--active' : ''}`}
@@ -148,6 +147,7 @@ const Meetings = () => {
                 Tuần này
               </button>
             </div>
+            <MeetingsViewToggle />
           </div>
           <div className="meetings-header__actions-right">
             <button 

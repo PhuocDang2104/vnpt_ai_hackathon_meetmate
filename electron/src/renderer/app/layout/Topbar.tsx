@@ -127,8 +127,9 @@ const getNotificationIcon = (type: NotificationType) => {
 }
 
 const routeTitles: Record<string, string> = {
-  '/': 'Dashboard',
-  '/app': 'Dashboard',
+  '/': 'Home',
+  '/app': 'Home',
+  '/app/dashboard': 'Home',
   '/app/calendar': 'Lịch họp',
   '/app/meetings': 'Cuộc họp',
   '/app/projects': 'Dự án',

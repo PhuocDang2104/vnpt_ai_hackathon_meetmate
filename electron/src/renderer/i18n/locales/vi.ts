@@ -29,7 +29,7 @@ export const vi = {
 
   // Navigation
   nav: {
-    dashboard: 'Tổng quan',
+    dashboard: 'Home',
     meetings: 'Cuộc họp',
     calendar: 'Lịch',
     tasks: 'Nhiệm vụ',
@@ -45,7 +45,7 @@ export const vi = {
 
   // Dashboard
   dashboard: {
-    title: 'Tổng quan',
+    title: 'Home',
     welcome: 'Chào mừng trở lại',
     liveMeeting: 'Cuộc họp đang diễn ra',
     upcomingMeetings: 'Cuộc họp sắp tới',
