@@ -49,7 +49,7 @@ const ProjectDetail = () => {
   const [attaching, setAttaching] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
-  const [editForm, setEditForm] = useState<{ name: string; code?: string; description?: string }>({ name: '', code: '', description: '' })
+  const [editForm, setEditForm] = useState<{ name: string; code?: string; description?: string; objective?: string }>({ name: '', code: '', description: '', objective: '' })
 
   useEffect(() => {
     const load = async () => {
@@ -63,6 +63,7 @@ const ProjectDetail = () => {
           name: proj.name || '',
           code: proj.code || '',
           description: proj.description || '',
+          objective: proj.objective || '',
         })
         // members
         const m = await projectsApi.listMembers(projectId)
@@ -153,7 +154,19 @@ const ProjectDetail = () => {
         <div>
           <p className="page-header__eyebrow">Project</p>
           <h1 className="page-header__title">{project.name}</h1>
-          <p className="page-header__subtitle">{project.description || 'Chưa có mô tả'}</p>
+          {project.objective && (
+            <div style={{ marginTop: 'var(--space-sm)', padding: 'var(--space-sm)', background: 'rgba(246, 193, 59, 0.1)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--primary)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Mục tiêu dự án
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                {project.objective}
+              </div>
+            </div>
+          )}
+          <p className="page-header__subtitle" style={{ marginTop: project.objective ? 'var(--space-sm)' : 0 }}>
+            {project.description || 'Chưa có mô tả'}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn--ghost btn--sm" onClick={() => setShowEditModal(true)}>Chỉnh sửa</button>
@@ -486,13 +499,23 @@ const ProjectDetail = () => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Mô tả</label>
+                <label className="form-label">Mục tiêu dự án</label>
                 <textarea
                   className="form-textarea"
-                  rows={4}
+                  rows={3}
+                  value={editForm.objective || ''}
+                  onChange={e => setEditForm({ ...editForm, objective: e.target.value })}
+                  placeholder="VD: Số hóa quy trình onboarding, giảm thời gian xử lý..."
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mô tả chi tiết</label>
+                <textarea
+                  className="form-textarea"
+                  rows={3}
                   value={editForm.description || ''}
                   onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                  placeholder="Tóm tắt mục tiêu, phạm vi..."
+                  placeholder="Scope, milestones, stakeholders..."
                 />
               </div>
             </div>
@@ -508,6 +531,7 @@ const ProjectDetail = () => {
                     const updated = await projectsApi.update(projectId, {
                       name: editForm.name.trim(),
                       code: editForm.code?.trim(),
+                      objective: editForm.objective?.trim(),
                       description: editForm.description?.trim(),
                     } as any)
                     setProject(updated)

@@ -1,3 +1,11 @@
+---
+title: MeetMate AI API
+sdk: docker
+app_port: 7860
+---
+
+Backend AI microservice for MeetMate.
+
 # 🎙️ MeetMate Model Service
 
 **Microservice API** cho voice diarization, transcription, và speaker embedding - deploy trên **Hugging Face Spaces**.
