@@ -76,3 +76,4 @@ Thumbs.db
 
 # Local scripts output
 scripts/*.log
+.cursor/

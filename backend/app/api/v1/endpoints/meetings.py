@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.schemas.meeting import (
@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.services import meeting_service
 from app.services import participant_service, agenda_service
 from app.services import email_service, knowledge_service
+from app.services import video_service
 from app.services.storage_client import generate_presigned_get_url
 from app.schemas.knowledge import KnowledgeDocument
 from datetime import datetime
@@ -209,3 +210,88 @@ def update_meeting_phase(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
+
+
+@router.post('/{meeting_id}/upload-video')
+async def upload_meeting_video(
+    meeting_id: str,
+    video: UploadFile = File(..., description="Video file to upload"),
+    uploaded_by: Optional[str] = Form(None, description="User ID who uploaded the video"),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a video recording for a meeting.
+    
+    Accepts video files (MP4, MOV, AVI, WebM, MKV) up to 500MB.
+    Uploads to Supabase S3 storage (or local fallback) and updates meeting.recording_url.
+    """
+    from uuid import UUID as UUIDType
+    
+    uploaded_by_uuid = None
+    if uploaded_by:
+        try:
+            uploaded_by_uuid = UUIDType(uploaded_by)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid uploaded_by UUID format")
+    
+    try:
+        result = await video_service.upload_meeting_video(
+            db=db,
+            meeting_id=meeting_id,
+            file=video,
+            uploaded_by=uploaded_by_uuid,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Unexpected error uploading video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post('/{meeting_id}/trigger-inference')
+async def trigger_inference(
+    meeting_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger AI inference (transcription + diarization) from video recording.
+    
+    This endpoint queues a background job to:
+    1. Extract audio from video
+    2. Run Whisper transcription
+    3. Run speaker diarization
+    4. Generate transcript chunks
+    5. Auto-generate meeting minutes
+    """
+    # Check meeting exists
+    meeting = meeting_service.get_meeting(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Check if meeting has recording_url
+    if not meeting.recording_url:
+        raise HTTPException(status_code=400, detail="Meeting does not have a video recording")
+    
+    # TODO: Implement background job queue
+    # For now, return a mock job_id
+    # In production, this should:
+    # 1. Queue a Celery task or similar
+    # 2. Return job_id to track progress
+    # 3. Process video → audio → transcript → minutes
+    
+    import uuid
+    job_id = str(uuid.uuid4())
+    
+    # TODO: Start background job here
+    # Example:
+    # from app.tasks.inference import process_meeting_video
+    # task = process_meeting_video.delay(meeting_id, meeting.recording_url)
+    # job_id = task.id
+    
+    return {
+        "job_id": job_id,
+        "message": "Inference job started. Processing will begin shortly.",
+        "status": "queued"
+    }

@@ -29,7 +29,8 @@ import { useChatContext } from '../../../contexts/ChatContext';
 
 // Tab Components
 import { PreMeetTab } from './tabs/PreMeetTab';
-import { PostMeetTab } from './tabs/PostMeetTab';
+import PostMeetTabFireflies from './tabs/PostMeetTabFireflies';
+import { PostMeetTab } from './tabs/PostMeetTabdrop';
 
 type MeetingTabType = 'pre' | 'post';
 
@@ -591,7 +592,7 @@ export const MeetingDetail = () => {
           />
         )}
         {activeTab === 'post' && (
-          <PostMeetTab 
+          <PostMeetTabFireflies 
             meeting={meeting}
             onRefresh={fetchMeeting}
           />
