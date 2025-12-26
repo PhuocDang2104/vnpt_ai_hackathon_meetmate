@@ -7,6 +7,7 @@ class ProjectBase(BaseModel):
     name: str
     code: Optional[str] = None
     description: Optional[str] = None
+    objective: Optional[str] = None  # Project objectives/goals
     organization_id: Optional[str] = None
     department_id: Optional[str] = None
 
@@ -19,6 +20,7 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
     description: Optional[str] = None
+    objective: Optional[str] = None  # Project objectives/goals
     organization_id: Optional[str] = None
     department_id: Optional[str] = None
 

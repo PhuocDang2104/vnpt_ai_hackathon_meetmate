@@ -63,7 +63,7 @@ const Sidebar = () => {
         <div className="sidebar__logo">
           <div className="sidebar__logo-icon" style={{ padding: 0 }}>
             <img
-              src="/meetmate_icon.png"
+              src="/meetmate_icon.svg"
               alt="MeetMate"
               style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'contain' }}
             />

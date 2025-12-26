@@ -22,7 +22,7 @@ def list_projects(
     organization_id: Optional[str] = None,
 ) -> Tuple[List[Project], int]:
     query = """
-        SELECT id::text, name, code, description, organization_id::text, department_id::text,
+        SELECT id::text, name, code, description, objective, organization_id::text, department_id::text,
                created_at, updated_at
         FROM project
         WHERE 1=1
@@ -58,10 +58,11 @@ def list_projects(
             name=row[1],
             code=row[2],
             description=row[3],
-            organization_id=row[4],
-            department_id=row[5],
-            created_at=row[6],
-            updated_at=row[7],
+            objective=row[4],
+            organization_id=row[5],
+            department_id=row[6],
+            created_at=row[7],
+            updated_at=row[8],
         )
         for row in rows
     ]
@@ -71,7 +72,7 @@ def list_projects(
 
 def get_project(db: Session, project_id: str) -> Optional[Project]:
     query = text("""
-        SELECT id::text, name, code, description, organization_id::text, department_id::text,
+        SELECT id::text, name, code, description, objective, organization_id::text, department_id::text,
                created_at, updated_at
         FROM project
         WHERE id = :project_id
@@ -84,10 +85,11 @@ def get_project(db: Session, project_id: str) -> Optional[Project]:
         name=row[1],
         code=row[2],
         description=row[3],
-        organization_id=row[4],
-        department_id=row[5],
-        created_at=row[6],
-        updated_at=row[7],
+        objective=row[4],
+        organization_id=row[5],
+        department_id=row[6],
+        created_at=row[7],
+        updated_at=row[8],
     )
 
 
@@ -95,17 +97,18 @@ def create_project(db: Session, data: ProjectCreate) -> Project:
     project_id = str(uuid4())
     query = text("""
         INSERT INTO project (
-            id, name, code, description, organization_id, department_id, created_at, updated_at
+            id, name, code, description, objective, organization_id, department_id, created_at, updated_at
         ) VALUES (
-            :id, :name, :code, :description, :organization_id, :department_id, now(), now()
+            :id, :name, :code, :description, :objective, :organization_id, :department_id, now(), now()
         )
-        RETURNING id::text, name, code, description, organization_id::text, department_id::text, created_at, updated_at
+        RETURNING id::text, name, code, description, objective, organization_id::text, department_id::text, created_at, updated_at
     """)
     row = db.execute(query, {
         'id': project_id,
         'name': data.name,
         'code': data.code,
         'description': data.description,
+        'objective': data.objective,
         'organization_id': data.organization_id,
         'department_id': data.department_id,
     }).fetchone()
@@ -117,8 +120,8 @@ def create_project(db: Session, data: ProjectCreate) -> Project:
 
     return Project(
         id=row[0], name=row[1], code=row[2], description=row[3],
-        organization_id=row[4], department_id=row[5],
-        created_at=row[6], updated_at=row[7]
+        objective=row[4], organization_id=row[5], department_id=row[6],
+        created_at=row[7], updated_at=row[8]
     )
 
 
@@ -136,6 +139,9 @@ def update_project(db: Session, project_id: str, data: ProjectUpdate) -> Optiona
     if data.description is not None:
         updates.append("description = :description")
         params['description'] = data.description
+    if data.objective is not None:
+        updates.append("objective = :objective")
+        params['objective'] = data.objective
     if data.organization_id is not None:
         updates.append("organization_id = :organization_id")
         params['organization_id'] = data.organization_id
@@ -151,7 +157,7 @@ def update_project(db: Session, project_id: str, data: ProjectUpdate) -> Optiona
         UPDATE project
         SET {', '.join(updates)}
         WHERE id = :project_id
-        RETURNING id::text, name, code, description, organization_id::text, department_id::text, created_at, updated_at
+        RETURNING id::text, name, code, description, objective, organization_id::text, department_id::text, created_at, updated_at
     """)
     row = db.execute(query, params).fetchone()
     db.commit()
@@ -160,8 +166,8 @@ def update_project(db: Session, project_id: str, data: ProjectUpdate) -> Optiona
 
     return Project(
         id=row[0], name=row[1], code=row[2], description=row[3],
-        organization_id=row[4], department_id=row[5],
-        created_at=row[6], updated_at=row[7]
+        objective=row[4], organization_id=row[5], department_id=row[6],
+        created_at=row[7], updated_at=row[8]
     )
 
 

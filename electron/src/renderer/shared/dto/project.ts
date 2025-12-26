@@ -3,6 +3,7 @@ export interface Project {
   name: string
   code?: string
   description?: string
+  objective?: string  // Project objectives/goals
   organization_id?: string
   department_id?: string
   owner_id?: string

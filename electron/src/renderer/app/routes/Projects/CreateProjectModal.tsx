@@ -4,14 +4,14 @@ type CreateProjectModalProps = {
   open: boolean
   loading?: boolean
   onClose: () => void
-  onSubmit: (data: { name: string; code?: string; scope?: string; description?: string }) => void
+  onSubmit: (data: { name: string; code?: string; scope?: string; description?: string; objective?: string }) => void
 }
 
 /**
  * Create Project modal reusing the same visual language/layout as the Create Meeting modal.
  */
 const CreateProjectModal = ({ open, loading, onClose, onSubmit }: CreateProjectModalProps) => {
-  const [form, setForm] = useState({ name: '', code: '', scope: '', description: '' })
+  const [form, setForm] = useState({ name: '', code: '', scope: '', description: '', objective: '' })
 
   if (!open) return null
 
@@ -55,11 +55,22 @@ const CreateProjectModal = ({ open, loading, onClose, onSubmit }: CreateProjectM
           </div>
 
           <div className="form-group">
+            <label className="form-label">Mục tiêu dự án (Objectives)</label>
+            <textarea
+              className="form-textarea"
+              rows={3}
+              placeholder="VD: Số hóa quy trình onboarding, giảm thời gian xử lý từ 3 ngày xuống 1 ngày..."
+              value={form.objective}
+              onChange={e => setForm({ ...form, objective: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Mô tả chi tiết</label>
             <textarea
               className="form-textarea"
-              rows={4}
-              placeholder="Objectives, scope, milestones, key stakeholders…"
+              rows={3}
+              placeholder="Scope, milestones, key stakeholders, deliverables..."
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
             />
@@ -75,6 +86,7 @@ const CreateProjectModal = ({ open, loading, onClose, onSubmit }: CreateProjectM
               name: form.name.trim(),
               code: form.code.trim() || undefined,
               scope: form.scope.trim() || undefined,
+              objective: form.objective.trim() || undefined,
               description: form.description.trim() || undefined,
             })}
           >

@@ -32,6 +32,8 @@ class Project(Base, UUIDMixin, TimestampMixin):
     organization_id = Column(UUID(as_uuid=True), ForeignKey('organization.id'))
     name = Column(String, nullable=False)
     code = Column(String)
+    description = Column(Text)  # Project description
+    objective = Column(Text)  # Project objectives/goals
     
     organization = relationship("Organization", back_populates="projects")
     meetings = relationship("Meeting", back_populates="project")

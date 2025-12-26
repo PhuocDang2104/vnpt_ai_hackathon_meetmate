@@ -15,11 +15,12 @@ const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState<{ name: string; code?: string; scope?: string; description?: string }>({
+  const [form, setForm] = useState<{ name: string; code?: string; scope?: string; description?: string; objective?: string }>({
     name: '',
     code: '',
     scope: '',
     description: '',
+    objective: '',
   })
   const [showModal, setShowModal] = useState(false)
 
@@ -33,7 +34,7 @@ const Projects = () => {
     }
   }
 
-  const handleCreate = async (payload?: { name: string; code?: string; scope?: string; description?: string }) => {
+  const handleCreate = async (payload?: { name: string; code?: string; scope?: string; description?: string; objective?: string }) => {
     const data = payload || form
     if (!data.name.trim()) return
     setCreating(true)
@@ -42,9 +43,10 @@ const Projects = () => {
         name: data.name.trim(),
         code: data.code?.trim() || undefined,
         description: data.description?.trim() || undefined,
+        objective: data.objective?.trim() || undefined,
         scope: data.scope?.trim() || undefined,
       } as any)
-      setForm({ name: '', code: '', scope: '', description: '' })
+      setForm({ name: '', code: '', scope: '', description: '', objective: '' })
       await loadProjects()
       setShowModal(false)
     } finally {

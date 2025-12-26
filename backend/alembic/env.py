@@ -1,7 +1,8 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
+from logging.config import fileConfig   # Cấu hình logging
+from typing_extensions import runtime
+from sqlalchemy import engine_from_config   #Tạo SQLAlchemy engine
+from sqlalchemy import pool # Quản lý kết nối DB
+from alembic import context # Alembic migration context
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config
