@@ -1,20 +1,20 @@
 /**
  * Transcripts API Client
  */
-import { apiClient } from '../apiClient';
+import api from '../apiClient';
 
 export interface TranscriptChunk {
   id: string;
   meeting_id: string;
-  chunk: string;
-  speaker: string;
-  time_start: number;
-  time_end: number;
-  is_final: boolean;
+  chunk_index: number;
+  start_time: number;
+  end_time: number;
+  speaker?: string;
+  speaker_user_id?: string;
+  speaker_name?: string;
+  text: string;
   confidence?: number;
-  lang?: string;
-  question?: boolean;
-  seq?: number;
+  language?: string;
   created_at?: string;
 }
 
@@ -23,19 +23,50 @@ export interface TranscriptChunksResponse {
   total: number;
 }
 
+export interface TranscriptChunkCreate {
+  chunk_index: number;
+  start_time: number;
+  end_time: number;
+  speaker?: string;
+  speaker_user_id?: string;
+  text: string;
+  confidence?: number;
+  language?: string;
+}
+
 /**
  * List transcript chunks for a meeting
  */
-export const list = async (meetingId: string): Promise<TranscriptChunksResponse> => {
-  const response = await apiClient.get(`/transcripts/meeting/${meetingId}/chunks`);
-  return response.data;
+export const list = async (
+  meetingId: string,
+  params?: {
+    from_index?: number;
+    to_index?: number;
+    limit?: number;
+  }
+): Promise<TranscriptChunksResponse> => {
+  return api.get<TranscriptChunksResponse>(`/transcripts/${meetingId}`, params);
+};
+
+/**
+ * Get full transcript text for a meeting
+ */
+export const getFull = async (meetingId: string): Promise<{ meeting_id: string; transcript: string }> => {
+  return api.get<{ meeting_id: string; transcript: string }>(`/transcripts/${meetingId}/full`);
 };
 
 /**
  * Ingest a single transcript chunk
  */
-export const ingest = async (meetingId: string, chunk: Omit<TranscriptChunk, 'id' | 'created_at'>): Promise<void> => {
-  await apiClient.post(`/transcripts/${meetingId}/chunks`, chunk);
+export const ingest = async (meetingId: string, chunk: TranscriptChunkCreate): Promise<TranscriptChunk> => {
+  return api.post<TranscriptChunk>(`/transcripts/${meetingId}/chunks`, chunk);
+};
+
+/**
+ * Ingest multiple transcript chunks (batch)
+ */
+export const ingestBatch = async (meetingId: string, chunks: TranscriptChunkCreate[]): Promise<TranscriptChunksResponse> => {
+  return api.post<TranscriptChunksResponse>(`/transcripts/${meetingId}/chunks/batch`, chunks);
 };
 
 /**
@@ -46,13 +77,26 @@ export const extract = async (meetingId: string): Promise<{
   decisions: any[];
   risks: any[];
 }> => {
-  const response = await apiClient.post(`/transcripts/${meetingId}/extract`);
-  return response.data;
+  // Note: Backend has separate endpoints for extract actions/decisions/risks
+  // This is a convenience wrapper (if needed, implement separately)
+  const [actionsRes, decisionsRes, risksRes] = await Promise.all([
+    api.post(`/transcripts/${meetingId}/extract/actions`).catch(() => ({ actions: [] })),
+    api.post(`/transcripts/${meetingId}/extract/decisions`).catch(() => ({ decisions: [] })),
+    api.post(`/transcripts/${meetingId}/extract/risks`).catch(() => ({ risks: [] })),
+  ]);
+  
+  return {
+    actions: actionsRes.actions || [],
+    decisions: decisionsRes.decisions || [],
+    risks: risksRes.risks || [],
+  };
 };
 
 export const transcriptsApi = {
   list,
+  getFull,
   ingest,
+  ingestBatch,
   extract,
 };
 

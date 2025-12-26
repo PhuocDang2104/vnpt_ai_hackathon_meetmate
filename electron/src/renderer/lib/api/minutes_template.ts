@@ -1,7 +1,7 @@
 /**
  * Minutes Template API Client
  */
-import { apiClient } from '../apiClient';
+import api from '../apiClient';
 
 export interface MinutesTemplate {
   id: string;
@@ -62,49 +62,49 @@ export const minutesTemplateApi = {
     skip?: number;
     limit?: number;
   }): Promise<MinutesTemplateList> => {
-    return apiClient.get<MinutesTemplateList>(ENDPOINT, params);
+    return api.get<MinutesTemplateList>(ENDPOINT, params);
   },
 
   /**
    * Get default template
    */
   getDefault: async (): Promise<MinutesTemplate> => {
-    return apiClient.get<MinutesTemplate>(`${ENDPOINT}/default`);
+    return api.get<MinutesTemplate>(`${ENDPOINT}/default`);
   },
 
   /**
    * Get template by ID
    */
   get: async (templateId: string): Promise<MinutesTemplate> => {
-    return apiClient.get<MinutesTemplate>(`${ENDPOINT}/${templateId}`);
+    return api.get<MinutesTemplate>(`${ENDPOINT}/${templateId}`);
   },
 
   /**
    * Create template
    */
   create: async (data: MinutesTemplateCreate): Promise<MinutesTemplate> => {
-    return apiClient.post<MinutesTemplate>(ENDPOINT, data);
+    return api.post<MinutesTemplate>(ENDPOINT, data);
   },
 
   /**
    * Update template
    */
   update: async (templateId: string, data: MinutesTemplateUpdate): Promise<MinutesTemplate> => {
-    return apiClient.put<MinutesTemplate>(`${ENDPOINT}/${templateId}`, data);
+    return api.put<MinutesTemplate>(`${ENDPOINT}/${templateId}`, data);
   },
 
   /**
    * Delete template
    */
   delete: async (templateId: string): Promise<void> => {
-    return apiClient.delete<void>(`${ENDPOINT}/${templateId}`);
+    return api.delete<void>(`${ENDPOINT}/${templateId}`);
   },
 
   /**
    * Set template as default
    */
   setDefault: async (templateId: string): Promise<MinutesTemplate> => {
-    return apiClient.post<MinutesTemplate>(`${ENDPOINT}/${templateId}/set-default`, {});
+    return api.post<MinutesTemplate>(`${ENDPOINT}/${templateId}/set-default`, {});
   },
 };
 

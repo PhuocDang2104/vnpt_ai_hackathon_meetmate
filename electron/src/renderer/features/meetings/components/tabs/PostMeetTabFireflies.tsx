@@ -42,11 +42,14 @@ interface PostMeetTabFirefliesProps {
 
 interface TranscriptChunk {
   id: string;
-  chunk: string;
-  speaker: string;
-  time_start: number;
-  time_end: number;
-  is_final: boolean;
+  chunk_index: number;
+  start_time: number;
+  end_time: number;
+  speaker?: string;
+  text: string;
+  confidence?: number;
+  language?: string;
+  created_at?: string;
 }
 
 interface SpeakerStats {
@@ -82,6 +85,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   const [templates, setTemplates] = useState<MinutesTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [defaultTemplate, setDefaultTemplate] = useState<MinutesTemplate | null>(null);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   
   const [filters, setFilters] = useState<FilterState>({
     questions: false,
@@ -102,21 +106,42 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   }, [meeting.id]);
   
   const loadTemplates = async () => {
+    setTemplatesLoading(true);
     try {
-      const [templatesList, defaultTmpl] = await Promise.all([
-        minutesTemplateApi.list({ is_active: true }),
-        minutesTemplateApi.getDefault().catch(() => null),
-      ]);
+      const templatesList = await minutesTemplateApi.list({ is_active: true });
       
-      setTemplates(templatesList.templates);
-      if (defaultTmpl) {
-        setDefaultTemplate(defaultTmpl);
-        setSelectedTemplateId(defaultTmpl.id);
-      } else if (templatesList.templates.length > 0) {
-        setSelectedTemplateId(templatesList.templates[0].id);
+      console.log('Templates loaded:', templatesList);
+      
+      if (templatesList.templates && templatesList.templates.length > 0) {
+        setTemplates(templatesList.templates);
+        
+        // Try to get default template
+        try {
+          const defaultTmpl = await minutesTemplateApi.getDefault();
+          if (defaultTmpl) {
+            setDefaultTemplate(defaultTmpl);
+            setSelectedTemplateId(defaultTmpl.id);
+            console.log('Default template selected:', defaultTmpl.id);
+          } else {
+            // If no default, select first template
+            setSelectedTemplateId(templatesList.templates[0].id);
+            console.log('First template selected:', templatesList.templates[0].id);
+          }
+        } catch (defaultErr) {
+          // If default fails, just select first template
+          console.warn('Could not get default template:', defaultErr);
+          setSelectedTemplateId(templatesList.templates[0].id);
+          console.log('First template selected (fallback):', templatesList.templates[0].id);
+        }
+      } else {
+        console.warn('No templates found');
+        setTemplates([]);
       }
     } catch (err) {
       console.error('Load templates failed:', err);
+      setTemplates([]);
+    } finally {
+      setTemplatesLoading(false);
     }
   };
 
@@ -153,8 +178,8 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
 
     chunks.forEach((chunk) => {
       const speaker = chunk.speaker || 'Unknown';
-      const words = chunk.chunk.split(/\s+/).length;
-      const duration = chunk.time_end - chunk.time_start;
+      const words = chunk.text.split(/\s+/).length;
+      const duration = chunk.end_time - chunk.start_time;
 
       const current = stats.get(speaker) || { words: 0, time: 0 };
       stats.set(speaker, {
@@ -268,16 +293,16 @@ const LeftPanel = ({ filters, setFilters, actionItems, speakerStats, transcripts
   };
 
   // Count questions in transcript
-  const questionsCount = transcripts.filter((t) => t.chunk.includes('?')).length;
+  const questionsCount = transcripts.filter((t) => t.text.includes('?')).length;
 
   // Extract dates/times mentions (simple heuristic)
   const datesCount = transcripts.filter((t) => 
-    /\b\d{1,2}\/\d{1,2}|\b(thứ|ngày|tháng|tuần|quý)\b/i.test(t.chunk)
+    /\b\d{1,2}\/\d{1,2}|\b(thứ|ngày|tháng|tuần|quý)\b/i.test(t.text)
   ).length;
 
   // Count metrics mentions (numbers + units)
   const metricsCount = transcripts.filter((t) => 
-    /\d+\s?(triệu|nghìn|tỷ|%|người|đơn|vị)/i.test(t.chunk)
+    /\d+\s?(triệu|nghìn|tỷ|%|người|đơn|vị)/i.test(t.text)
   ).length;
 
   return (
@@ -557,28 +582,46 @@ const CenterPanel = ({
       </div>
 
       {/* Template Selector */}
-      <div className="fireflies-template-selector">
-        <label className="fireflies-template-label">
-          <span>Template biên bản:</span>
-        </label>
-        <select
-          className="fireflies-template-select"
-          value={selectedTemplateId || ''}
-          onChange={(e) => onSelectTemplate(e.target.value || null)}
-          disabled={isGenerating}
-        >
-          {templates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name} {template.is_default ? '(Mặc định)' : ''}
-            </option>
-          ))}
-        </select>
-        {selectedTemplateId && (
-          <span className="fireflies-template-description">
-            {templates.find((t) => t.id === selectedTemplateId)?.description || ''}
+      {templates.length > 0 && (
+        <div className="fireflies-template-selector">
+          <label className="fireflies-template-label">
+            <span>Template biên bản:</span>
+          </label>
+          <select
+            className="fireflies-template-select"
+            value={selectedTemplateId || ''}
+            onChange={(e) => {
+              const templateId = e.target.value || null;
+              console.log('Template selected:', templateId);
+              onSelectTemplate(templateId);
+            }}
+            disabled={isGenerating || templatesLoading}
+          >
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name} {template.is_default ? '(Mặc định)' : ''}
+              </option>
+            ))}
+          </select>
+          {selectedTemplateId && (
+            <span className="fireflies-template-description">
+              {templates.find((t) => t.id === selectedTemplateId)?.description || ''}
+            </span>
+          )}
+        </div>
+      )}
+      {templatesLoading && (
+        <div className="fireflies-template-selector">
+          <span className="fireflies-template-label">Đang tải templates...</span>
+        </div>
+      )}
+      {!templatesLoading && templates.length === 0 && (
+        <div className="fireflies-template-selector">
+          <span className="fireflies-template-label" style={{ color: 'var(--text-muted)' }}>
+            Không có template nào. Vui lòng tạo template trong cài đặt.
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="fireflies-center-content">
@@ -610,17 +653,17 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
 
   const filteredTranscripts = transcripts.filter((t) => {
     // Apply search filter
-    if (filters.searchQuery && !t.chunk.toLowerCase().includes(filters.searchQuery.toLowerCase())) {
+    if (filters.searchQuery && !t.text.toLowerCase().includes(filters.searchQuery.toLowerCase())) {
       return false;
     }
 
     // Apply question filter
-    if (filters.questions && !t.chunk.includes('?')) {
+    if (filters.questions && !t.text.includes('?')) {
       return false;
     }
 
     // Apply speaker filter
-    if (filters.speakers.length > 0 && !filters.speakers.includes(t.speaker)) {
+    if (filters.speakers.length > 0 && t.speaker && !filters.speakers.includes(t.speaker)) {
       return false;
     }
 
@@ -664,19 +707,21 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
         ) : (
           filteredTranscripts.map((chunk) => {
             const matchesSearch =
-              searchInTranscript && chunk.chunk.toLowerCase().includes(searchInTranscript.toLowerCase());
+              searchInTranscript && chunk.text.toLowerCase().includes(searchInTranscript.toLowerCase());
 
             return (
               <div key={chunk.id} className={`fireflies-transcript-item ${matchesSearch ? 'highlight' : ''}`}>
                 <div className="fireflies-transcript-header">
                   <div className="fireflies-speaker">
-                    <div className="fireflies-speaker-avatar">{chunk.speaker.charAt(chunk.speaker.length - 1)}</div>
-                    <span className="fireflies-speaker-name">{chunk.speaker}</span>
+                    <div className="fireflies-speaker-avatar">
+                      {chunk.speaker ? chunk.speaker.charAt(chunk.speaker.length - 1) : '?'}
+                    </div>
+                    <span className="fireflies-speaker-name">{chunk.speaker || 'Unknown'}</span>
                   </div>
-                  <span className="fireflies-timestamp">{formatTime(chunk.time_start)}</span>
+                  <span className="fireflies-timestamp">{formatTime(chunk.start_time)}</span>
                 </div>
                 <div className="fireflies-transcript-text">
-                  {highlightText(chunk.chunk, searchInTranscript)}
+                  {highlightText(chunk.text, searchInTranscript)}
                 </div>
               </div>
             );

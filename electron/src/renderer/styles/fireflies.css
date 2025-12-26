@@ -512,6 +512,8 @@
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-secondary);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fireflies-template-label {
@@ -552,6 +554,9 @@
   font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Threads (deprecated - keeping for backward compatibility) */
@@ -604,13 +609,20 @@
 .fireflies-center-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-lg);
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 /* Summary */
 .fireflies-summary {
   max-width: 720px;
   margin: 0 auto;
+  width: 100%;
+  word-wrap: break-word;
+  word-break: break-word;
+  box-sizing: border-box;
 }
 
 .fireflies-keywords {
@@ -645,6 +657,9 @@
   font-size: 14px;
   line-height: 1.8;
   color: var(--text-primary);
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .fireflies-bullet-point {
@@ -665,11 +680,17 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 24px 0 12px 0;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .fireflies-summary-paragraph {
   margin-bottom: 12px;
   line-height: 1.8;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Edit */
@@ -925,11 +946,14 @@
   padding: var(--space-2xl);
   gap: var(--space-lg);
   min-height: 400px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fireflies-empty-ai__icon {
   color: var(--text-muted);
   opacity: 0.3;
+  flex-shrink: 0;
 }
 
 .fireflies-empty-ai__title {
@@ -937,6 +961,13 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  text-align: center;
+  word-wrap: break-word;
+  word-break: break-word;
+  width: 100%;
+  max-width: 600px;
+  padding: 0 var(--space-md);
+  box-sizing: border-box;
 }
 
 .fireflies-empty-ai__description {
@@ -944,8 +975,13 @@
   color: var(--text-secondary);
   line-height: 1.8;
   text-align: center;
-  max-width: 400px;
+  max-width: 600px;
+  width: 100%;
   margin: 0;
+  padding: 0 var(--space-md);
+  box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 /* ==================== Right Panel - Transcript ==================== */
