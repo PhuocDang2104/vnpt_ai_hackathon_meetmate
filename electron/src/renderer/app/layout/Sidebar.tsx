@@ -55,17 +55,16 @@ const Sidebar = () => {
     await logout()
     navigate('/login')
   }
-
   return (
     <aside className="sidebar app-shell__sidebar">
       {/* Logo */}
       <div className="sidebar__header">
         <div className="sidebar__logo">
-          <div className="sidebar__logo-icon" style={{ padding: 0 }}>
+          <div className="sidebar__logo-icon" style={{ padding: 0, background: 'transparent' }}>
             <img
               src="/meetmate_icon.svg"
               alt="MeetMate"
-              style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'contain' }}
+              style={{ width: 40, height: 40, objectFit: 'contain' }}
             />
           </div>
           <span className="sidebar__logo-text">MeetMate</span>
