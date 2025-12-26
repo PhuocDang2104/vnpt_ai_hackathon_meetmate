@@ -209,6 +209,57 @@ def update_meeting_phase(
     meeting = meeting_service.update_phase(db=db, meeting_id=meeting_id, phase=phase)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # When ending meeting (phase -> 'post'), save transcript from session store to database
+    if phase == 'post':
+        from app.services.realtime_session_store import session_store
+        from app.services import transcript_service
+        from app.schemas.transcript import TranscriptChunkCreate
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Try to get session by meeting_id (session_id might be same as meeting_id)
+        session = session_store.get(meeting_id)
+        if session and session.stream_state and session.stream_state.final_stream:
+            try:
+                # Check if transcript already exists in database
+                existing_chunks = transcript_service.list_transcript_chunks(
+                    db=db,
+                    meeting_id=meeting_id,
+                    limit=1
+                )
+                
+                # Only save if no transcript exists yet (avoid duplicates)
+                if existing_chunks.total == 0:
+                    # Convert FinalTranscriptChunk to TranscriptChunkCreate
+                    chunks_to_save = []
+                    for idx, chunk in enumerate(session.stream_state.final_stream, start=1):
+                        chunks_to_save.append(TranscriptChunkCreate(
+                            chunk_index=idx,
+                            start_time=chunk.time_start,
+                            end_time=chunk.time_end,
+                            speaker=chunk.speaker,
+                            text=chunk.text,
+                            confidence=chunk.confidence,
+                            language=chunk.lang,
+                            meeting_id=meeting_id
+                        ))
+                    
+                    if chunks_to_save:
+                        # Save all transcript chunks to database
+                        result = transcript_service.create_batch_transcript_chunks(
+                            db=db,
+                            meeting_id=meeting_id,
+                            chunks=chunks_to_save
+                        )
+                        logger.info(f"Saved {result.total} transcript chunks for meeting {meeting_id}")
+                else:
+                    logger.info(f"Transcript already exists for meeting {meeting_id}, skipping save")
+            except Exception as e:
+                # Log error but don't fail the phase update
+                logger.error(f"Failed to save transcript when ending meeting {meeting_id}: {e}", exc_info=True)
+    
     return meeting
 
 
