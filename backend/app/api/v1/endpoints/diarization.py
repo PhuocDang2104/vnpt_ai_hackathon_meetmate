@@ -39,3 +39,13 @@ async def ingest_diarization(session_id: str, payload: Dict[str, Any]):
 
     logger.info("diarization_ingested session_id=%s segments=%s", session_id, len(stream_state.speaker_segments))
     return {"status": "ok"}
+
+
+@router.get("/diarization/{session_id}")
+async def get_diarization(session_id: str):
+    session = session_store.get(session_id)
+    if not session:
+        return {"status": "error", "reason": "session_not_found"}
+    stream_state = session.stream_state
+    segments = sorted(stream_state.speaker_segments, key=lambda s: s.get("start", 0.0))
+    return {"status": "ok", "segments": segments}

@@ -84,8 +84,7 @@ def _compute_tick_anchor(stream_state) -> float:
 
 
 def _prune_stream_state(stream_state) -> None:
-    cutoff = stream_state.max_see
-    n_time_end - ROLLING_RETENTION_SEC
+    cutoff = stream_state.max_seen_time_end - ROLLING_RETENTION_SEC
     if cutoff <= 0:
         return
     kept = [chunk for chunk in stream_state.rolling_window if chunk.time_end >= cutoff]
@@ -308,10 +307,6 @@ async def _stream_consumer(session_id: str, queue: asyncio.Queue) -> None:
             time_start = float(payload.get("time_start") or 0.0)
             time_end = float(payload.get("time_end") or 0.0)
             speaker = payload.get("speaker") or "SPEAKER_01"
-
-            aligned = _match_speaker_by_time(stream_state.speaker_segments, time_start, time_end)
-            if aligned:
-                speaker = aligned.get("speaker", speaker)
 
             chunk = FinalTranscriptChunk(
                 seq=seq,
