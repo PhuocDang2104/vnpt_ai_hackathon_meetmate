@@ -448,7 +448,6 @@ export const InMeetTab = ({
             audioIngestToken={audioIngestToken}
             tokenError={tokenError}
             isTokenLoading={isTokenLoading}
-            meetingId={meeting.id}
             sessionId={sessionIdForStream}
             onFetchAudioToken={handleFetchAudioToken}
             onReconnect={handleReconnect}
@@ -486,7 +485,6 @@ interface TranscriptPanelProps {
   audioIngestToken: string | null;
   tokenError: string | null;
   isTokenLoading: boolean;
-  meetingId: string;
   sessionId: string;
   onFetchAudioToken: () => void;
   onReconnect: () => void;
@@ -561,7 +559,6 @@ const LiveTranscriptPanel = ({
   audioIngestToken,
   tokenError,
   isTokenLoading,
-  meetingId,
   sessionId,
   onFetchAudioToken,
   onReconnect,
@@ -601,14 +598,6 @@ const LiveTranscriptPanel = ({
       second: '2-digit',
     })}`;
   }, [feedStatus, lastTranscriptAt]);
-  const captureUrl = useMemo(() => {
-    if (joinPlatform !== 'gmeet') return null;
-    if (!sessionId) return null;
-    const params = new URLSearchParams();
-    params.set('session', sessionId);
-    if (audioIngestToken) params.set('token', audioIngestToken);
-    return `#/app/meetings/${meetingId}/capture?${params.toString()}`;
-  }, [audioIngestToken, joinPlatform, meetingId, sessionId]);
   const partialText = livePartial?.text || 'Đang lắng nghe...';
   const finalText = liveFinal?.text || 'Chưa có final transcript.';
 
@@ -675,15 +664,6 @@ const LiveTranscriptPanel = ({
                   disabled={isTokenLoading || !USE_API}
                 >
                   {isTokenLoading ? 'Đang lấy token...' : 'Tạo token'}
-                </button>
-              )}
-              {joinPlatform === 'gmeet' && captureUrl && (
-                <button
-                  className="btn btn--secondary btn--sm"
-                  onClick={() => window.open(captureUrl, '_blank', 'noopener,noreferrer')}
-                  disabled={!audioIngestToken}
-                >
-                  Mở MeetMate Capture
                 </button>
               )}
             </div>

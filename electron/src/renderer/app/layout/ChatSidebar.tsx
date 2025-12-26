@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bot, MessageSquare, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { Bot, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { aiApi } from '../../lib/api/ai';
 import { knowledgeApi, type KnowledgeDocument } from '../../lib/api/knowledge';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -551,7 +551,12 @@ const ChatSidebar = () => {
         onClick={() => setIsOpen(true)}
         title={t('ai.sidebar.toggleOpen')}
       >
-        <MessageSquare size={18} />
+        <img
+          src="/meetmate_ai.png"
+          alt="MeetMate AI"
+          className="ai-sidebar__toggle-img"
+        />
+        <span className="ai-sidebar__toggle-label" aria-hidden="true">Ask me!</span>
       </button>
     </>
   );

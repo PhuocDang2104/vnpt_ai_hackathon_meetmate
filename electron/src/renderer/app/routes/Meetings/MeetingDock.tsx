@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Mic, MonitorSmartphone, RefreshCw, ScreenShare, Video, X } from 'lucide-react';
 import { InMeetTab } from '../../../features/meetings/components/tabs/InMeetTab';
 import { meetingsApi } from '../../../lib/api/meetings';
+import { sessionsApi } from '../../../lib/api/sessions';
 import type { MeetingWithParticipants } from '../../../shared/dto/meeting';
 import { MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { useChatContext } from '../../../contexts/ChatContext';
+import { API_URL, USE_API } from '../../../config/env';
+
+const TARGET_SAMPLE_RATE = 16000;
+const DEFAULT_FRAME_MS = 250;
 
 const MeetingDock = () => {
   const { meetingId } = useParams<{ meetingId: string }>();
@@ -21,7 +26,18 @@ const MeetingDock = () => {
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [audioStatus, setAudioStatus] = useState<'idle' | 'starting' | 'streaming' | 'error'>('idle');
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioInfo, setAudioInfo] = useState<string | null>(null);
+  const [audioToken, setAudioToken] = useState('');
+  const [isAudioTokenLoading, setIsAudioTokenLoading] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const audioWsRef = useRef<WebSocket | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const audioPendingRef = useRef<number[]>([]);
+  const audioStartAckRef = useRef(false);
+  const frameSamplesRef = useRef(Math.round((TARGET_SAMPLE_RATE * DEFAULT_FRAME_MS) / 1000));
   const { setOverride, clearOverride } = useChatContext();
 
   const sessionFromQuery = searchParams.get('session');
@@ -29,11 +45,62 @@ const MeetingDock = () => {
   const platformFromQuery = searchParams.get('platform');
   const tokenFromQuery = searchParams.get('token') || '';
 
+  const wsBase = useMemo(() => {
+    if (API_URL.startsWith('https://')) return API_URL.replace(/^https:/i, 'wss:').replace(/\/$/, '');
+    if (API_URL.startsWith('http://')) return API_URL.replace(/^http:/i, 'ws:').replace(/\/$/, '');
+    return API_URL.replace(/\/$/, '');
+  }, []);
+
+  const audioWsUrl = useMemo(() => {
+    if (!streamSessionId) return '';
+    return `${wsBase}/api/v1/ws/audio/${streamSessionId}`;
+  }, [streamSessionId, wsBase]);
+
+  const stopAudioCapture = useCallback((message?: string) => {
+    if (audioWsRef.current) {
+      audioWsRef.current.onclose = null;
+      audioWsRef.current.onerror = null;
+      audioWsRef.current.onmessage = null;
+      audioWsRef.current.close();
+      audioWsRef.current = null;
+    }
+    if (audioProcessorRef.current) {
+      audioProcessorRef.current.disconnect();
+      audioProcessorRef.current.onaudioprocess = null;
+      audioProcessorRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    audioPendingRef.current = [];
+    audioStartAckRef.current = false;
+    setAudioStatus(message ? 'error' : 'idle');
+    setAudioError(message || null);
+    if (!message) {
+      setAudioInfo(null);
+    }
+  }, []);
+
+  const stopPreview = useCallback((message?: string) => {
+    setPreviewStream(prev => {
+      if (prev) {
+        prev.getTracks().forEach(track => track.stop());
+      }
+      return null;
+    });
+    stopAudioCapture(message);
+  }, [stopAudioCapture]);
+
   useEffect(() => {
     if (platformFromQuery === 'gmeet') {
       setJoinPlatform('gmeet');
     }
   }, [platformFromQuery]);
+
+  useEffect(() => {
+    setAudioToken(tokenFromQuery);
+  }, [tokenFromQuery]);
 
   useEffect(() => {
     document.body.classList.add('sidecar-mode');
@@ -59,13 +126,14 @@ const MeetingDock = () => {
     const track = previewStream.getVideoTracks()[0];
     if (!track) return;
     const handleEnded = () => {
+      stopAudioCapture('Đã dừng chia sẻ tab.');
       setPreviewStream(null);
     };
     track.addEventListener('ended', handleEnded);
     return () => {
       track.removeEventListener('ended', handleEnded);
     };
-  }, [previewStream]);
+  }, [previewStream, stopAudioCapture]);
 
   useEffect(() => {
     return () => {
@@ -74,6 +142,12 @@ const MeetingDock = () => {
       }
     };
   }, [previewStream]);
+
+  useEffect(() => {
+    return () => {
+      stopAudioCapture();
+    };
+  }, [stopAudioCapture]);
 
   const fetchMeeting = useCallback(async () => {
     if (!meetingId) return;
@@ -110,6 +184,160 @@ const MeetingDock = () => {
     return () => clearOverride();
   }, [clearOverride]);
 
+  const ensureAudioToken = useCallback(async () => {
+    if (audioToken) return audioToken;
+    if (!streamSessionId) {
+      setAudioStatus('error');
+      setAudioError('Thiếu session_id để capture audio.');
+      return '';
+    }
+    if (!USE_API) {
+      setAudioStatus('error');
+      setAudioError('USE_API=false: không thể lấy audio_ingest_token.');
+      return '';
+    }
+    setIsAudioTokenLoading(true);
+    setAudioError(null);
+    try {
+      const res = await sessionsApi.registerSource(streamSessionId);
+      setAudioToken(res.audio_ingest_token);
+      setAudioInfo(`Token audio mới (TTL ${res.token_ttl_seconds}s).`);
+      return res.audio_ingest_token;
+    } catch (err) {
+      console.error('Failed to fetch audio_ingest_token', err);
+      setAudioStatus('error');
+      setAudioError('Không lấy được audio_ingest_token. Kiểm tra backend /sessions/{id}/sources.');
+      return '';
+    } finally {
+      setIsAudioTokenLoading(false);
+    }
+  }, [audioToken, streamSessionId]);
+
+  const startAudioCapture = useCallback(async (stream: MediaStream) => {
+    if (joinPlatform !== 'gmeet') return;
+    if (!streamSessionId) {
+      setAudioStatus('error');
+      setAudioError('Thiếu session_id để capture audio.');
+      return;
+    }
+    if (!USE_API) {
+      setAudioStatus('error');
+      setAudioError('USE_API=false: không thể mở WS audio ingest.');
+      return;
+    }
+
+    const token = await ensureAudioToken();
+    if (!token) return;
+
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) {
+      setAudioStatus('error');
+      setAudioError('Chưa bật "Share tab audio". Hãy chọn lại tab và tick audio.');
+      return;
+    }
+
+    stopAudioCapture();
+    setAudioStatus('starting');
+    setAudioError(null);
+    setAudioInfo('Đang kết nối audio ingest...');
+    audioStartAckRef.current = false;
+
+    const wsUrl = `${audioWsUrl}?token=${token}&stt=1`;
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    audioWsRef.current = ws;
+
+    const startAudioPipeline = async () => {
+      try {
+        const ctx = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
+        audioCtxRef.current = ctx;
+        await ctx.resume();
+        const source = ctx.createMediaStreamSource(stream);
+        const processor = ctx.createScriptProcessor(4096, 1, 1);
+        audioProcessorRef.current = processor;
+        audioPendingRef.current = [];
+
+        processor.onaudioprocess = event => {
+          if (!audioStartAckRef.current) return;
+          const input = event.inputBuffer.getChannelData(0);
+          const pending = audioPendingRef.current;
+          for (let i = 0; i < input.length; i++) {
+            const s = Math.max(-1, Math.min(1, input[i]));
+            pending.push(s * 0x7fff);
+          }
+          while (pending.length >= frameSamplesRef.current) {
+            const frameSamples = frameSamplesRef.current;
+            const frame = pending.splice(0, frameSamples);
+            const buf = new ArrayBuffer(frameSamples * 2);
+            const view = new DataView(buf);
+            for (let i = 0; i < frameSamples; i++) {
+              view.setInt16(i * 2, frame[i], true);
+            }
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(buf);
+            }
+          }
+        };
+
+        source.connect(processor);
+        processor.connect(ctx.destination);
+        audioTracks[0].onended = () => stopAudioCapture('Tab audio đã dừng.');
+        setAudioStatus('streaming');
+        setAudioInfo('Đang stream audio tab vào SmartVoice ingest.');
+      } catch (err) {
+        console.error('AudioContext init failed', err);
+        stopAudioCapture('Không khởi tạo được AudioContext để lấy audio tab.');
+      }
+    };
+
+    ws.onmessage = evt => {
+      if (typeof evt.data !== 'string') return;
+      try {
+        const data = JSON.parse(evt.data);
+        if (data?.event === 'audio_start_ack') {
+          if (!audioStartAckRef.current) {
+            audioStartAckRef.current = true;
+            setAudioInfo('Audio start đã được backend xác nhận.');
+            startAudioPipeline();
+          }
+          return;
+        }
+        if (data?.event === 'error') {
+          const message = data?.message ? String(data.message) : 'WS audio ingest lỗi.';
+          stopAudioCapture(message);
+          return;
+        }
+      } catch (_err) {
+        // ignore non-JSON messages
+      }
+    };
+
+    ws.onopen = () => {
+      const startMsg = {
+        type: 'start',
+        platform: 'browser_tab',
+        platform_meeting_ref: meetingId || streamSessionId || undefined,
+        audio: { codec: 'PCM_S16LE', sample_rate_hz: TARGET_SAMPLE_RATE, channels: 1 },
+        language_code: 'vi-VN',
+        frame_ms: DEFAULT_FRAME_MS,
+        stream_id: `tab_${Date.now()}`,
+        client_ts_ms: Date.now(),
+      };
+      ws.send(JSON.stringify(startMsg));
+      setAudioInfo('Đã gửi start, chờ backend xác nhận...');
+    };
+
+    ws.onerror = evt => {
+      console.error('Audio WS error', evt);
+      stopAudioCapture('WS audio ingest lỗi. Kiểm tra token/session.');
+    };
+
+    ws.onclose = evt => {
+      const reason = evt.reason ? `, reason: ${evt.reason}` : '';
+      stopAudioCapture(`WS audio đã đóng (code ${evt.code}${reason}).`);
+    };
+  }, [audioWsUrl, ensureAudioToken, joinPlatform, meetingId, streamSessionId, stopAudioCapture]);
+
   const handleEndMeeting = async () => {
     if (!meetingId) return;
     try {
@@ -126,36 +354,24 @@ const MeetingDock = () => {
     window.open(joinLink, '_blank', 'noopener,noreferrer');
   };
 
-  const handleOpenCapturePage = () => {
-    if (!meeting) return;
-    const params = new URLSearchParams();
-    if (streamSessionId) params.set('session', streamSessionId);
-    if (joinLink) params.set('link', joinLink);
-    if (tokenFromQuery) params.set('token', tokenFromQuery);
-    const qs = params.toString();
-    window.open(`#/app/meetings/${meeting.id}/capture${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
-  };
-
   const handleStopPreview = useCallback(() => {
-    setPreviewStream(prev => {
-      if (prev) {
-        prev.getTracks().forEach(track => track.stop());
-      }
-      return null;
-    });
-  }, []);
+    stopPreview();
+  }, [stopPreview]);
 
   const handleSelectPreview = useCallback(async () => {
     setPreviewError(null);
+    setAudioError(null);
+    setAudioInfo(null);
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setPreviewError('Trình duyệt không hỗ trợ chia sẻ màn hình.');
       return;
     }
     setIsPreviewLoading(true);
     try {
+      const shouldCaptureAudio = joinPlatform === 'gmeet';
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
-        audio: false,
+        audio: shouldCaptureAudio ? { channelCount: 1, sampleRate: TARGET_SAMPLE_RATE } : false,
       });
       setPreviewStream(prev => {
         if (prev) {
@@ -163,6 +379,11 @@ const MeetingDock = () => {
         }
         return stream;
       });
+      if (shouldCaptureAudio) {
+        await startAudioCapture(stream);
+      } else {
+        stopAudioCapture();
+      }
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') {
         setPreviewError('Bạn đã hủy chọn tab.');
@@ -172,7 +393,7 @@ const MeetingDock = () => {
     } finally {
       setIsPreviewLoading(false);
     }
-  }, []);
+  }, [joinPlatform, startAudioCapture, stopAudioCapture]);
 
   if (isLoading) {
     return (
@@ -195,6 +416,28 @@ const MeetingDock = () => {
     );
   }
 
+  const previewLabel = joinPlatform === 'gmeet'
+    ? 'Chọn tab để xem và capture audio'
+    : 'Chọn tab để xem';
+  const previewSwitchLabel = joinPlatform === 'gmeet'
+    ? 'Đổi tab xem và capture audio'
+    : 'Đổi tab xem';
+  const previewActionLabel = previewStream ? previewSwitchLabel : previewLabel;
+  const previewHint = joinPlatform === 'gmeet'
+    ? 'Bấm “Chọn tab để xem và capture audio” và tick "Share tab audio" trong Chrome.'
+    : 'Bấm “Chọn tab để xem” để mở hộp thoại chọn Tab / Window / Screen.';
+  const audioStatusLabel = joinPlatform === 'gmeet'
+    ? (audioInfo || (audioStatus === 'streaming'
+        ? 'Đang capture audio tab'
+        : audioStatus === 'starting'
+        ? 'Đang kết nối audio ingest...'
+        : audioStatus === 'error'
+        ? 'Capture audio gặp lỗi'
+        : isAudioTokenLoading
+        ? 'Đang lấy audio token...'
+        : 'Sẵn sàng capture audio'))
+    : '';
+
   return (
     <div className="sidecar-dock">
       <div className="sidecar-preview">
@@ -202,11 +445,11 @@ const MeetingDock = () => {
           <div className="sidecar-preview__header">
             <div className="sidecar-preview__title">
               <ScreenShare size={16} />
-              Chọn tab để xem
+              {previewLabel}
             </div>
             <div className="sidecar-preview__actions">
               <button className="btn btn--secondary btn--sm" onClick={handleSelectPreview} disabled={isPreviewLoading}>
-                {isPreviewLoading ? 'Đang mở...' : 'Chọn tab để xem'}
+                {isPreviewLoading ? 'Đang mở...' : previewActionLabel}
               </button>
               {previewStream && (
                 <button className="btn btn--ghost btn--sm" onClick={handleStopPreview}>
@@ -218,14 +461,22 @@ const MeetingDock = () => {
           </div>
           <div className="sidecar-preview__body">
             {previewStream ? (
-              <video ref={previewVideoRef} className="sidecar-preview__video" autoPlay muted playsInline />
+              <div className="sidecar-preview__content">
+                <video ref={previewVideoRef} className="sidecar-preview__video" autoPlay muted playsInline />
+                {joinPlatform === 'gmeet' && (
+                  <div className="sidecar-preview__note">
+                    <Mic size={14} />
+                    <span>{audioStatusLabel}</span>
+                    {audioError && <span className="sidecar-preview__error">{audioError}</span>}
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="sidecar-preview__placeholder">
                 <p>Chưa có tab nào được chọn.</p>
-                <span className="sidecar-preview__hint">
-                  Bấm “Chọn tab để xem” để mở hộp thoại chọn Tab / Window / Screen.
-                </span>
+                <span className="sidecar-preview__hint">{previewHint}</span>
                 {previewError && <span className="sidecar-preview__error">{previewError}</span>}
+                {!previewError && audioError && <span className="sidecar-preview__error">{audioError}</span>}
               </div>
             )}
           </div>
@@ -259,18 +510,12 @@ const MeetingDock = () => {
             </button>
             <button className="btn btn--secondary" onClick={handleSelectPreview} disabled={isPreviewLoading}>
               <ScreenShare size={14} />
-              {isPreviewLoading ? 'Đang mở...' : previewStream ? 'Đổi tab xem' : 'Chọn tab để xem'}
+              {isPreviewLoading ? 'Đang mở...' : previewActionLabel}
             </button>
             {previewStream && (
               <button className="btn btn--ghost" onClick={handleStopPreview}>
                 <X size={14} />
                 Dừng xem
-              </button>
-            )}
-            {joinPlatform === 'gmeet' && (
-              <button className="btn btn--secondary" onClick={handleOpenCapturePage}>
-                <Mic size={14} />
-                Capture tab audio
               </button>
             )}
             {joinLink && (

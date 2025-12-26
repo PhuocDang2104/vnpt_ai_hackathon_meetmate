@@ -182,8 +182,8 @@ export const MeetingDetail = () => {
   }) => {
     if (!meeting) return;
     const resolved = resolveJoinTarget(override?.platform);
-    const link = override?.link || resolved.link;
-    const platform = override?.platform || resolved.platform || joinPlatform;
+    const link = override?.link ?? resolved.link;
+    const platform = override?.platform ?? resolved.platform ?? joinPlatform;
     if (link) {
       window.open(link, '_blank', 'noopener,noreferrer');
     }
@@ -235,6 +235,12 @@ export const MeetingDetail = () => {
       }
       setAudioIngestToken(token);
       setShowJoinModal(false);
+      openMeetingLink({
+        link: gmeetJoinLink || undefined,
+        platform: 'gmeet',
+        sessionId,
+        token,
+      });
     } catch (err) {
       console.error('Failed to init realtime session:', err);
       setSessionInitError('Không thể khởi tạo realtime session. Kiểm tra backend /api/v1/sessions.');
