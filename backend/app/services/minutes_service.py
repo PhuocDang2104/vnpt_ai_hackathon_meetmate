@@ -230,6 +230,7 @@ async def generate_minutes_with_ai(
 ) -> MeetingMinutesResponse:
     """Generate meeting minutes using AI (with meeting fields + transcript + actions/decisions/risks + related docs)."""
     from app.llm.gemini_client import MeetingAIAssistant
+    from app.services import template_service, template_formatter
 
     meeting_id = request.meeting_id
     
@@ -334,19 +335,32 @@ async def generate_minutes_with_ai(
         if not isinstance(summary_result["key_points"], list):
             summary_result["key_points"] = [str(summary_result["key_points"])]
 
-    # Format minutes with available context (even if AI fallback)
-    minutes_content = format_minutes(
-        meeting_title=meeting_title,
-        meeting_type=meeting_type,
-        start_time=start_time,
-        end_time=end_time,
-        summary=summary_result.get('summary', ''),
-        key_points=summary_result.get('key_points', []),
-        actions=actions,
-        decisions=decisions,
-        risks=risks,
-        format_type=request.format
-    )
+    # Format minutes with template if provided, otherwise use default format
+    if request.template_id:
+        # Use template-based formatting
+        context_payload['summary'] = summary_result.get('summary', '')
+        context_payload['key_points'] = summary_result.get('key_points', [])
+        minutes_content = template_formatter.format_minutes_with_template(
+            db=db,
+            template_id=request.template_id,
+            meeting_id=meeting_id,
+            context=context_payload,
+            format_type=request.format
+        )
+    else:
+        # Use default formatting
+        minutes_content = format_minutes(
+            meeting_title=meeting_title,
+            meeting_type=meeting_type,
+            start_time=start_time,
+            end_time=end_time,
+            summary=summary_result.get('summary', ''),
+            key_points=summary_result.get('key_points', []),
+            actions=actions,
+            decisions=decisions,
+            risks=risks,
+            format_type=request.format
+        )
     
     # Create minutes record
     minutes_data = MeetingMinutesCreate(

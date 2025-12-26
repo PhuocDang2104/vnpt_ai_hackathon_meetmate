@@ -85,6 +85,7 @@ class DistributionLogList(BaseModel):
 
 class GenerateMinutesRequest(BaseModel):
     meeting_id: str
+    template_id: Optional[str] = None  # Template ID to use for generation
     include_transcript: bool = True
     include_actions: bool = True
     include_decisions: bool = True

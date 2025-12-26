@@ -18,6 +18,7 @@ from . import (
     transcripts,
     participants,
     minutes,
+    minutes_template,
     tools,
 )
 
@@ -41,5 +42,6 @@ __all__ = [
     'transcripts',
     'participants',
     'minutes',
+    'minutes_template',
     'tools',
 ]

@@ -279,6 +279,10 @@ def update_meeting(db: Session, meeting_id: str, payload: MeetingUpdate) -> Opti
         update_fields.append("teams_link = :teams_link")
         params['teams_link'] = payload.teams_link
     
+    if payload.recording_url is not None:
+        update_fields.append("recording_url = :recording_url")
+        params['recording_url'] = payload.recording_url
+    
     if not update_fields:
         return get_meeting(db, meeting_id)
     

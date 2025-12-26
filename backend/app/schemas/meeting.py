@@ -48,6 +48,7 @@ class MeetingUpdate(BaseModel):
     phase: Optional[str] = None
     location: Optional[str] = None
     teams_link: Optional[str] = None
+    recording_url: Optional[str] = None
 
 
 class Meeting(MeetingBase):

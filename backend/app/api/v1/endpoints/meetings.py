@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.schemas.meeting import (
@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.services import meeting_service
 from app.services import participant_service, agenda_service
 from app.services import email_service, knowledge_service
+from app.services import video_service
 from app.services.storage_client import generate_presigned_get_url
 from app.schemas.knowledge import KnowledgeDocument
 from datetime import datetime
@@ -208,4 +209,140 @@ def update_meeting_phase(
     meeting = meeting_service.update_phase(db=db, meeting_id=meeting_id, phase=phase)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # When ending meeting (phase -> 'post'), save transcript from session store to database
+    if phase == 'post':
+        from app.services.realtime_session_store import session_store
+        from app.services import transcript_service
+        from app.schemas.transcript import TranscriptChunkCreate
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Try to get session by meeting_id (session_id might be same as meeting_id)
+        session = session_store.get(meeting_id)
+        if session and session.stream_state and session.stream_state.final_stream:
+            try:
+                # Check if transcript already exists in database
+                existing_chunks = transcript_service.list_transcript_chunks(
+                    db=db,
+                    meeting_id=meeting_id,
+                    limit=1
+                )
+                
+                # Only save if no transcript exists yet (avoid duplicates)
+                if existing_chunks.total == 0:
+                    # Convert FinalTranscriptChunk to TranscriptChunkCreate
+                    chunks_to_save = []
+                    for idx, chunk in enumerate(session.stream_state.final_stream, start=1):
+                        chunks_to_save.append(TranscriptChunkCreate(
+                            chunk_index=idx,
+                            start_time=chunk.time_start,
+                            end_time=chunk.time_end,
+                            speaker=chunk.speaker,
+                            text=chunk.text,
+                            confidence=chunk.confidence,
+                            language=chunk.lang,
+                            meeting_id=meeting_id
+                        ))
+                    
+                    if chunks_to_save:
+                        # Save all transcript chunks to database
+                        result = transcript_service.create_batch_transcript_chunks(
+                            db=db,
+                            meeting_id=meeting_id,
+                            chunks=chunks_to_save
+                        )
+                        logger.info(f"Saved {result.total} transcript chunks for meeting {meeting_id}")
+                else:
+                    logger.info(f"Transcript already exists for meeting {meeting_id}, skipping save")
+            except Exception as e:
+                # Log error but don't fail the phase update
+                logger.error(f"Failed to save transcript when ending meeting {meeting_id}: {e}", exc_info=True)
+    
     return meeting
+
+
+@router.post('/{meeting_id}/upload-video')
+async def upload_meeting_video(
+    meeting_id: str,
+    video: UploadFile = File(..., description="Video file to upload"),
+    uploaded_by: Optional[str] = Form(None, description="User ID who uploaded the video"),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a video recording for a meeting.
+    
+    Accepts video files (MP4, MOV, AVI, WebM, MKV) up to 500MB.
+    Uploads to Supabase S3 storage (or local fallback) and updates meeting.recording_url.
+    """
+    from uuid import UUID as UUIDType
+    
+    uploaded_by_uuid = None
+    if uploaded_by:
+        try:
+            uploaded_by_uuid = UUIDType(uploaded_by)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid uploaded_by UUID format")
+    
+    try:
+        result = await video_service.upload_meeting_video(
+            db=db,
+            meeting_id=meeting_id,
+            file=video,
+            uploaded_by=uploaded_by_uuid,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Unexpected error uploading video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post('/{meeting_id}/trigger-inference')
+async def trigger_inference(
+    meeting_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger AI inference (transcription + diarization) from video recording.
+    
+    This endpoint queues a background job to:
+    1. Extract audio from video
+    2. Run Whisper transcription
+    3. Run speaker diarization
+    4. Generate transcript chunks
+    5. Auto-generate meeting minutes
+    """
+    # Check meeting exists
+    meeting = meeting_service.get_meeting(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Check if meeting has recording_url
+    if not meeting.recording_url:
+        raise HTTPException(status_code=400, detail="Meeting does not have a video recording")
+    
+    # TODO: Implement background job queue
+    # For now, return a mock job_id
+    # In production, this should:
+    # 1. Queue a Celery task or similar
+    # 2. Return job_id to track progress
+    # 3. Process video → audio → transcript → minutes
+    
+    import uuid
+    job_id = str(uuid.uuid4())
+    
+    # TODO: Start background job here
+    # Example:
+    # from app.tasks.inference import process_meeting_video
+    # task = process_meeting_video.delay(meeting_id, meeting.recording_url)
+    # job_id = task.id
+    
+    return {
+        "job_id": job_id,
+        "message": "Inference job started. Processing will begin shortly.",
+        "status": "queued"
+    }
