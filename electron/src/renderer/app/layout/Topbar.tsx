@@ -9,6 +9,7 @@ import {
   CheckSquare,
   FileText,
   AlertTriangle,
+  Search,
   X,
   Check,
   Clock,
@@ -241,15 +242,19 @@ const Topbar = () => {
         </div>
           )
         })()}
+        <div className="topbar__search">
+          <Search className="topbar__search-icon" />
+          <input
+            type="search"
+            className="topbar__search-input"
+            placeholder="Tìm kiếm cuộc họp, dự án, tài liệu..."
+            value={searchTerm}
+            onChange={event => setSearchTerm(event.target.value)}
+          />
+        </div>
       </div>
 
       <div className="topbar__right">
-        {/* AI Status */}
-        <div className="topbar__status">
-          <span className="topbar__status-dot"></span>
-          <span>AI Ready</span>
-        </div>
-
         {/* Notifications */}
         <div className="notification-wrapper" ref={dropdownRef}>
           <button 

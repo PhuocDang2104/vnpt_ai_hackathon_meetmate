@@ -26,6 +26,7 @@ import {
   useCalendarMeetings,
   type NormalizedMeeting,
 } from '../../services/meeting'
+import MeetingsViewToggle from '../../components/MeetingsViewToggle'
 
 type ViewMode = 'year' | 'month' | 'week'
 
@@ -158,6 +159,7 @@ const Calendar = () => {
           <p className="page-header__subtitle">Quản lý lịch họp của bạn</p>
         </div>
         <div className="page-header__actions">
+          <MeetingsViewToggle />
           <button className="btn btn--ghost" onClick={() => refetch()} title="Làm mới">
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </button>

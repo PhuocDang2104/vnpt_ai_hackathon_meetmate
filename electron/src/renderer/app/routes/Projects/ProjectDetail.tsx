@@ -148,6 +148,31 @@ const ProjectDetail = () => {
     )
   }
 
+  const fallbackMembers: ProjectMember[] = [
+    {
+      project_id: projectId || '',
+      user_id: 'dang-nhu-phuoc',
+      display_name: 'Đặng Như Phước',
+      email: 'phuoc.dang2104@gmail.com',
+      role: 'member',
+    },
+    {
+      project_id: projectId || '',
+      user_id: 'dat-truongminh',
+      display_name: 'Đạt',
+      email: 'truongminhdathd@gmail.com',
+      role: 'member',
+    },
+    {
+      project_id: projectId || '',
+      user_id: 'thai-hoai-an',
+      display_name: 'Thái Hoài An',
+      email: 'hoaianthai345@gmail.com',
+      role: 'member',
+    },
+  ]
+  const displayMembers = members.length > 0 ? members : fallbackMembers
+
   return (
     <div className="page">
       <div className="page-header">
@@ -552,36 +577,6 @@ const ProjectDetail = () => {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-xl)' }}>
-        <div className="card" style={{ height: '100%', minHeight: 320 }}>
-          <div className="card__header">
-            <h3 className="card__title">Thành viên</h3>
-            <p className="card__subtitle">{members.length} người</p>
-            <button className="btn btn--primary btn--sm" onClick={() => setShowMemberModal(true)}>Thêm thành viên</button>
-          </div>
-          {members.length === 0 ? (
-            <div className="empty-state">
-              <Users className="empty-state__icon" />
-              <h3 className="empty-state__title">Chưa có thành viên</h3>
-              <p className="empty-state__description">Thêm thành viên từ trang admin nếu cần.</p>
-            </div>
-          ) : (
-            <div className="admin-table">
-              <div className="admin-table__head" style={{ gridTemplateColumns: '1.4fr 1fr 0.8fr' }}>
-                <span>Tên</span><span>Email</span><span>Role</span>
-              </div>
-              {members.map(m => (
-                <div key={m.user_id} className="admin-table__row" style={{ gridTemplateColumns: '1.4fr 1fr 0.8fr' }}>
-                  <span>{m.display_name || m.user_id}</span>
-                  <span>{m.email || '--'}</span>
-                  <span>{m.role || '--'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-xl)', marginTop: 'var(--space-lg)' }}>
         <div className="card" style={{ minHeight: 320 }}>
           <div className="card__header">
             <h3 className="card__title">Tài liệu</h3>
@@ -607,6 +602,36 @@ const ProjectDetail = () => {
                   <span>{d.file_type || '--'}</span>
                   <span>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer">Xem</a> : '--'}</span>
                   <span>{d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : '--'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-xl)', marginTop: 'var(--space-lg)' }}>
+        <div className="card" style={{ minHeight: 320 }}>
+          <div className="card__header">
+            <h3 className="card__title">Thành viên</h3>
+            <p className="card__subtitle">{displayMembers.length} người</p>
+            <button className="btn btn--primary btn--sm" onClick={() => setShowMemberModal(true)}>Thêm thành viên</button>
+          </div>
+          {displayMembers.length === 0 ? (
+            <div className="empty-state">
+              <Users className="empty-state__icon" />
+              <h3 className="empty-state__title">Chưa có thành viên</h3>
+              <p className="empty-state__description">Thêm thành viên từ trang admin nếu cần.</p>
+            </div>
+          ) : (
+            <div className="admin-table">
+              <div className="admin-table__head" style={{ gridTemplateColumns: '1.4fr 1fr 0.8fr' }}>
+                <span>Tên</span><span>Email</span><span>Role</span>
+              </div>
+              {displayMembers.map(m => (
+                <div key={m.user_id} className="admin-table__row" style={{ gridTemplateColumns: '1.4fr 1fr 0.8fr' }}>
+                  <span>{m.display_name || m.user_id}</span>
+                  <span>{m.email || '--'}</span>
+                  <span>{m.role || '--'}</span>
                 </div>
               ))}
             </div>
