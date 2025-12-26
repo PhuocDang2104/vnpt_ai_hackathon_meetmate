@@ -1360,6 +1360,64 @@ a {
   gap: var(--space-md);
 }
 
+.meetings-header__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.meetings-header__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.meetings-header__actions-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ============================================
+   MEETINGS MODE TOGGLE
+   ============================================ */
+
+.meetings-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--card-shadow-soft);
+}
+
+.meetings-mode-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.meetings-mode-toggle__btn:hover {
+  color: var(--text-primary);
+}
+
+.meetings-mode-toggle__btn--active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 8px 16px var(--accent-glow-weak);
+}
+
 /* ============================================
    LIVE INDICATOR
    ============================================ */

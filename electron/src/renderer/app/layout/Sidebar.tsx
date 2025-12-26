@@ -1,7 +1,6 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
-  Calendar,
   Users,
   BookOpen,
   CheckSquare,
@@ -24,6 +23,7 @@ const overdueCount = actionItems.filter(a => a.deadline < new Date() && a.status
 
 const Sidebar = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const storedUser = getStoredUser()
   const displayUser = storedUser || currentUser
   const { t } = useLanguage()
@@ -31,7 +31,6 @@ const Sidebar = () => {
 
   const mainNavItems: NavItem[] = [
     { path: '/app', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
-    { path: '/app/calendar', labelKey: 'nav.calendar', icon: <Calendar size={20} /> },
     { path: '/app/meetings', labelKey: 'nav.meetings', icon: <Users size={20} /> },
     { path: '/app/projects', labelKey: 'nav.projects', icon: <FolderOpen size={20} /> },
   ]
@@ -81,9 +80,12 @@ const Sidebar = () => {
               <li key={item.path} className="sidebar__nav-item">
                 <NavLink 
                   to={item.path} 
-                  className={({ isActive }) => 
-                    `sidebar__nav-link ${isActive ? 'active' : ''}`
-                  }
+                  className={({ isActive }) => {
+                    const isMeetingsRoute = item.path === '/app/meetings'
+                    const isMergedActive = isMeetingsRoute && (location.pathname.startsWith('/app/meetings') || location.pathname.startsWith('/app/calendar'))
+                    const active = isMergedActive || (!isMeetingsRoute && isActive)
+                    return `sidebar__nav-link ${active ? 'active' : ''}`
+                  }}
                   end={item.path === '/app'}
                 >
                   <span className="sidebar__nav-icon">{item.icon}</span>

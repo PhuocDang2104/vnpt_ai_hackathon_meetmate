@@ -18,6 +18,7 @@ import {
 } from '../../../store/mockData'
 import { Modal } from '../../../components/ui/Modal'
 import { CreateMeetingForm } from '../../../features/meetings/components/CreateMeetingForm'
+import MeetingsViewToggle from '../../../components/MeetingsViewToggle'
 import { meetingsApi } from '../../../lib/api/meetings'
 import type { Meeting, MeetingPhase } from '../../../shared/dto/meeting'
 import { USE_API } from '../../../config/env'
@@ -124,42 +125,47 @@ const Meetings = () => {
           <h1 className="page-header__title">Cuộc họp</h1>
           <p className="page-header__subtitle">Quản lý tất cả cuộc họp của bạn</p>
         </div>
-        <div className="page-header__actions">
-          <div className="tabs">
+        <div className="page-header__actions meetings-header__actions">
+          <div className="meetings-header__filters">
+            <MeetingsViewToggle />
+            <div className="tabs">
+              <button 
+                className={`tabs__item ${activeTab === 'all' ? 'tabs__item--active' : ''}`}
+                onClick={() => setActiveTab('all')}
+              >
+                Tất cả
+              </button>
+              <button 
+                className={`tabs__item ${activeTab === 'today' ? 'tabs__item--active' : ''}`}
+                onClick={() => setActiveTab('today')}
+              >
+                Hôm nay
+              </button>
+              <button 
+                className={`tabs__item ${activeTab === 'week' ? 'tabs__item--active' : ''}`}
+                onClick={() => setActiveTab('week')}
+              >
+                Tuần này
+              </button>
+            </div>
+          </div>
+          <div className="meetings-header__actions-right">
             <button 
-              className={`tabs__item ${activeTab === 'all' ? 'tabs__item--active' : ''}`}
-              onClick={() => setActiveTab('all')}
+              className="btn btn--secondary"
+              onClick={fetchMeetings}
+              disabled={isLoading}
+              title="Làm mới"
             >
-              Tất cả
+              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             </button>
             <button 
-              className={`tabs__item ${activeTab === 'today' ? 'tabs__item--active' : ''}`}
-              onClick={() => setActiveTab('today')}
+              className="btn btn--primary"
+              onClick={() => setIsCreateModalOpen(true)}
             >
-              Hôm nay
-            </button>
-            <button 
-              className={`tabs__item ${activeTab === 'week' ? 'tabs__item--active' : ''}`}
-              onClick={() => setActiveTab('week')}
-            >
-              Tuần này
+              <Plus size={16} />
+              Tạo cuộc họp
             </button>
           </div>
-          <button 
-            className="btn btn--secondary"
-            onClick={fetchMeetings}
-            disabled={isLoading}
-            title="Làm mới"
-          >
-            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          </button>
-          <button 
-            className="btn btn--primary"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus size={16} />
-            Tạo cuộc họp
-          </button>
         </div>
       </div>
 
