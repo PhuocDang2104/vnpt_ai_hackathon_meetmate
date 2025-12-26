@@ -1,11 +1,10 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Mic,
   CheckSquare,
   AlertTriangle,
   FileText,
-  Bot,
-  Send,
   Clock,
   User,
   Check,
@@ -13,6 +12,7 @@ import {
   Edit3,
   Play,
 } from 'lucide-react'
+import { useChatContext } from '../../../contexts/ChatContext'
 import {
   meetings,
   transcriptChunks,
@@ -30,6 +30,21 @@ const MeetingIn = () => {
   const actions = actionItems.filter(a => a.meetingId === meetingId).slice(0, 3)
   const meetingDecisions = decisions.filter(d => d.meetingId === meetingId)
   const meetingRisks = risks.filter(r => r.meetingId === meetingId)
+  const { setOverride, clearOverride } = useChatContext()
+
+  useEffect(() => {
+    if (!meeting) return
+    setOverride({
+      scope: 'meeting',
+      meetingId: meeting.id,
+      phase: 'in',
+      title: meeting.title,
+    })
+  }, [meeting?.id, meeting?.title, setOverride])
+
+  useEffect(() => {
+    return () => clearOverride()
+  }, [clearOverride])
 
   if (!meeting) {
     return <div>Meeting not found</div>
@@ -179,49 +194,8 @@ const MeetingIn = () => {
         </div>
       </div>
 
-      {/* Side Panel - AI Assistant */}
+      {/* Side Panel */}
       <div className="panel-split__side">
-        <div className="ai-chat">
-          <div className="ai-chat__header">
-            <div className="ai-chat__avatar">
-              <Bot size={20} />
-            </div>
-            <div>
-              <div className="ai-chat__title">MeetMate AI</div>
-              <div className="ai-chat__subtitle">Trợ lý trong cuộc họp</div>
-            </div>
-          </div>
-          <div className="ai-chat__messages">
-            <div className="ai-chat__message ai-chat__message--ai">
-              Đang theo dõi cuộc họp. Tôi đã phát hiện:
-              <br /><br />
-              <strong>{actions.length}</strong> action items<br />
-              <strong>{meetingDecisions.length}</strong> quyết định<br />
-              <strong>{meetingRisks.length}</strong> rủi ro<br /><br />
-              Bạn có thể hỏi tôi về bất kỳ tài liệu hoặc thông tin nào liên quan.
-            </div>
-            <div className="ai-chat__message ai-chat__message--user">
-              Data retention policy theo NHNN là bao nhiêu năm?
-            </div>
-            <div className="ai-chat__message ai-chat__message--ai">
-              Theo Thông tư 09/2020/TT-NHNN, thời gian lưu trữ dữ liệu giao dịch tối thiểu là <strong>10 năm</strong> kể từ ngày phát sinh giao dịch.
-              <div className="ai-chat__message-citation">
-                Thông tư 09/2020/TT-NHNN, Điều 15, Trang 12
-              </div>
-            </div>
-          </div>
-          <div className="ai-chat__input">
-            <input 
-              type="text" 
-              className="ai-chat__input-field" 
-              placeholder="Hỏi AI về tài liệu, policy..."
-            />
-            <button className="btn btn--primary btn--icon">
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-
         {/* Live Recap */}
         <div className="card mt-4">
           <div className="card__header">

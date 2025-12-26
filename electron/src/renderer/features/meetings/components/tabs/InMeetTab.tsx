@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { actionItems, decisions, formatDuration, risks } from '../../../../store/mockData';
-import { AIAssistantChat } from '../AIAssistantChat';
 import { API_URL, USE_API } from '../../../../config/env';
 import { sessionsApi, diarizationApi } from '../../../../lib/api';
 
@@ -464,7 +463,6 @@ export const InMeetTab = ({
             risks={resolvedRisks}
           />
           <ToolSuggestionsPanel />
-          <AIAssistantChat meetingId={meeting.id} meetingTitle={meeting.title} />
         </div>
       </div>
     </div>

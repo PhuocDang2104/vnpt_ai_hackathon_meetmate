@@ -24,7 +24,6 @@ export const PostMeetTab = ({ meeting }: PostMeetTabProps) => {
         <DecisionsSection meetingId={meeting.id} />
       </div>
       <RisksSection meetingId={meeting.id} />
-      <QAAgentSection meeting={meeting} />
       <HighlightsSection meeting={meeting} />
       <TasksSyncSection meeting={meeting} />
       <DistributionSection meeting={meeting} />
@@ -682,105 +681,6 @@ const RisksSection = ({ meetingId }: { meetingId: string }) => {
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-// ------------------ QA Agent ------------------
-const QAAgentSection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
-  const [question, setQuestion] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [conversation, setConversation] = useState<Array<{role: 'user' | 'ai', content: string}>>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const handleAskQuestion = async () => {
-    if (!question.trim()) return;
-    setIsAsking(true);
-    const userQuestion = question;
-    setConversation(prev => [...prev, { role: 'user', content: userQuestion }]);
-    setQuestion('');
-    setTimeout(() => {
-      const mockAnswers = [
-        `Theo biên bản, deadline chính được nhắc tới là cuối tháng này cho UAT.`,
-        `Trong cuộc họp có 3 action items đã được giao cho các thành viên.`,
-        `Rủi ro chính được nhận diện là chậm từ vendor, cần theo sát.`,
-      ];
-      const randomAnswer = mockAnswers[Math.floor(Math.random() * mockAnswers.length)];
-      setConversation(prev => [...prev, { role: 'ai', content: randomAnswer }]);
-      setIsAsking(false);
-    }, 1200);
-  };
-
-  return (
-    <div className="card qa-agent-card">
-      <div 
-        className="card__header card__header--clickable"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <h3>Q&A Agent - Hỏi về cuộc họp</h3>
-        <button
-          className="btn btn--ghost btn--icon btn--sm"
-          style={{ padding: '6px', width: '32px', height: '32px' }}
-        >
-          {isExpanded ? 'Thu gọn' : 'Mở'}
-        </button>
-      </div>
-      
-      {isExpanded && (
-        <div className="card__body">
-          {conversation.length > 0 && (
-            <div className="qa-conversation">
-              {conversation.map((msg, idx) => (
-                <div key={idx} className={`qa-message qa-message--${msg.role}`}>
-                  <div className="qa-message__avatar">{msg.role === 'user' ? 'U' : 'AI'}</div>
-                  <div className="qa-message__content">{msg.content}</div>
-                </div>
-              ))}
-              {isAsking && (
-                <div className="qa-message qa-message--ai">
-                  <div className="qa-message__avatar">AI</div>
-                  <div className="qa-message__content">
-                    <div className="spinner spinner--sm" />
-                    <span>Đang phân tích...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <div className="qa-input-wrapper">
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Hỏi về nội dung cuộc họp... (VD: Ai được giao làm gì? Deadline là khi nào?)"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAskQuestion()}
-              disabled={isAsking}
-            />
-            <button 
-              className="btn btn--accent"
-              onClick={handleAskQuestion}
-              disabled={isAsking || !question.trim()}
-            >
-              {isAsking ? 'Đang gửi...' : 'Gửi'}
-            </button>
-          </div>
-          
-          <div className="qa-quick-questions">
-            <span>Gợi ý:</span>
-            {['Ai được giao việc?', 'Deadline là khi nào?', 'Có rủi ro gì?', 'Quyết định quan trọng?'].map((q) => (
-              <button
-                key={q}
-                className="btn btn--ghost btn--sm"
-                onClick={() => setQuestion(q)}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

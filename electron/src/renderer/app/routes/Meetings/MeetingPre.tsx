@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   FileText,
@@ -7,10 +8,9 @@ import {
   Plus,
   AlertTriangle,
   HelpCircle,
-  Bot,
-  Send,
   ExternalLink,
 } from 'lucide-react'
+import { useChatContext } from '../../../contexts/ChatContext'
 import {
   meetings,
   prereadDocuments,
@@ -21,6 +21,21 @@ const MeetingPre = () => {
   const { meetingId } = useParams()
   const meeting = meetings.find(m => m.id === meetingId)
   const prereads = prereadDocuments.filter(d => d.meetingId === meetingId)
+  const { setOverride, clearOverride } = useChatContext()
+
+  useEffect(() => {
+    if (!meeting) return
+    setOverride({
+      scope: 'meeting',
+      meetingId: meeting.id,
+      phase: 'pre',
+      title: meeting.title,
+    })
+  }, [meeting?.id, meeting?.title, setOverride])
+
+  useEffect(() => {
+    return () => clearOverride()
+  }, [clearOverride])
 
   if (!meeting) {
     return <div>Meeting not found</div>
@@ -43,7 +58,7 @@ const MeetingPre = () => {
   const totalDuration = agenda.reduce((sum, item) => sum + item.duration, 0)
 
   return (
-    <div className="panel-split">
+    <div className="panel-split panel-split--single">
       {/* Main Content */}
       <div className="panel-split__main">
         {/* Agenda Section */}
@@ -192,53 +207,6 @@ const MeetingPre = () => {
         </div>
       </div>
 
-      {/* Side Panel - AI Assistant */}
-      <div className="panel-split__side">
-        <div className="ai-chat">
-          <div className="ai-chat__header">
-            <div className="ai-chat__avatar">
-              <Bot size={20} />
-            </div>
-            <div>
-              <div className="ai-chat__title">MeetMate AI</div>
-              <div className="ai-chat__subtitle">Trợ lý chuẩn bị họp</div>
-            </div>
-          </div>
-          <div className="ai-chat__messages">
-            <div className="ai-chat__message ai-chat__message--ai">
-              Xin chào! Tôi đã chuẩn bị sẵn cho cuộc họp:
-              <br /><br />
-              <strong>✓</strong> Agenda dựa trên lịch sử họp tương tự<br />
-              <strong>✓</strong> 3 tài liệu liên quan từ SharePoint/LOffice<br />
-              <strong>✓</strong> 2 câu hỏi từ participants<br /><br />
-              Bạn có muốn tôi gợi ý thêm người tham dự?
-            </div>
-            <div className="ai-chat__message ai-chat__message--user">
-              Có ai nên mời thêm không?
-            </div>
-            <div className="ai-chat__message ai-chat__message--ai">
-              Tôi đề xuất mời thêm:
-              <br /><br />
-              <strong>Nguyễn Thị M - Security Architect</strong>
-              <br />
-              Lý do: Cuộc họp liên quan đến integration security, cần review API security design.
-              <div className="ai-chat__message-citation">
-                Dựa trên: LOS-CoreBanking Integration Architecture v2.1
-              </div>
-            </div>
-          </div>
-          <div className="ai-chat__input">
-            <input 
-              type="text" 
-              className="ai-chat__input-field" 
-              placeholder="Hỏi AI về cuộc họp..."
-            />
-            <button className="btn btn--primary btn--icon">
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

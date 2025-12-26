@@ -26,6 +26,7 @@ import { ApiError } from '../../../lib/apiClient';
 import type { MeetingWithParticipants, MeetingUpdate } from '../../../shared/dto/meeting';
 import { MEETING_TYPE_LABELS, MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { USE_API } from '../../../config/env';
+import { useChatContext } from '../../../contexts/ChatContext';
 
 // Tab Components
 import { PreMeetTab } from './tabs/PreMeetTab';
@@ -55,6 +56,7 @@ export const MeetingDetail = () => {
   const [isInitSessionLoading, setIsInitSessionLoading] = useState(false);
   const [gomeetInitError, setGomeetInitError] = useState<string | null>(null);
   const [isGoMeetLoading, setIsGoMeetLoading] = useState(false);
+  const { setOverride, clearOverride } = useChatContext();
   
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -118,6 +120,20 @@ export const MeetingDetail = () => {
   useEffect(() => {
     fetchMeeting();
   }, [fetchMeeting]);
+
+  useEffect(() => {
+    if (!meeting) return;
+    setOverride({
+      scope: 'meeting',
+      meetingId: meeting.id,
+      phase: activeTab,
+      title: meeting.title,
+    });
+  }, [activeTab, meeting?.id, meeting?.title, setOverride]);
+
+  useEffect(() => {
+    return () => clearOverride();
+  }, [clearOverride]);
 
   const handleStartMeeting = async () => {
     if (!meetingId) return;

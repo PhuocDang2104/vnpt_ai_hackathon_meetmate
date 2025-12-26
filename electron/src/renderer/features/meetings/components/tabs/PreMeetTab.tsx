@@ -11,10 +11,8 @@ import {
   ExternalLink,
   Loader2,
   Send,
-  Bot,
   Save,
   Edit2,
-  Trash2,
   Upload,
   UserPlus,
   Search,
@@ -66,7 +64,6 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
           <PrepStatusPanel meeting={meeting} />
           <ParticipantsPanel meeting={meeting} onRefresh={onRefresh} />
           <DocumentsPanel meetingId={meeting.id} />
-          <AIAssistantPanel meetingId={meeting.id} />
         </div>
       </div>
 
@@ -1354,193 +1351,6 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// ============================================
-// AI ASSISTANT PANEL - Enhanced chat with history
-// ============================================
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'ai';
-  content: string;
-  timestamp: Date;
-}
-
-const AIAssistantPanel = ({ meetingId }: { meetingId: string }) => {
-  const [query, setQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const suggestedQuestions = [
-    'Những điểm chính cần thảo luận?',
-    'Rủi ro tiềm ẩn của dự án?',
-    'Policy liên quan cần biết?',
-  ];
-
-  // Auto scroll to bottom when new message
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = async (customQuery?: string) => {
-    const messageText = customQuery || query.trim();
-    if (!messageText || isLoading) return;
-
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'user',
-      content: messageText,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setQuery('');
-    setIsLoading(true);
-
-    try {
-      const result = await knowledgeApi.query({
-        query: messageText,
-        limit: 5,
-        meeting_id: meetingId,
-      });
-      const aiMessage: ChatMessage = {
-        id: `msg-${Date.now()}-ai`,
-        role: 'ai',
-        content: result.answer,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (err) {
-      const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
-        role: 'ai',
-        content: 'Xin lỗi, không thể trả lời lúc này. Vui lòng thử lại.',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    setQuery('');
-  };
-
-  return (
-    <div className={`ai-chat-panel ${isExpanded ? 'ai-chat-panel--expanded' : ''}`}>
-      {/* Header */}
-      <div className="ai-chat-panel__header">
-        <div className="ai-chat-panel__title">
-          <Bot size={16} className="ai-chat-panel__icon" />
-          <span>MeetMate AI</span>
-          <span className="ai-chat-panel__status">
-            <span className="ai-chat-panel__dot"></span>
-            Online
-          </span>
-        </div>
-          <div className="ai-chat-panel__actions">
-            {messages.length > 0 && (
-            <button
-              className="btn btn--ghost btn--icon btn--sm"
-              style={{ padding: '6px', width: '32px', height: '32px' }}
-              onClick={clearChat}
-              title="Xóa cuộc trò chuyện"
-            >
-              <Trash2 size={16} />
-            </button>
-            )}
-            <button 
-              className="btn btn--ghost btn--icon btn--sm" 
-            onClick={() => setIsExpanded(!isExpanded)}
-            title={isExpanded ? 'Thu nhỏ' : 'Mở rộng'}
-          >
-            {isExpanded ? <X size={12} /> : <Sparkles size={12} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Messages Area */}
-      <div className="ai-chat-panel__messages">
-        {messages.length === 0 ? (
-          <div className="ai-chat-panel__welcome">
-            <div className="ai-chat-panel__welcome-icon">
-              <Bot size={28} />
-            </div>
-            <p className="ai-chat-panel__welcome-text">
-              Tôi là MeetMate AI, có thể giúp bạn chuẩn bị cuộc họp.
-            </p>
-            <div className="ai-chat-panel__suggestions">
-              {suggestedQuestions.map((q, i) => (
-                <button 
-                  key={i} 
-                  className="ai-suggestion-chip"
-                  onClick={() => handleSend(q)}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <div key={msg.id} className={`ai-chat-message ai-chat-message--${msg.role}`}>
-                {msg.role === 'ai' && (
-                  <div className="ai-chat-message__avatar">
-                    <Bot size={14} />
-                  </div>
-                )}
-                <div className="ai-chat-message__bubble">
-                  <p>{msg.content}</p>
-                  <span className="ai-chat-message__time">
-                    {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="ai-chat-message ai-chat-message--ai ai-chat-message--typing">
-                <div className="ai-chat-message__avatar">
-                  <Bot size={14} />
-                </div>
-                <div className="ai-chat-message__bubble">
-                  <div className="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Input Area */}
-      <div className="ai-chat-panel__input">
-        <input
-          type="text"
-          placeholder="Hỏi MeetMate AI..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          disabled={isLoading}
-        />
-        <button 
-          className="btn btn--primary btn--icon" 
-          onClick={() => handleSend()}
-          disabled={!query.trim() || isLoading}
-        >
-          {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-        </button>
-      </div>
     </div>
   );
 };

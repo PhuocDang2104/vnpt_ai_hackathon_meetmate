@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import ChatSidebar from './ChatSidebar'
 
 const AppShell = () => {
   return (
@@ -12,6 +13,7 @@ const AppShell = () => {
           <Outlet />
         </main>
       </div>
+      <ChatSidebar />
     </div>
   )
 }

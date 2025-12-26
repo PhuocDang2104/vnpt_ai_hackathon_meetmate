@@ -13,13 +13,11 @@ import {
   Plus,
   X,
   CheckCircle,
-  MessageCircle,
   Trash2,
 } from 'lucide-react'
 import { knowledgeApi, type KnowledgeDocument, type RecentQuery } from '../../lib/api/knowledge'
 import { meetingsApi } from '../../lib/api/meetings'
 import type { Meeting } from '../../shared/dto/meeting'
-import { KnowledgeHubChat } from '../../features/knowledge/components/KnowledgeHubChat'
 import { API_URL } from '../../config/env'
 
 type UploadToastState = {
@@ -37,7 +35,6 @@ const KnowledgeHub = () => {
   const [suggestedDocs, setSuggestedDocs] = useState<KnowledgeDocument[]>([])
   const [isLoadingDocs, setIsLoadingDocs] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
-  const [isChatExpanded, setIsChatExpanded] = useState(false)
   const [uploadToast, setUploadToast] = useState<UploadToastState | null>(null)
 
   useEffect(() => {
@@ -183,9 +180,8 @@ const KnowledgeHub = () => {
         </div>
       </div>
 
-      {/* Main Layout: 60/40 split - Documents & Chat */}
-      <div className="knowledge-hub-layout">
-        {/* Left: Documents List */}
+      {/* Main Layout */}
+      <div className="knowledge-hub-layout knowledge-hub-layout--single">
         <div className="knowledge-hub-layout__main">
           <div className="card mb-4">
             <div className="card__header">
@@ -382,23 +378,7 @@ const KnowledgeHub = () => {
           </div>
         </div>
 
-        {/* Right: AI Chat Panel */}
-        <div className="knowledge-hub-layout__chat">
-          <KnowledgeHubChat 
-            isExpanded={isChatExpanded}
-            onToggle={() => setIsChatExpanded(!isChatExpanded)}
-          />
-        </div>
       </div>
-
-      {/* Mobile Chat Toggle Button */}
-      <button 
-        className="knowledge-chat-toggle"
-        onClick={() => setIsChatExpanded(!isChatExpanded)}
-        title="Hỏi AI"
-      >
-        <MessageCircle size={24} />
-      </button>
 
       {/* Upload Document Modal */}
       <UploadDocumentModal

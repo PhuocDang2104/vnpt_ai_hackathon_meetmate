@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   FileText,
@@ -18,6 +19,7 @@ import {
   decisions,
   risks,
 } from '../../../store/mockData'
+import { useChatContext } from '../../../contexts/ChatContext'
 
 const MeetingPost = () => {
   const { meetingId } = useParams()
@@ -25,6 +27,21 @@ const MeetingPost = () => {
   const actions = actionItems.filter(a => a.meetingId === meetingId)
   const meetingDecisions = decisions.filter(d => d.meetingId === meetingId)
   const meetingRisks = risks.filter(r => r.meetingId === meetingId)
+  const { setOverride, clearOverride } = useChatContext()
+
+  useEffect(() => {
+    if (!meeting) return
+    setOverride({
+      scope: 'meeting',
+      meetingId: meeting.id,
+      phase: 'post',
+      title: meeting.title,
+    })
+  }, [meeting?.id, meeting?.title, setOverride])
+
+  useEffect(() => {
+    return () => clearOverride()
+  }, [clearOverride])
 
   if (!meeting) {
     return <div>Meeting not found</div>

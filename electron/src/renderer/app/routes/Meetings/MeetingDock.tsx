@@ -5,6 +5,7 @@ import { InMeetTab } from '../../../features/meetings/components/tabs/InMeetTab'
 import { meetingsApi } from '../../../lib/api/meetings';
 import type { MeetingWithParticipants } from '../../../shared/dto/meeting';
 import { MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
+import { useChatContext } from '../../../contexts/ChatContext';
 
 const MeetingDock = () => {
   const { meetingId } = useParams<{ meetingId: string }>();
@@ -21,6 +22,7 @@ const MeetingDock = () => {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const { setOverride, clearOverride } = useChatContext();
 
   const sessionFromQuery = searchParams.get('session');
   const linkFromQuery = searchParams.get('link');
@@ -93,6 +95,20 @@ const MeetingDock = () => {
   useEffect(() => {
     fetchMeeting();
   }, [fetchMeeting]);
+
+  useEffect(() => {
+    if (!meeting) return;
+    setOverride({
+      scope: 'meeting',
+      meetingId: meeting.id,
+      phase: 'in',
+      title: meeting.title,
+    });
+  }, [meeting?.id, meeting?.title, setOverride]);
+
+  useEffect(() => {
+    return () => clearOverride();
+  }, [clearOverride]);
 
   const handleEndMeeting = async () => {
     if (!meetingId) return;
