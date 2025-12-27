@@ -36,6 +36,7 @@ export const en = {
     knowledge: 'Knowledge Hub',
     settings: 'Settings',
     adminConsole: 'Admin Console',
+    templates: 'Minutes Templates',
     projects: 'Projects',
     help: 'Help',
     notifications: 'Notifications',

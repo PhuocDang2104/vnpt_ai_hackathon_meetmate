@@ -2,9 +2,13 @@
 -- MINUTES TEMPLATE SYSTEM
 -- ============================================
 
+-- Enable pgcrypto extension for gen_random_uuid() (if PostgreSQL < 13)
+-- For PostgreSQL 13+, gen_random_uuid() is built-in and doesn't need this
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Minutes Template Table
 CREATE TABLE IF NOT EXISTS minutes_template (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
     -- Basic Info
     name TEXT NOT NULL,
@@ -42,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_template_default ON minutes_template(is_default) 
 -- 1. Default Template
 INSERT INTO minutes_template (id, name, code, description, meeting_types, is_default, structure) VALUES
 (
-    uuid_generate_v4(),
+    gen_random_uuid(),
     'Biên bản Mặc định',
     'DEFAULT',
     'Template mặc định cho biên bản họp',
@@ -130,7 +134,7 @@ ON CONFLICT (code) DO NOTHING;
 -- 2. Board Meeting Template
 INSERT INTO minutes_template (id, name, code, description, meeting_types, structure) VALUES
 (
-    uuid_generate_v4(),
+    gen_random_uuid(),
     'Biên bản Hội đồng Quản trị',
     'BOARD_MEETING',
     'Template cho cuộc họp Hội đồng Quản trị',
@@ -208,7 +212,7 @@ ON CONFLICT (code) DO NOTHING;
 -- 3. Compliance/Audit Template
 INSERT INTO minutes_template (id, name, code, description, meeting_types, structure) VALUES
 (
-    uuid_generate_v4(),
+    gen_random_uuid(),
     'Biên bản Tuân thủ/Kiểm toán',
     'COMPLIANCE_AUDIT',
     'Template cho cuộc họp tuân thủ và kiểm toán',
@@ -273,7 +277,7 @@ ON CONFLICT (code) DO NOTHING;
 -- 4. Progress Review Template
 INSERT INTO minutes_template (id, name, code, description, meeting_types, structure) VALUES
 (
-    uuid_generate_v4(),
+    gen_random_uuid(),
     'Biên bản Theo dõi Tiến độ',
     'PROGRESS_REVIEW',
     'Template cho cuộc họp theo dõi tiến độ dự án',

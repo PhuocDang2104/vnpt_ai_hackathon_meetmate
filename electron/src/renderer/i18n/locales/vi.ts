@@ -36,6 +36,7 @@ export const vi = {
     knowledge: 'Kho kiến thức',
     settings: 'Cài đặt',
     adminConsole: 'Bảng quản trị',
+    templates: 'Template Biên bản',
     projects: 'Dự án',
     help: 'Trợ giúp',
     notifications: 'Thông báo',

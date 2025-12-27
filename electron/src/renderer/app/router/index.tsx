@@ -19,6 +19,7 @@ import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 import { Login, Register } from '../routes/Auth'
 import Landing from '../routes/Landing'
 import AdminConsole from '../routes/AdminConsole'
+import TemplateManagement from '../routes/TemplateManagement'
 import ProtectedRoute from './ProtectedRoute'
 
 const router = createHashRouter([
@@ -71,6 +72,7 @@ const router = createHashRouter([
       { path: 'tasks', element: <Tasks /> },
       { path: 'settings', element: <Settings /> },
       { path: 'admin', element: <AdminConsole /> },
+      { path: 'templates', element: <TemplateManagement /> },
     ],
   },
 ])
