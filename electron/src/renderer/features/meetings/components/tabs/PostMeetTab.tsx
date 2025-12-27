@@ -117,7 +117,7 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
               }} />
             </>
           )}
-          
+
           <button
             className="btn btn--primary"
             onClick={handleGenerate}
@@ -445,7 +445,7 @@ const ActionItemsBlockV2 = ({ meetingId }: ActionItemsBlockV2Props) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listActions({ meeting_id: meetingId });
+      const data = await itemsApi.listActions(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load actions failed:', err);
@@ -628,7 +628,7 @@ const DecisionsBlockV2 = ({ meetingId }: { meetingId: string }) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listDecisions({ meeting_id: meetingId });
+      const data = await itemsApi.listDecisions(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load decisions failed:', err);
@@ -695,7 +695,7 @@ const RisksBlockV2 = ({ meetingId }: { meetingId: string }) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listRisks({ meeting_id: meetingId });
+      const data = await itemsApi.listRisks(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load risks failed:', err);

@@ -152,9 +152,9 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       const [minutesData, transcriptData, actionsData, decisionsData, risksData] = await Promise.all([
         minutesApi.getLatest(meeting.id).catch(() => null),
         transcriptsApi.list(meeting.id).catch(() => ({ chunks: [] })),
-        itemsApi.listActions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
-        itemsApi.listDecisions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
-        itemsApi.listRisks({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
+        itemsApi.listActions(meeting.id).catch(() => ({ items: [] })),
+        itemsApi.listDecisions(meeting.id).catch(() => ({ items: [] })),
+        itemsApi.listRisks(meeting.id).catch(() => ({ items: [] })),
       ]);
 
       setMinutes(minutesData);
@@ -259,7 +259,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         setIsUploadingVideo={setIsUploadingVideo}
         isProcessingVideo={isProcessingVideo}
         setIsProcessingVideo={setIsProcessingVideo}
-        onRefresh={onRefresh}
+        onRefresh={loadAllData}
         templates={templates}
         selectedTemplateId={selectedTemplateId}
         onSelectTemplate={setSelectedTemplateId}
@@ -414,7 +414,7 @@ interface CenterPanelProps {
   setIsUploadingVideo: (value: boolean) => void;
   isProcessingVideo: boolean;
   setIsProcessingVideo: (value: boolean) => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   templates: MinutesTemplate[];
   selectedTemplateId: string | null;
   onSelectTemplate: (templateId: string | null) => void;
@@ -476,18 +476,28 @@ const CenterPanel = ({
       
       // Trigger inference (transcription + diarization)
       setIsProcessingVideo(true);
-      await meetingsApi.triggerInference(meeting.id);
-      
-      // Refresh meeting data
-      onRefresh();
-      
-      alert('Video đã được tải lên và đang xử lý. Transcript sẽ được tạo tự động.');
+      try {
+        const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+        console.log('Video inference result:', inferenceResult);
+        
+        // Wait a bit for processing to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Refresh meeting data to load new transcripts
+        await onRefresh();
+        
+        alert(`Video đã được tải lên và xử lý thành công. Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
+      } catch (inferenceErr: any) {
+        console.error('Video inference failed:', inferenceErr);
+        alert(`Video đã được tải lên nhưng xử lý gặp lỗi: ${inferenceErr.message || 'Không thể tạo transcript'}. Vui lòng kiểm tra logs backend.`);
+      } finally {
+        setIsProcessingVideo(false);
+      }
     } catch (err: any) {
       console.error('Upload video failed:', err);
       alert(`Lỗi: ${err.message || 'Không thể tải lên video'}`);
     } finally {
       setIsUploadingVideo(false);
-      setIsProcessingVideo(false);
     }
   };
 
@@ -541,7 +551,7 @@ const CenterPanel = ({
       await meetingsApi.update(meeting.id, { recording_url: null });
       
       // Refresh meeting data
-      onRefresh();
+      await onRefresh();
       
       alert('Video đã được xóa thành công.');
     } catch (err: any) {

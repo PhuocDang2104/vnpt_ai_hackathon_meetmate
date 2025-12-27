@@ -211,7 +211,12 @@ async def get_video_url(db: Session, meeting_id: str) -> Optional[str]:
 
 async def delete_meeting_video(db: Session, meeting_id: str) -> bool:
     """
-    Delete video recording for a meeting.
+    Delete video recording for a meeting and all related metadata.
+    
+    This includes:
+    - Video file (local or from storage)
+    - Transcript chunks (created from video processing)
+    - Meeting minutes (generated from video transcript)
     
     Args:
         db: Database session
@@ -220,44 +225,74 @@ async def delete_meeting_video(db: Session, meeting_id: str) -> bool:
     Returns:
         True if deleted successfully, False otherwise
     """
+    from sqlalchemy import text
+    
     meeting = meeting_service.get_meeting(db, meeting_id)
     if not meeting or not meeting.recording_url:
         return False
     
     recording_url = meeting.recording_url
     
-    # Delete file from storage or local filesystem
     try:
-        # If local file path (/files/...), delete local file
-        if recording_url.startswith("/files/"):
-            from pathlib import Path
-            local_path = Path(__file__).parent.parent.parent / recording_url.lstrip("/")
-            if local_path.exists():
-                local_path.unlink()
-                logger.info(f"Deleted local video file: {local_path}")
+        # 1. Delete video file from storage or local filesystem
+        try:
+            # If local file path (/files/...), delete local file
+            if recording_url.startswith("/files/"):
+                from pathlib import Path
+                local_path = Path(__file__).parent.parent.parent / recording_url.lstrip("/")
+                if local_path.exists():
+                    local_path.unlink()
+                    logger.info(f"Deleted local video file: {local_path}")
+            
+            # Note: If recording_url is a presigned URL, we cannot delete the actual file
+            # from Supabase Storage because we don't have the storage_key stored.
+            # The file will remain in storage but become inaccessible after URL expiration.
+            # To properly delete from storage, we would need to store storage_key in the database.
+            
+        except Exception as e:
+            logger.warning(f"Failed to delete video file (continuing to clear metadata): {e}", exc_info=True)
         
-        # Note: If recording_url is a presigned URL, we cannot delete the actual file
-        # from Supabase Storage because we don't have the storage_key stored.
-        # The file will remain in storage but become inaccessible after URL expiration.
-        # To properly delete from storage, we would need to store storage_key in the database.
+        # 2. Delete transcript chunks (created from video processing)
+        try:
+            result = db.execute(
+                text("DELETE FROM transcript_chunk WHERE meeting_id = :meeting_id"),
+                {'meeting_id': meeting_id}
+            )
+            deleted_chunks = result.rowcount
+            logger.info(f"Deleted {deleted_chunks} transcript chunks for meeting {meeting_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete transcript chunks: {e}", exc_info=True)
         
-    except Exception as e:
-        logger.warning(f"Failed to delete video file (continuing to clear URL): {e}", exc_info=True)
-        # Continue to clear recording_url even if file deletion fails
-    
-    # Clear recording_url from database
-    try:
+        # 3. Delete meeting minutes (generated from video transcript)
+        try:
+            result = db.execute(
+                text("DELETE FROM meeting_minutes WHERE meeting_id = :meeting_id"),
+                {'meeting_id': meeting_id}
+            )
+            deleted_minutes = result.rowcount
+            logger.info(f"Deleted {deleted_minutes} meeting minutes for meeting {meeting_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete meeting minutes: {e}", exc_info=True)
+        
+        # 4. Clear recording_url from database
         from app.schemas.meeting import MeetingUpdate
         updated_meeting = meeting_service.update_meeting(
             db,
             meeting_id,
             MeetingUpdate(recording_url=None)
         )
+        
         if updated_meeting:
-            logger.info(f"Cleared recording_url for meeting {meeting_id}")
+            # Commit all changes together (transcript chunks, minutes, recording_url)
+            db.commit()
+            logger.info(f"Successfully deleted video and cleared metadata for meeting {meeting_id}")
             return True
-        return False
+        else:
+            db.rollback()
+            return False
+            
     except Exception as e:
-        logger.error(f"Failed to clear recording_url: {e}", exc_info=True)
+        db.rollback()
+        logger.error(f"Failed to delete video and metadata: {e}", exc_info=True)
         return False
 
