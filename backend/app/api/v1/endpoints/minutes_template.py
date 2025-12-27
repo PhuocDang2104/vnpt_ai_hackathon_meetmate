@@ -17,7 +17,7 @@ from app.schemas.minutes_template import (
 router = APIRouter()
 
 
-@router.get('/', response_model=MinutesTemplateList)
+@router.get('', response_model=MinutesTemplateList)
 def list_templates(
     meeting_type: Optional[str] = Query(None, description="Filter by meeting type"),
     is_active: Optional[bool] = Query(True, description="Filter by active status"),
