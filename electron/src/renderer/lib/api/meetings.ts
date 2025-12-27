@@ -112,6 +112,13 @@ export const meetingsApi = {
   triggerInference: async (meetingId: string): Promise<{ job_id: string; message: string }> => {
     return api.post<{ job_id: string; message: string }>(`${ENDPOINT}/${meetingId}/trigger-inference`, {});
   },
+
+  /**
+   * Delete video recording for a meeting
+   */
+  deleteVideo: async (meetingId: string): Promise<{ status: string; message: string }> => {
+    return api.delete<{ status: string; message: string }>(`${ENDPOINT}/${meetingId}/video`);
+  },
 };
 
 export default meetingsApi;

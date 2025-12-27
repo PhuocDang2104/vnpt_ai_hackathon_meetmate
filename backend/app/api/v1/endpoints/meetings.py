@@ -305,6 +305,44 @@ async def upload_meeting_video(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.delete('/{meeting_id}/video')
+async def delete_meeting_video(
+    meeting_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete video recording for a meeting.
+    
+    Removes the video file from storage and clears the recording_url from the meeting.
+    """
+    from app.services import video_service
+    
+    # Check meeting exists
+    meeting = meeting_service.get_meeting(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Check if meeting has recording_url
+    if not meeting.recording_url:
+        raise HTTPException(status_code=404, detail="Meeting does not have a video recording")
+    
+    try:
+        success = await video_service.delete_meeting_video(db, meeting_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete video")
+        
+        return {
+            "status": "success",
+            "message": "Video deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Failed to delete video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete video: {str(e)}")
+
+
 @router.post('/{meeting_id}/trigger-inference')
 async def trigger_inference(
     meeting_id: str,

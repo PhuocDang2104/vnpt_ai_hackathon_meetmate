@@ -27,6 +27,7 @@ import {
   Upload,
   Play,
   Loader,
+  Trash2,
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
@@ -526,12 +527,36 @@ const CenterPanel = ({
     }
   };
 
+  const handleVideoDelete = async () => {
+    if (!meeting.recording_url) return;
+    
+    if (!confirm('Bạn có chắc chắn muốn xóa video này? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+
+    try {
+      await meetingsApi.deleteVideo(meeting.id);
+      
+      // Update meeting to clear recording_url
+      await meetingsApi.update(meeting.id, { recording_url: null });
+      
+      // Refresh meeting data
+      onRefresh();
+      
+      alert('Video đã được xóa thành công.');
+    } catch (err: any) {
+      console.error('Delete video failed:', err);
+      alert(`Lỗi: ${err.message || 'Không thể xóa video'}`);
+    }
+  };
+
   return (
     <div className="fireflies-center-panel">
       {/* Video Section */}
       <VideoSection
         recordingUrl={meeting.recording_url}
         onUpload={handleVideoUpload}
+        onDelete={handleVideoDelete}
         isUploading={isUploadingVideo}
         isProcessing={isProcessingVideo}
         dragActive={dragActive}
@@ -787,6 +812,7 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
 interface VideoSectionProps {
   recordingUrl?: string | null;
   onUpload: (file: File) => void;
+  onDelete: () => void;
   isUploading: boolean;
   isProcessing: boolean;
   dragActive: boolean;
@@ -798,6 +824,7 @@ interface VideoSectionProps {
 const VideoSection = ({
   recordingUrl,
   onUpload,
+  onDelete,
   isUploading,
   isProcessing,
   dragActive,
@@ -814,6 +841,14 @@ const VideoSection = ({
             <Video size={18} />
             <span>Video Recording</span>
           </div>
+          <button
+            className="fireflies-video-delete-btn"
+            onClick={onDelete}
+            title="Xóa video"
+            type="button"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
         <div className="fireflies-video-player">
           <video
