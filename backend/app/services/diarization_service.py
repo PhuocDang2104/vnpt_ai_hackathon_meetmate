@@ -69,6 +69,10 @@ async def diarize_audio(
     try:
         async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minute timeout
             response = await client.post(api_url, files=files, data=data)
+            
+            if response.status_code >= 400:
+                logger.error(f"Diarization API Error: {response.status_code} - {response.text}")
+            
             response.raise_for_status()
             result = response.json()
             
