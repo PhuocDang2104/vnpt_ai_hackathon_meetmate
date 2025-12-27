@@ -58,7 +58,7 @@ export const meetingsApi = {
   addParticipant: async (meetingId: string, userId: string, role: string = 'attendee'): Promise<Meeting> => {
     return api.post<Meeting>(`/participants/${meetingId}`, { user_id: userId, role });
   },
-  
+
   /**
    * Remove participant from meeting
    */
@@ -86,10 +86,10 @@ export const meetingsApi = {
   uploadVideo: async (meetingId: string, file: File): Promise<{ recording_url: string; message: string }> => {
     const formData = new FormData();
     formData.append('video', file);
-    
+
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const token = localStorage.getItem('meetmate_access_token');
-    
+
     const response = await fetch(`${API_BASE_URL}/api/v1${ENDPOINT}/${meetingId}/upload-video`, {
       method: 'POST',
       headers: token ? {
@@ -109,8 +109,8 @@ export const meetingsApi = {
   /**
    * Trigger inference (transcription + diarization) from video
    */
-  triggerInference: async (meetingId: string): Promise<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }> => {
-    return api.post<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }>(`${ENDPOINT}/${meetingId}/trigger-inference`, {});
+  triggerInference: async (meetingId: string, enableDiarization: boolean = true): Promise<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }> => {
+    return api.post<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }>(`${ENDPOINT}/${meetingId}/trigger-inference?enable_diarization=${enableDiarization}`, {});
   },
 
   /**

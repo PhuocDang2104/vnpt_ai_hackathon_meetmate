@@ -21,13 +21,14 @@ async def process_meeting_video(
     meeting_id: str,
     video_url: str,
     template_id: Optional[str] = None,
+    enable_diarization: bool = True,
 ) -> dict:
     """
     Process video file through full pipeline:
     1. Download video (if URL)
     2. Extract audio
     3. Transcribe with VNPT STT
-    4. Diarize speakers
+    4. Diarize speakers (Optional)
     5. Create transcript chunks
     6. Generate meeting minutes
     7. Export PDF (optional)
@@ -37,6 +38,7 @@ async def process_meeting_video(
         meeting_id: Meeting ID
         video_url: URL or local path to video file
         template_id: Optional template ID for minutes generation
+        enable_diarization: Whether to enable speaker diarization
         
     Returns:
         dict with status, transcript_count, minutes_id, pdf_url (if generated)
@@ -83,10 +85,18 @@ async def process_meeting_video(
             )
             logger.info(f"Transcription completed: {len(transcription_result.segments)} segments")
             
-            # Step 4: Diarize speakers
-            logger.info("Diarizing speakers...")
-            diarization_segments = await diarization_service.diarize_audio(audio_path)
-            logger.info(f"Diarization completed: {len(diarization_segments)} segments")
+            # Step 4: Diarize speakers (if enabled)
+            diarization_segments = []
+            if enable_diarization:
+                logger.info("Diarizing speakers...")
+                try:
+                    diarization_segments = await diarization_service.diarize_audio(audio_path)
+                    logger.info(f"Diarization completed: {len(diarization_segments)} segments")
+                except Exception as e:
+                    logger.error(f"Diarization failed: {e}. Continuing without speaker info.")
+                    # Continue without failing the entire process
+            else:
+                logger.info("Skipping diarization (disabled)...")
             
             # Step 5: Merge transcription and diarization
             logger.info("Merging transcription and diarization...")

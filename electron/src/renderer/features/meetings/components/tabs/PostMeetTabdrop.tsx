@@ -45,6 +45,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   const [hideSensitive, setHideSensitive] = useState(false);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [showChapters, setShowChapters] = useState(true);
+  const [enableDiarization, setEnableDiarization] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
         const transcriptList = await transcriptsApi.list(meeting.id);
         if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
           console.log('No transcripts found. Triggering inference...');
-          await meetingsApi.triggerInference(meeting.id);
+          await meetingsApi.triggerInference(meeting.id, enableDiarization);
         }
       } catch (infErr) {
         console.error('Auto-transcript generation failed:', infErr);
@@ -292,6 +293,17 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
             )}
           </div>
           <div className="summary-actions">
+            {!minutes && (
+              <label className="flex items-center space-x-1 cursor-pointer mr-2">
+                <input
+                  type="checkbox"
+                  checked={enableDiarization}
+                  onChange={(e) => setEnableDiarization(e.target.checked)}
+                  className="form-checkbox h-3 w-3 text-blue-600 rounded"
+                />
+                <span className="text-xs text-gray-600">Diarization</span>
+              </label>
+            )}
             <button className="btn btn--accent btn--sm" onClick={handleGenerateMinutes} disabled={isGenerating || isLoading}>
               {minutes ? 'Tạo lại' : 'AI tạo biên bản'}
             </button>

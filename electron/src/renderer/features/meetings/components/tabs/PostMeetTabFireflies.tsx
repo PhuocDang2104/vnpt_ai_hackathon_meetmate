@@ -100,6 +100,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   });
 
   const [speakerStats, setSpeakerStats] = useState<SpeakerStats[]>([]);
+  const [enableDiarization, setEnableDiarization] = useState(true);
 
   useEffect(() => {
     loadAllData();
@@ -215,7 +216,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         // For now relying on the loading state
 
         try {
-          const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+          const inferenceResult = await meetingsApi.triggerInference(meeting.id, enableDiarization);
           console.log('Inference complete:', inferenceResult);
 
           if (!inferenceResult.transcript_count || inferenceResult.transcript_count === 0) {
@@ -297,6 +298,8 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         onSelectTemplate={setSelectedTemplateId}
         defaultTemplate={defaultTemplate}
         templatesLoading={templatesLoading}
+        enableDiarization={enableDiarization}
+        setEnableDiarization={setEnableDiarization}
       />
 
       {/* Right - Transcript */}
@@ -452,6 +455,8 @@ interface CenterPanelProps {
   onSelectTemplate: (templateId: string | null) => void;
   defaultTemplate: MinutesTemplate | null;
   templatesLoading: boolean;
+  enableDiarization: boolean;
+  setEnableDiarization: (enabled: boolean) => void;
 }
 
 const CenterPanel = ({
@@ -473,10 +478,13 @@ const CenterPanel = ({
   onSelectTemplate,
   defaultTemplate,
   templatesLoading,
+  enableDiarization,
+  setEnableDiarization,
 }: CenterPanelProps) => {
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  // Removed local state, using prop instead
 
   const handleSaveSummary = async () => {
     if (!minutes) return;
@@ -509,7 +517,7 @@ const CenterPanel = ({
       // Trigger inference (transcription + diarization)
       setIsProcessingVideo(true);
       try {
-        const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+        const inferenceResult = await meetingsApi.triggerInference(meeting.id, enableDiarization);
         console.log('Video inference result:', inferenceResult);
 
         // Wait a bit for processing to complete
@@ -594,6 +602,21 @@ const CenterPanel = ({
 
   return (
     <div className="fireflies-center-panel">
+      {/* Diarization Toggle */}
+      <div style={{ padding: '0 24px', marginBottom: 16 }}>
+        <label className="flex items-center space-x-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enableDiarization}
+            onChange={(e) => setEnableDiarization(e.target.checked)}
+            className="form-checkbox h-4 w-4 text-blue-600 rounded"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            Kích hoạt nhận dạng người nói (Diarization) - Tắt nếu gặp lỗi 500
+          </span>
+        </label>
+      </div>
+
       {/* Video Section */}
       <VideoSection
         recordingUrl={meeting.recording_url}

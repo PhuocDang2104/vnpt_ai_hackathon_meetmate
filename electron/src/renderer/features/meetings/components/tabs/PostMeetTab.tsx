@@ -34,6 +34,7 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [enableDiarization, setEnableDiarization] = useState(true);
 
   useEffect(() => {
     loadMinutes();
@@ -59,7 +60,7 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
         const transcriptList = await transcriptsApi.list(meeting.id);
         if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
           console.log('No transcripts found. Triggering inference...');
-          const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+          const inferenceResult = await meetingsApi.triggerInference(meeting.id, enableDiarization);
           if (!inferenceResult.transcript_count) {
             console.warn('Inference finished but no transcripts created?');
           }
@@ -154,7 +155,22 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
 
       {/* Content */}
       {!minutes ? (
-        <EmptyState onGenerate={handleGenerate} isGenerating={isGenerating} />
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableDiarization}
+                onChange={(e) => setEnableDiarization(e.target.checked)}
+                className="form-checkbox h-4 w-4 text-blue-600 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Kích hoạt nhận dạng người nói (Diarization)
+              </span>
+            </label>
+          </div>
+          <EmptyState onGenerate={handleGenerate} isGenerating={isGenerating} />
+        </>
       ) : (
         <div className="notion-editor__content">
           {/* Executive Summary */}

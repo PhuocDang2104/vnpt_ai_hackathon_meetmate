@@ -7,6 +7,8 @@ import torch
 from pyannote.audio import Pipeline
 
 
+from huggingface_hub import login
+
 class DiarizationModel:
     """Speaker diarization using pyannote.audio"""
     
@@ -27,6 +29,14 @@ class DiarizationModel:
         if not hf_token:
             raise ValueError("HF_TOKEN environment variable is required")
         
+        # Login to Hugging Face
+        print(f"Logging in to Hugging Face Hub...")
+        try:
+            login(token=hf_token)
+        except Exception as e:
+            print(f"❌ Failed to login to Hugging Face Hub: {e}")
+            # Continue anyway, pipeline might fail later if login failed
+        
         # Auto-detect device
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -34,11 +44,24 @@ class DiarizationModel:
         self.device = device
         
         # Load pipeline
-        print(f"Loading diarization model {model_name} on {device}...")
-        self.pipeline = Pipeline.from_pretrained(
-            model_name,
-            use_auth_token=hf_token,
-        )
+        masked_token = f"{hf_token[:4]}...{hf_token[-4:]}" if len(hf_token) > 8 else "***"
+        print(f"Loading diarization model {model_name} on {device}... (Token: {masked_token})")
+        
+        try:
+            self.pipeline = Pipeline.from_pretrained(
+                model_name,
+                use_auth_token=True, # Uses the token from login()
+            )
+        except Exception as e:
+            print(f"❌ Failed to load pipeline: {e}")
+            raise RuntimeError(f"Failed to load pyannote pipeline. Check HF_TOKEN and model access permissions. Error: {e}")
+
+        if self.pipeline is None:
+            raise RuntimeError(
+                f"Failed to load pipeline '{model_name}'. result is None. "
+                "This usually means the HF_TOKEN is invalid or does not have access to the gated model. "
+                "Please verify your token at https://huggingface.co/settings/tokens and ensure you accepted the license at https://huggingface.co/pyannote/speaker-diarization-3.1"
+            )
         
         # Move to device
         if device == "cuda":
