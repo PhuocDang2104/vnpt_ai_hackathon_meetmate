@@ -6,9 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps for psycopg2-binary
+# System deps for psycopg2-binary and ffmpeg (for video/audio processing)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
