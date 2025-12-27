@@ -67,7 +67,7 @@ async def diarize_audio(
         data["max_speakers"] = max_speakers
     
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minute timeout
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minute timeout
             response = await client.post(api_url, files=files, data=data)
             response.raise_for_status()
             result = response.json()

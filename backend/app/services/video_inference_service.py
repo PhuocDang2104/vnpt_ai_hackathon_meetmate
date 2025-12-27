@@ -172,7 +172,7 @@ async def _download_video(url: str, meeting_id: str) -> Path:
     temp_dir = Path(tempfile.gettempdir())
     video_path = temp_dir / f"video_{meeting_id}_{Path(url).stem}.mp4"
     
-    async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minute timeout
+    async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minute timeout
         response = await client.get(url)
         response.raise_for_status()
         video_path.write_bytes(response.content)
