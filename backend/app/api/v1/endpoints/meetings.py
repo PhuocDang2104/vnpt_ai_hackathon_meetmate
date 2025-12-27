@@ -304,18 +304,26 @@ async def upload_meeting_video(
 @router.post('/{meeting_id}/trigger-inference')
 async def trigger_inference(
     meeting_id: str,
+    template_id: Optional[str] = Query(None, description="Template ID for minutes generation"),
     db: Session = Depends(get_db)
 ):
     """
     Trigger AI inference (transcription + diarization) from video recording.
     
-    This endpoint queues a background job to:
-    1. Extract audio from video
-    2. Run Whisper transcription
-    3. Run speaker diarization
-    4. Generate transcript chunks
-    5. Auto-generate meeting minutes
+    Process flow:
+    1. Extract audio from video (ffmpeg)
+    2. Transcribe with VNPT STT API
+    3. Diarize speakers with external API
+    4. Create transcript chunks in database
+    5. Generate meeting minutes with selected template
+    6. Export PDF (optional)
+    
+    Args:
+        meeting_id: Meeting ID
+        template_id: Optional template ID for minutes generation
     """
+    from app.services import video_inference_service
+    
     # Check meeting exists
     meeting = meeting_service.get_meeting(db, meeting_id)
     if not meeting:
@@ -325,24 +333,24 @@ async def trigger_inference(
     if not meeting.recording_url:
         raise HTTPException(status_code=400, detail="Meeting does not have a video recording")
     
-    # TODO: Implement background job queue
-    # For now, return a mock job_id
-    # In production, this should:
-    # 1. Queue a Celery task or similar
-    # 2. Return job_id to track progress
-    # 3. Process video → audio → transcript → minutes
-    
-    import uuid
-    job_id = str(uuid.uuid4())
-    
-    # TODO: Start background job here
-    # Example:
-    # from app.tasks.inference import process_meeting_video
-    # task = process_meeting_video.delay(meeting_id, meeting.recording_url)
-    # job_id = task.id
-    
-    return {
-        "job_id": job_id,
-        "message": "Inference job started. Processing will begin shortly.",
-        "status": "queued"
-    }
+    try:
+        # Process video (this is synchronous for now - can be moved to background job later)
+        result = await video_inference_service.process_meeting_video(
+            db=db,
+            meeting_id=meeting_id,
+            video_url=meeting.recording_url,
+            template_id=template_id,
+        )
+        
+        return {
+            "status": "completed",
+            "message": "Video processing completed successfully",
+            "transcript_count": result.get("transcript_count", 0),
+            "minutes_id": result.get("minutes_id"),
+            "pdf_url": result.get("pdf_url"),
+        }
+        
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Video inference failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Video processing failed: {str(e)}")

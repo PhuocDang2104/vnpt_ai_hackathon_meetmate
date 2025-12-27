@@ -65,7 +65,8 @@ app.include_router(meetings.router, prefix=f"{settings.api_v1_prefix}/meetings",
 app.include_router(documents.router, prefix=f"{settings.api_v1_prefix}/documents", tags=['documents'])
 app.include_router(agenda.router, prefix=f"{settings.api_v1_prefix}/agenda", tags=['agenda'])
 app.include_router(knowledge.router, prefix=f"{settings.api_v1_prefix}/knowledge", tags=['knowledge'])
-app.include_router(diarization.router, prefix=f"{settings.api_v1_prefix}", tags=['diarization'])
+# Diarization API temporarily disabled - using external service instead
+# app.include_router(diarization.router, prefix=f"{settings.api_v1_prefix}", tags=['diarization'])
 app.include_router(pre_meeting.router, prefix=f"{settings.api_v1_prefix}/pre-meeting", tags=['pre-meeting'])
 app.include_router(in_meeting.router, prefix=f"{settings.api_v1_prefix}/in-meeting", tags=['in-meeting'])
 app.include_router(post_meeting.router, prefix=f"{settings.api_v1_prefix}/post-meeting", tags=['post-meeting'])
