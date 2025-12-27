@@ -16,8 +16,10 @@ from app.services.storage_client import (
     generate_presigned_get_url,
 )
 from app.services import meeting_service
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 # Allowed video formats
 ALLOWED_VIDEO_TYPES = {
@@ -28,8 +30,8 @@ ALLOWED_VIDEO_TYPES = {
     'video/x-matroska',  # MKV
 }
 
-# Max file size: 500MB
-MAX_FILE_SIZE = 500 * 1024 * 1024
+# Max file size: configurable via settings (default 100MB for Supabase free tier)
+MAX_FILE_SIZE = settings.max_video_file_size_mb * 1024 * 1024
 
 
 async def upload_meeting_video(
@@ -65,6 +67,21 @@ async def upload_meeting_video(
             detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_VIDEO_TYPES)}"
         )
     
+    # Get file size first (if available from headers)
+    file_size = 0
+    content_length = file.headers.get("content-length")
+    if content_length:
+        try:
+            file_size = int(content_length)
+            # Validate file size early (before reading)
+            if file_size > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
+                )
+        except (ValueError, TypeError):
+            pass
+    
     # Read file content
     try:
         content = await file.read()
@@ -73,11 +90,11 @@ async def upload_meeting_video(
         logger.error(f"Failed to read file: {e}")
         raise HTTPException(status_code=400, detail="Failed to read file")
     
-    # Validate file size
+    # Validate file size after reading
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"File size exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
+            detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
         )
     
     if file_size == 0:
@@ -114,6 +131,18 @@ async def upload_meeting_video(
             logger.warning("Storage not configured, falling back to local")
     except Exception as e:
         logger.error(f"Storage upload failed: {e}", exc_info=True)
+        error_msg = str(e)
+        # Provide helpful error message for size limits
+        if "EntityTooLarge" in error_msg or "too large" in error_msg.lower():
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Video file is too large for storage. "
+                    f"File size: {file_size / (1024*1024):.2f}MB. "
+                    f"Supabase Storage may have file size limits (typically 50-100MB for free tier). "
+                    f"Please compress the video or use a smaller file."
+                )
+            )
         raise HTTPException(status_code=500, detail=f"Failed to upload video: {str(e)}")
     
     # Fallback to local storage if S3 not configured or failed

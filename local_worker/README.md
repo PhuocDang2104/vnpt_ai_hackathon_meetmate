@@ -1,4 +1,5 @@
 ---
+
 title: MeetMate AI API
 sdk: docker
 app_port: 7860
@@ -378,3 +379,14 @@ Apache 2.0
 
 **Built for VNPT AI Hackathon 2025 | MeetMate Project** 🚀
 
+=======
+title: Meetmate
+emoji: 👀
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+>>>>>>> 4e3325fdf8225a31d45dec28174441e4ec6c0842

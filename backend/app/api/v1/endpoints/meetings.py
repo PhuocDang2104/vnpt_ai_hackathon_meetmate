@@ -273,8 +273,12 @@ async def upload_meeting_video(
     """
     Upload a video recording for a meeting.
     
-    Accepts video files (MP4, MOV, AVI, WebM, MKV) up to 500MB.
+    Accepts video files (MP4, MOV, AVI, WebM, MKV).
+    Max file size: Configurable via MAX_VIDEO_FILE_SIZE_MB (default: 100MB for Supabase free tier).
     Uploads to Supabase S3 storage (or local fallback) and updates meeting.recording_url.
+    
+    Note: Supabase Storage free tier typically has a 50-100MB limit per file.
+    For larger files, consider upgrading your Supabase plan or compressing videos.
     """
     from uuid import UUID as UUIDType
     

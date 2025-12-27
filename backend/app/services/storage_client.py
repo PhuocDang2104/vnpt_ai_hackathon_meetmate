@@ -79,6 +79,9 @@ def upload_bytes_to_storage(
     """
     Upload bytes to Supabase Storage.
     
+    Uses multipart upload for large files (automatically handled by boto3).
+    For files larger than 64MB, boto3 automatically uses multipart upload.
+    
     Returns the object key on success, or None if not configured.
     """
     if not is_storage_configured():
@@ -89,15 +92,27 @@ def upload_bytes_to_storage(
         return None
     settings = get_settings()
     try:
+        file_size = len(data)
+        
+        # upload_fileobj automatically uses multipart upload for files > multipart_threshold
+        # Default multipart_threshold is 8MB, which should work fine
         client.upload_fileobj(
             io.BytesIO(data),
             settings.supabase_s3_bucket,
             object_key,
             ExtraArgs={"ContentType": content_type or "application/octet-stream"},
         )
+        logger.info(f"Successfully uploaded {file_size / (1024*1024):.2f}MB to {object_key}")
         return object_key
     except (BotoCoreError, NoCredentialsError, ClientError) as exc:
         logger.error("Failed to upload to storage: %s", exc)
+        # Provide more helpful error message
+        if "EntityTooLarge" in str(exc):
+            raise RuntimeError(
+                f"File is too large for storage. "
+                f"Current file size: {len(data) / (1024*1024):.2f}MB. "
+                f"Supabase Storage might have size limits. Consider compressing the video or using direct upload."
+            ) from exc
         raise
 
 
