@@ -22,6 +22,8 @@ import {
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
+import { transcriptsApi } from '../../../../lib/api/transcripts';
+import { meetingsApi } from '../../../../lib/api/meetings';
 
 interface PostMeetTabV2Props {
   meeting: MeetingWithParticipants;
@@ -52,6 +54,26 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      // 1. Check/Generate Transcript
+      try {
+        const transcriptList = await transcriptsApi.list(meeting.id);
+        if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
+          console.log('No transcripts found. Triggering inference...');
+          const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+          if (!inferenceResult.transcript_count) {
+            console.warn('Inference finished but no transcripts created?');
+          }
+        }
+      } catch (infErr: any) {
+        console.error('Auto-transcript generation failed:', infErr);
+        // Continue anyway? Or ask? For now, we continue but warn
+        if (!confirm('Không tìm thấy transcript và không thể tự động tạo. Bạn có muốn tiếp tục tạo biên bản không?')) {
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      // 2. Generate Minutes
       const generated = await minutesApi.generate({
         meeting_id: meeting.id,
         include_transcript: true,

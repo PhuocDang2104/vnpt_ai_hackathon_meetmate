@@ -59,7 +59,7 @@ async def diarize_audio(
         raise RuntimeError(f"Failed to read audio file: {e}")
     
     # Prepare request
-    files = {"audio": (audio_path.name, audio_bytes, "audio/wav")}
+    files = {"audio_file": (audio_path.name, audio_bytes, "audio/wav")}
     data = {}
     if min_speakers is not None:
         data["min_speakers"] = min_speakers

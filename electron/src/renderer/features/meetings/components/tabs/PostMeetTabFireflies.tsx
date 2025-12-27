@@ -77,17 +77,17 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [decisions, setDecisions] = useState<DecisionItem[]>([]);
   const [risks, setRisks] = useState<RiskItem[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isProcessingVideo, setIsProcessingVideo] = useState(false);
-  
+
   const [templates, setTemplates] = useState<MinutesTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [defaultTemplate, setDefaultTemplate] = useState<MinutesTemplate | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
-  
+
   const [filters, setFilters] = useState<FilterState>({
     questions: false,
     dates: false,
@@ -105,17 +105,17 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     loadAllData();
     loadTemplates();
   }, [meeting.id]);
-  
+
   const loadTemplates = async () => {
     setTemplatesLoading(true);
     try {
       const templatesList = await minutesTemplateApi.list({ is_active: true });
-      
+
       console.log('Templates loaded:', templatesList);
-      
+
       if (templatesList.templates && templatesList.templates.length > 0) {
         setTemplates(templatesList.templates);
-        
+
         // Try to get default template
         try {
           const defaultTmpl = await minutesTemplateApi.getDefault();
@@ -205,6 +205,38 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      // 1. Check if we have transcript
+      console.log('Checking for transcripts...');
+      const transcriptList = await transcriptsApi.list(meeting.id);
+
+      if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
+        console.log('No transcripts found. Triggering inference first...');
+        // Notify user via UI (optional, but good for UX)
+        // For now relying on the loading state
+
+        try {
+          const inferenceResult = await meetingsApi.triggerInference(meeting.id);
+          console.log('Inference complete:', inferenceResult);
+
+          if (!inferenceResult.transcript_count || inferenceResult.transcript_count === 0) {
+            throw new Error('Không thể tạo transcript từ video. Vui lòng kiểm tra lại video.');
+          }
+
+          // Refresh data to show new transcript
+          await loadAllData();
+        } catch (infErr: any) {
+          console.error('Inference failed:', infErr);
+          // If inference fails, we should probably stop and ask user
+          const continueGen = confirm(`Không thể tạo transcript tự động (${infErr.message}). Bạn có muốn tiếp tục tạo biên bản không?`);
+          if (!continueGen) {
+            setIsGenerating(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Generate minutes
+      console.log('Generating minutes...');
       const generated = await minutesApi.generate({
         meeting_id: meeting.id,
         template_id: selectedTemplateId || undefined,
@@ -217,7 +249,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       setMinutes(generated);
     } catch (err) {
       console.error('Generate failed:', err);
-      alert('Không thể tạo biên bản. Vui lòng thử lại.');
+      alert('Không thể tạo biên bản (Lỗi Server). Vui lòng thử lại.');
     } finally {
       setIsGenerating(false);
     }
@@ -298,12 +330,12 @@ const LeftPanel = ({ filters, setFilters, actionItems, speakerStats, transcripts
   const questionsCount = transcripts.filter((t) => t.text.includes('?')).length;
 
   // Extract dates/times mentions (simple heuristic)
-  const datesCount = transcripts.filter((t) => 
+  const datesCount = transcripts.filter((t) =>
     /\b\d{1,2}\/\d{1,2}|\b(thứ|ngày|tháng|tuần|quý)\b/i.test(t.text)
   ).length;
 
   // Count metrics mentions (numbers + units)
-  const metricsCount = transcripts.filter((t) => 
+  const metricsCount = transcripts.filter((t) =>
     /\d+\s?(triệu|nghìn|tỷ|%|người|đơn|vị)/i.test(t.text)
   ).length;
 
@@ -470,22 +502,22 @@ const CenterPanel = ({
     try {
       // Upload video
       const result = await meetingsApi.uploadVideo(meeting.id, file);
-      
+
       // Update meeting with recording_url
       await meetingsApi.update(meeting.id, { recording_url: result.recording_url });
-      
+
       // Trigger inference (transcription + diarization)
       setIsProcessingVideo(true);
       try {
         const inferenceResult = await meetingsApi.triggerInference(meeting.id);
         console.log('Video inference result:', inferenceResult);
-        
+
         // Wait a bit for processing to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Refresh meeting data to load new transcripts
         await onRefresh();
-        
+
         alert(`Video đã được tải lên và xử lý thành công. Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
       } catch (inferenceErr: any) {
         console.error('Video inference failed:', inferenceErr);
@@ -539,20 +571,20 @@ const CenterPanel = ({
 
   const handleVideoDelete = async () => {
     if (!meeting.recording_url) return;
-    
+
     if (!confirm('Bạn có chắc chắn muốn xóa video này? Hành động này không thể hoàn tác.')) {
       return;
     }
 
     try {
       await meetingsApi.deleteVideo(meeting.id);
-      
+
       // Update meeting to clear recording_url
       await meetingsApi.update(meeting.id, { recording_url: null });
-      
+
       // Refresh meeting data
       await onRefresh();
-      
+
       alert('Video đã được xóa thành công.');
     } catch (err: any) {
       console.error('Delete video failed:', err);
@@ -644,7 +676,7 @@ const CenterPanel = ({
           {selectedTemplateId && (() => {
             const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
             if (!selectedTemplate) return null;
-            
+
             return (
               <div className="fireflies-template-info">
                 {selectedTemplate.description && (
@@ -898,7 +930,7 @@ const VideoSection = ({
           id="video-upload-input"
           disabled={isUploading || isProcessing}
         />
-        
+
         {isUploading ? (
           <div className="fireflies-upload-status">
             <Loader size={32} className="spinner" />

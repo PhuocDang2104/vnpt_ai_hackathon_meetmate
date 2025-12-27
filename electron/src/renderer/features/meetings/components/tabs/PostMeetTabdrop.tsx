@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
+import { transcriptsApi } from '../../../../lib/api/transcripts';
+import { meetingsApi } from '../../../../lib/api/meetings';
 
 interface PostMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -85,6 +87,19 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
     setIsGenerating(true);
     setError(null);
     try {
+      // 1. Check for Transcript
+      try {
+        const transcriptList = await transcriptsApi.list(meeting.id);
+        if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
+          console.log('No transcripts found. Triggering inference...');
+          await meetingsApi.triggerInference(meeting.id);
+        }
+      } catch (infErr) {
+        console.error('Auto-transcript generation failed:', infErr);
+        // We'll proceed but it might result in empty minutes
+      }
+
+      // 2. Generate Minutes
       const generated = await minutesApi.generate({
         meeting_id: meeting.id,
         include_transcript: true,
@@ -482,18 +497,18 @@ const ActionItemsSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-      <div className="card">
-        <div className="card__header">
-          <h3>Action Items</h3>
-          <button
-            className="btn btn--ghost btn--icon btn--sm"
-            style={{ padding: '6px', width: '32px', height: '32px' }}
-            onClick={loadActions}
-            title="Làm mới"
-          >
-            Làm mới
-          </button>
-        </div>
+    <div className="card">
+      <div className="card__header">
+        <h3>Action Items</h3>
+        <button
+          className="btn btn--ghost btn--icon btn--sm"
+          style={{ padding: '6px', width: '32px', height: '32px' }}
+          onClick={loadActions}
+          title="Làm mới"
+        >
+          Làm mới
+        </button>
+      </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -565,18 +580,18 @@ const DecisionsSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-      <div className="card">
-        <div className="card__header">
-          <h3>Quyết định</h3>
-          <button
-            className="btn btn--ghost btn--icon btn--sm"
-            style={{ padding: '6px', width: '32px', height: '32px' }}
-            onClick={loadDecisions}
-            title="Làm mới"
-          >
-            Làm mới
-          </button>
-        </div>
+    <div className="card">
+      <div className="card__header">
+        <h3>Quyết định</h3>
+        <button
+          className="btn btn--ghost btn--icon btn--sm"
+          style={{ padding: '6px', width: '32px', height: '32px' }}
+          onClick={loadDecisions}
+          title="Làm mới"
+        >
+          Làm mới
+        </button>
+      </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -636,18 +651,18 @@ const RisksSection = ({ meetingId }: { meetingId: string }) => {
   };
 
   return (
-      <div className="card">
-        <div className="card__header">
-          <h3>Rủi ro đã nhận diện</h3>
-          <button
-            className="btn btn--ghost btn--icon btn--sm"
-            style={{ padding: '6px', width: '32px', height: '32px' }}
-            onClick={loadRisks}
-            title="Làm mới"
-          >
-            Làm mới
-          </button>
-        </div>
+    <div className="card">
+      <div className="card__header">
+        <h3>Rủi ro đã nhận diện</h3>
+        <button
+          className="btn btn--ghost btn--icon btn--sm"
+          style={{ padding: '6px', width: '32px', height: '32px' }}
+          onClick={loadRisks}
+          title="Làm mới"
+        >
+          Làm mới
+        </button>
+      </div>
       <div className="card__body">
         {isLoading ? (
           <div className="section-loading">Đang tải...</div>
@@ -688,7 +703,7 @@ const RisksSection = ({ meetingId }: { meetingId: string }) => {
 // ------------------ Highlights ------------------
 const HighlightsSection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   const [selectedClip, setSelectedClip] = useState<number | null>(null);
-  
+
   const mockHighlights = [
     { id: 1, title: 'Quyết định kiến trúc microservices', startTime: '05:23', endTime: '08:45', type: 'decision' },
     { id: 2, title: 'Phân công code review module auth', startTime: '12:10', endTime: '14:30', type: 'action' },
@@ -731,12 +746,12 @@ const HighlightsSection = ({ meeting }: { meeting: MeetingWithParticipants }) =>
                 <span className="video-preview__time">14:32 / 40:10</span>
               </div>
             </div>
-            
+
             <div className="highlight-clips">
               <h4>Candidate Clips ({mockHighlights.length})</h4>
               <div className="highlight-clips__list">
                 {mockHighlights.map((clip) => (
-                  <div 
+                  <div
                     key={clip.id}
                     className={`highlight-clip ${selectedClip === clip.id ? 'highlight-clip--active' : ''}`}
                     onClick={() => setSelectedClip(clip.id)}
@@ -757,7 +772,7 @@ const HighlightsSection = ({ meeting }: { meeting: MeetingWithParticipants }) =>
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="card__header">
             <h3>Chapters</h3>
@@ -793,7 +808,7 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<Record<string, string>>({});
   const [editingTask, setEditingTask] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{owner: string; deadline: string; priority: string}>({
+  const [editForm, setEditForm] = useState<{ owner: string; deadline: string; priority: string }>({
     owner: '', deadline: '', priority: ''
   });
 
@@ -864,7 +879,7 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
         <div className="card__header">
           <h3>Đồng bộ Tasks ra hệ thống ngoài</h3>
           <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-            <select 
+            <select
               className="form-select"
               value={syncTarget}
               onChange={(e) => setSyncTarget(e.target.value as any)}
@@ -874,7 +889,7 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
               <option value="jira">Jira</option>
               <option value="loffice">LOffice Work</option>
             </select>
-            <button 
+            <button
               className="btn btn--primary"
               onClick={handleSync}
               disabled={isSyncing || selectedTasks.size === 0}
@@ -913,8 +928,8 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
                 const isEditingRow = editingTask === action.id;
                 const isSynced = syncResults[action.id] === 'synced';
                 return (
-                  <div 
-                    key={action.id} 
+                  <div
+                    key={action.id}
                     className={`task-row ${selectedTasks.has(action.id) ? 'task-row--selected' : ''} ${isSynced ? 'task-row--synced' : ''}`}
                   >
                     <input
@@ -923,10 +938,10 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
                       onChange={() => toggleTask(action.id)}
                       style={{ accentColor: 'var(--accent)' }}
                     />
-                    
+
                     <div className="task-row__content">
                       <div className="task-row__description">{action.description}</div>
-                      
+
                       {isEditingRow ? (
                         <div className="task-row__edit-form">
                           <input
@@ -934,18 +949,18 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
                             className="form-input form-input--sm"
                             placeholder="Owner"
                             value={editForm.owner}
-                            onChange={(e) => setEditForm({...editForm, owner: e.target.value})}
+                            onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })}
                           />
                           <input
                             type="date"
                             className="form-input form-input--sm"
                             value={editForm.deadline}
-                            onChange={(e) => setEditForm({...editForm, deadline: e.target.value})}
+                            onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
                           />
                           <select
                             className="form-select form-select--sm"
                             value={editForm.priority}
-                            onChange={(e) => setEditForm({...editForm, priority: e.target.value})}
+                            onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
                           >
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
@@ -973,12 +988,12 @@ const TasksSyncSection = ({ meeting }: { meeting: MeetingWithParticipants }) => 
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="task-row__actions">
                       {isSynced ? (
                         <span className="badge badge--success">Đã sync</span>
                       ) : (
-                        <button 
+                        <button
                           className="btn btn--ghost btn--icon btn--sm"
                           onClick={() => startEditTask(action)}
                           title="Chỉnh sửa"
@@ -1004,7 +1019,7 @@ const DistributionSection = ({ meeting }: { meeting: MeetingWithParticipants }) 
   const [isDistributing, setIsDistributing] = useState(false);
   const [distributionLogs, setDistributionLogs] = useState<any[]>([]);
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null);
-  
+
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [emailSubject, setEmailSubject] = useState('');
@@ -1119,8 +1134,8 @@ MeetMate AI Assistant`;
             {minutes?.status === 'approved' && (
               <span className="badge badge--success">Đã phê duyệt - Sẵn sàng gửi</span>
             )}
-            <button 
-              className="btn btn--primary btn--sm" 
+            <button
+              className="btn btn--primary btn--sm"
               onClick={handleOpenEmailModal}
               disabled={!minutes || isDistributing}
             >
@@ -1138,7 +1153,7 @@ MeetMate AI Assistant`;
                   <p>Tạo biên bản để gửi cho attendees</p>
                 </div>
               )}
-              
+
               {minutes && (
                 <>
                   <div className="distribution-list">
@@ -1166,7 +1181,7 @@ MeetMate AI Assistant`;
                       </div>
                     )}
                   </div>
-                  
+
                   {distributionLogs.length > 0 && (
                     <div className="distribution-logs">
                       <h4>Lịch sử gửi</h4>
@@ -1193,15 +1208,15 @@ MeetMate AI Assistant`;
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="modal__header">
               <h2 className="modal__title">Gửi biên bản qua Email</h2>
-              <button 
-                className="btn btn--ghost btn--icon" 
+              <button
+                className="btn btn--ghost btn--icon"
                 onClick={() => setShowEmailModal(false)}
                 disabled={isDistributing}
               >
                 Đóng
               </button>
             </div>
-            
+
             {sendSuccess ? (
               <div className="modal__body" style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
                 <h3 style={{ color: 'var(--success)', marginBottom: 'var(--space-sm)' }}>Gửi thành công!</h3>
@@ -1224,8 +1239,8 @@ MeetMate AI Assistant`;
                         Bỏ chọn tất cả
                       </button>
                     </div>
-                    <div className="recipients-grid" style={{ 
-                      display: 'grid', 
+                    <div className="recipients-grid" style={{
+                      display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                       gap: 'var(--space-sm)',
                       maxHeight: '150px',
@@ -1240,7 +1255,7 @@ MeetMate AI Assistant`;
                         const isSelected = selectedRecipients.includes(id);
                         const isDistributed = distributedEmails.has(p.email);
                         return (
-                          <label 
+                          <label
                             key={id || idx}
                             className="recipient-checkbox"
                             style={{
@@ -1302,9 +1317,9 @@ MeetMate AI Assistant`;
 
                   <div className="form-group">
                     <label className="form-label">Đính kèm</label>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: 'var(--space-sm)',
                       padding: 'var(--space-sm)',
                       background: 'var(--bg-surface)',
@@ -1320,17 +1335,17 @@ MeetMate AI Assistant`;
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="modal__footer">
-                  <button 
-                    className="btn btn--secondary" 
+                  <button
+                    className="btn btn--secondary"
                     onClick={() => setShowEmailModal(false)}
                     disabled={isDistributing}
                   >
                     Hủy
                   </button>
-                  <button 
-                    className="btn btn--primary" 
+                  <button
+                    className="btn btn--primary"
                     onClick={handleSendEmail}
                     disabled={isDistributing || selectedRecipients.length === 0}
                   >
