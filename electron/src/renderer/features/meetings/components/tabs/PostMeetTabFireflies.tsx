@@ -606,11 +606,59 @@ const CenterPanel = ({
               </option>
             ))}
           </select>
-          {selectedTemplateId && (
-            <span className="fireflies-template-description">
-              {templates.find((t) => t.id === selectedTemplateId)?.description || ''}
-            </span>
-          )}
+          {selectedTemplateId && (() => {
+            const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+            if (!selectedTemplate) return null;
+            
+            return (
+              <div className="fireflies-template-info">
+                {selectedTemplate.description && (
+                  <div className="fireflies-template-description">
+                    {selectedTemplate.description}
+                  </div>
+                )}
+                {selectedTemplate.structure?.sections && selectedTemplate.structure.sections.length > 0 && (
+                  <div className="fireflies-template-fields">
+                    <div className="fireflies-template-fields__title">Các phần trong template:</div>
+                    <div className="fireflies-template-fields__list">
+                      {selectedTemplate.structure.sections
+                        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                        .map((section: any, idx: number) => (
+                          <div key={idx} className="fireflies-template-field-item">
+                            <div className="fireflies-template-field-item__title">
+                              {section.title || section.id}
+                              {section.required && (
+                                <span className="fireflies-template-field-item__required">*</span>
+                              )}
+                            </div>
+                            {section.fields && section.fields.length > 0 && (
+                              <div className="fireflies-template-field-item__fields">
+                                {section.fields.map((field: any, fieldIdx: number) => (
+                                  <div key={fieldIdx} className="fireflies-template-field-item__field">
+                                    {field.label || field.id}
+                                    {field.required && (
+                                      <span className="fireflies-template-field-item__required">*</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+                {selectedTemplate.meeting_types && selectedTemplate.meeting_types.length > 0 && (
+                  <div className="fireflies-template-meta">
+                    <span className="fireflies-template-meta__label">Loại cuộc họp:</span>
+                    <span className="fireflies-template-meta__value">
+                      {selectedTemplate.meeting_types.join(', ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
       {templatesLoading && (

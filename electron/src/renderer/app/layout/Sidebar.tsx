@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
   FolderOpen,
+  FileText,
 } from 'lucide-react'
 import { currentUser, getInitials, actionItems } from '../../store/mockData'
 import { logout, getStoredUser } from '../../lib/api/auth'
@@ -47,7 +48,10 @@ const Sidebar = () => {
 
   const settingsNavItems: NavItem[] = [
     { path: '/app/settings', labelKey: 'nav.settings', icon: <Settings size={20} /> },
-    ...(isAdmin ? [{ path: '/app/admin', labelKey: 'nav.adminConsole', icon: <Users size={20} /> }] : []),
+    ...(isAdmin ? [
+      { path: '/app/admin', labelKey: 'nav.adminConsole', icon: <Users size={20} /> },
+      { path: '/app/templates', labelKey: 'nav.templates', icon: <FileText size={20} /> },
+    ] : []),
   ]
 
   const handleLogout = async () => {

@@ -559,6 +559,109 @@
   overflow-wrap: break-word;
 }
 
+.fireflies-template-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.fireflies-template-fields {
+  margin-top: var(--space-xs);
+}
+
+.fireflies-template-fields__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-xs);
+}
+
+.fireflies-template-fields__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: var(--space-xs);
+}
+
+.fireflies-template-fields__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fireflies-template-fields__list::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.fireflies-template-fields__list::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 2px;
+}
+
+.fireflies-template-fields__list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+.fireflies-template-field-item {
+  padding: var(--space-xs);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.fireflies-template-field-item__title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fireflies-template-field-item__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-left: var(--space-sm);
+}
+
+.fireflies-template-field-item__field {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fireflies-template-field-item__required {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.fireflies-template-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.fireflies-template-meta__label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fireflies-template-meta__value {
+  color: var(--text-primary);
+}
+
 /* Threads (deprecated - keeping for backward compatibility) */
 .fireflies-threads {
   display: flex;
