@@ -553,9 +553,7 @@ export const Landing: React.FC = () => {
           opacity: 0;
           max-height: 0;
           transform: translateY(8px);
-          transition: max-height 0.6s cubic-bezier(0.22, 0.61, 0.36, 1),
-            opacity 0.35s ease,
-            transform 0.45s ease;
+          transition: none;
           overflow: hidden;
         }
 
@@ -563,6 +561,9 @@ export const Landing: React.FC = () => {
           opacity: 1;
           max-height: 420px;
           transform: translateY(0);
+          transition: max-height 0.6s cubic-bezier(0.22, 0.61, 0.36, 1),
+            opacity 0.35s ease,
+            transform 0.45s ease;
         }
 
         .feature-card__desc {

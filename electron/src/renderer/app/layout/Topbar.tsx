@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { 
+  ArrowLeft,
   Bell, 
   HelpCircle, 
   Home, 
@@ -160,6 +161,7 @@ const Topbar = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const pageTitle = findPageTitle(currentPath)
+  const isDockView = /^\/app\/meetings\/[^/]+\/dock/.test(currentPath)
   
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -220,7 +222,29 @@ const Topbar = () => {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${isDockView ? 'topbar--dock' : ''}`}>
+      {isDockView ? (
+        <>
+          <div className="topbar__dock-left">
+            <div className="topbar__dock-brand">
+              <img src="/meetmate_icon.svg" alt="MeetMate" className="topbar__dock-logo" />
+              <span className="topbar__dock-name">MeetMate</span>
+            </div>
+            <ChevronRight size={14} className="topbar__dock-sep" />
+            <span className="topbar__dock-crumb">Cuộc họp</span>
+          </div>
+          <div className="topbar__dock-right">
+            <button
+              className="topbar__icon-btn topbar__dock-back"
+              onClick={() => navigate(-1)}
+              title="Quay lại"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
       <div className="topbar__left">
         {(() => {
           const matched = routeBreadcrumbs.find(item => item.match.test(currentPath))
@@ -332,6 +356,8 @@ const Topbar = () => {
           <HelpCircle size={18} />
         </Link>
       </div>
+        </>
+      )}
     </header>
   )
 }

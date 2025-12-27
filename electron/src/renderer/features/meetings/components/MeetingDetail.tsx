@@ -828,7 +828,7 @@ export const MeetingDetail = () => {
                   }}
                 >
                   <div className="join-platform__head">
-                    <div className="join-platform__title">Google Meet</div>
+                    <div className="join-platform__title">Other Platform ( Teams, Google Meet, Zoom, etc.)</div>
                     <span className="join-platform__badge join-platform__badge--ghost">Manual</span>
                   </div>
                   <p className="join-platform__desc">

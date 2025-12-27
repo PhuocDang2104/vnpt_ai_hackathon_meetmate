@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Mic, MonitorSmartphone, RefreshCw, ScreenShare, Video, X } from 'lucide-react';
+import { AlertCircle, Mic, ScreenShare, Video, X } from 'lucide-react';
 import { InMeetTab } from '../../../features/meetings/components/tabs/InMeetTab';
 import { meetingsApi } from '../../../lib/api/meetings';
 import { sessionsApi } from '../../../lib/api/sessions';
 import type { MeetingWithParticipants } from '../../../shared/dto/meeting';
-import { MEETING_PHASE_LABELS } from '../../../shared/dto/meeting';
 import { useChatContext } from '../../../contexts/ChatContext';
 import { API_URL, USE_API } from '../../../config/env';
 
@@ -37,6 +36,7 @@ const MeetingDock = () => {
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioPendingRef = useRef<number[]>([]);
   const audioStartAckRef = useRef(false);
+  const autoPreviewRef = useRef(false);
   const frameSamplesRef = useRef(Math.round((TARGET_SAMPLE_RATE * DEFAULT_FRAME_MS) / 1000));
   const { setOverride, clearOverride } = useChatContext();
 
@@ -395,6 +395,15 @@ const MeetingDock = () => {
     }
   }, [joinPlatform, startAudioCapture, stopAudioCapture]);
 
+  useEffect(() => {
+    if (autoPreviewRef.current) return;
+    if (joinPlatform !== 'gmeet') return;
+    if (!streamSessionId) return;
+    if (previewStream || isPreviewLoading) return;
+    autoPreviewRef.current = true;
+    handleSelectPreview();
+  }, [handleSelectPreview, isPreviewLoading, joinPlatform, previewStream, streamSessionId]);
+
   if (isLoading) {
     return (
       <div className="meeting-detail-loading">
@@ -416,16 +425,19 @@ const MeetingDock = () => {
     );
   }
 
+  const previewTitle = joinPlatform === 'gmeet'
+    ? 'Chọn tab chia sẻ (kèm âm thanh)'
+    : 'Chọn tab chia sẻ';
   const previewLabel = joinPlatform === 'gmeet'
-    ? 'Chọn tab để xem và capture audio'
-    : 'Chọn tab để xem';
+    ? 'Chọn tab + âm thanh'
+    : 'Chọn tab';
   const previewSwitchLabel = joinPlatform === 'gmeet'
-    ? 'Đổi tab xem và capture audio'
-    : 'Đổi tab xem';
+    ? 'Đổi tab + âm thanh'
+    : 'Đổi tab';
   const previewActionLabel = previewStream ? previewSwitchLabel : previewLabel;
   const previewHint = joinPlatform === 'gmeet'
-    ? 'Bấm “Chọn tab để xem và capture audio” và tick "Share tab audio" trong Chrome.'
-    : 'Bấm “Chọn tab để xem” để mở hộp thoại chọn Tab / Window / Screen.';
+    ? 'Bấm “Chọn tab + âm thanh” và tick "Share tab audio" trong Chrome.'
+    : 'Bấm “Chọn tab” để mở hộp thoại chọn Tab / Window / Screen.';
   const audioStatusLabel = joinPlatform === 'gmeet'
     ? (audioInfo || (audioStatus === 'streaming'
         ? 'Đang capture audio tab'
@@ -445,7 +457,7 @@ const MeetingDock = () => {
           <div className="sidecar-preview__header">
             <div className="sidecar-preview__title">
               <ScreenShare size={16} />
-              {previewLabel}
+              {previewTitle}
             </div>
             <div className="sidecar-preview__actions">
               <button className="btn btn--secondary btn--sm" onClick={handleSelectPreview} disabled={isPreviewLoading}>
@@ -486,28 +498,12 @@ const MeetingDock = () => {
       <div className="sidecar-page">
         <div className="sidecar-header">
           <div className="sidecar-header__left">
-            <button className="btn btn--ghost btn--icon" onClick={() => navigate(`/app/meetings/${meeting.id}/detail`)}>
-              <ArrowLeft size={18} />
-            </button>
             <div className="sidecar-header__info">
               <div className="sidecar-header__eyebrow">Dock in-meeting</div>
               <h2 className="sidecar-header__title">{meeting.title}</h2>
-              <div className="sidecar-header__meta">
-                <span className="pill pill--ghost">
-                  {MEETING_PHASE_LABELS[meeting.phase as keyof typeof MEETING_PHASE_LABELS] || meeting.phase}
-                </span>
-              </div>
             </div>
           </div>
           <div className="sidecar-header__actions">
-            <button className="btn btn--secondary" onClick={fetchMeeting}>
-              <RefreshCw size={14} />
-              Làm mới
-            </button>
-            <button className="btn btn--secondary" onClick={() => navigate(`/app/meetings/${meeting.id}/detail`)}>
-              <MonitorSmartphone size={14} />
-              Mở chế độ đầy đủ
-            </button>
             <button className="btn btn--secondary" onClick={handleSelectPreview} disabled={isPreviewLoading}>
               <ScreenShare size={14} />
               {isPreviewLoading ? 'Đang mở...' : previewActionLabel}
@@ -531,7 +527,6 @@ const MeetingDock = () => {
           <InMeetTab
             meeting={meeting}
             joinPlatform={joinPlatform}
-            joinLink={joinLink}
             streamSessionId={streamSessionId || meeting.id}
             initialAudioIngestToken={tokenFromQuery || undefined}
             onRefresh={fetchMeeting}

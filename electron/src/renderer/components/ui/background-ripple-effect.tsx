@@ -85,6 +85,7 @@ const DivGrid = ({
   interactive = true,
 }: DivGridProps) => {
   const cells = useMemo(() => Array.from({ length: rows * cols }, (_, idx) => idx), [rows, cols])
+  const maxDistance = Math.ceil(Math.min(rows, cols) * 0.55)
   const gridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
@@ -100,11 +101,12 @@ const DivGrid = ({
         const rowIdx = Math.floor(idx / cols)
         const colIdx = idx % cols
         const distance = clickedCell ? Math.hypot(clickedCell.row - rowIdx, clickedCell.col - colIdx) : 0
-        const delay = clickedCell ? Math.max(0, distance * 55) : 0
-        const duration = 200 + distance * 80
+        const isActive = !!clickedCell && distance <= maxDistance
+        const delay = isActive ? Math.max(0, distance * 45) : 0
+        const duration = isActive ? 180 + distance * 60 : 0
 
         const style: CellStyle = {}
-        if (clickedCell) {
+        if (isActive) {
           style['--delay'] = `${delay}ms`
           style['--duration'] = `${duration}ms`
         }
@@ -112,7 +114,7 @@ const DivGrid = ({
         return (
           <div
             key={idx}
-            className={cn('ripple-cell', clickedCell && 'ripple-cell--active', !interactive && 'ripple-cell--static')}
+            className={cn('ripple-cell', isActive && 'ripple-cell--active', !interactive && 'ripple-cell--static')}
             style={{
               backgroundColor: fillColor,
               borderColor,

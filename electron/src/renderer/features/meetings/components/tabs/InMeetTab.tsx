@@ -23,7 +23,6 @@ type WsStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disabled';
 interface InMeetTabProps {
   meeting: MeetingWithParticipants;
   joinPlatform: 'gomeet' | 'gmeet';
-  joinLink: string;
   streamSessionId: string;
   initialAudioIngestToken?: string;
   onRefresh: () => void;
@@ -129,14 +128,10 @@ const formatAdrDate = (value?: string) => {
 export const InMeetTab = ({
   meeting,
   joinPlatform,
-  joinLink,
   streamSessionId,
   initialAudioIngestToken,
-  onRefresh,
-  onEndMeeting,
 }: InMeetTabProps) => {
   const [feedStatus, setFeedStatus] = useState<WsStatus>(USE_API ? 'idle' : 'disabled');
-  const [wsNonce, setWsNonce] = useState(0);
   const [lastTranscriptAt, setLastTranscriptAt] = useState<number | null>(null);
   const [livePartial, setLivePartial] = useState<{
     speaker: string;
@@ -168,6 +163,7 @@ export const InMeetTab = ({
   );
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [isTokenLoading, setIsTokenLoading] = useState(false);
+  const [activePanel, setActivePanel] = useState<'transcript' | 'insights'>('transcript');
 
   const feedRef = useRef<WebSocket | null>(null);
   const partialClearRef = useRef<number | null>(null);
@@ -400,16 +396,7 @@ export const InMeetTab = ({
         window.clearTimeout(finalClearRef.current);
       }
     };
-  }, [feedEndpoint, wsNonce]);
-
-  const handleReconnect = () => {
-    feedRef.current?.close();
-    setFeedStatus(USE_API ? 'connecting' : 'disabled');
-    setLastTranscriptAt(null);
-    setLivePartial(null);
-    setLiveFinal(null);
-    setWsNonce(prev => prev + 1);
-  };
+  }, [feedEndpoint]);
 
   const handleFetchAudioToken = async () => {
     if (!USE_API) return;
@@ -429,39 +416,59 @@ export const InMeetTab = ({
 
   return (
     <div className="inmeet-tab">
-      <div className="inmeet-grid">
+      <div className="inmeet-toggle" role="tablist" aria-label="In-meeting panels">
+        <button
+          type="button"
+          className={`inmeet-toggle__btn ${activePanel === 'transcript' ? 'is-active' : ''}`}
+          onClick={() => setActivePanel('transcript')}
+          aria-pressed={activePanel === 'transcript'}
+        >
+          Live Transcript
+        </button>
+        <button
+          type="button"
+          className={`inmeet-toggle__btn ${activePanel === 'insights' ? 'is-active' : ''}`}
+          onClick={() => setActivePanel('insights')}
+          aria-pressed={activePanel === 'insights'}
+        >
+          Recap & Insights
+        </button>
+      </div>
+
+      <div className="inmeet-grid inmeet-grid--single">
         <div className="inmeet-column inmeet-column--main">
-          <LiveTranscriptPanel
-            livePartial={livePartial}
-            liveFinal={liveFinal}
-            finalTranscriptCount={finalTranscript.length}
-            finalTranscript={finalTranscript}
-            diarizationSegments={diarizationSegments}
-            liveRecap={liveRecap}
-            semanticIntent={semanticIntent}
-            currentTopicTitle={currentTopicTitle}
-            topicLog={topicLog}
-            joinPlatform={joinPlatform}
-            joinLink={joinLink}
+          {activePanel === 'transcript' ? (
+            <LiveTranscriptPanel
+              livePartial={livePartial}
+              liveFinal={liveFinal}
+              finalTranscriptCount={finalTranscript.length}
+              finalTranscript={finalTranscript}
+              diarizationSegments={diarizationSegments}
+              joinPlatform={joinPlatform}
             feedStatus={feedStatus}
             lastTranscriptAt={lastTranscriptAt}
             audioIngestToken={audioIngestToken}
             tokenError={tokenError}
-            isTokenLoading={isTokenLoading}
-            sessionId={sessionIdForStream}
-            onFetchAudioToken={handleFetchAudioToken}
-            onReconnect={handleReconnect}
-          />
-          <LiveRecapPanel recapItems={recapItems} currentTopicTitle={currentTopicTitle} />
-        </div>
-
-        <div className="inmeet-column inmeet-column--side">
-          <AdrPanel
-            actions={resolvedActions}
-            decisions={resolvedDecisions}
-            risks={resolvedRisks}
-          />
-          <ToolSuggestionsPanel />
+              isTokenLoading={isTokenLoading}
+              onFetchAudioToken={handleFetchAudioToken}
+            />
+          ) : (
+            <div className="inmeet-insights">
+              <LiveSignalPanel
+                liveRecap={liveRecap}
+                semanticIntent={semanticIntent}
+                currentTopicTitle={currentTopicTitle}
+                topicLog={topicLog}
+              />
+              <LiveRecapPanel recapItems={recapItems} currentTopicTitle={currentTopicTitle} />
+              <AdrPanel
+                actions={resolvedActions}
+                decisions={resolvedDecisions}
+                risks={resolvedRisks}
+              />
+              <ToolSuggestionsPanel />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -474,20 +481,13 @@ interface TranscriptPanelProps {
   finalTranscriptCount: number;
   finalTranscript: { id: string; speaker: string; text: string; time: number }[];
   diarizationSegments: { speaker: string; start: number; end: number; confidence?: number }[];
-  liveRecap: string | null;
-  semanticIntent: string;
-  currentTopicTitle: string;
-  topicLog: { id: string; time: string; text: string }[];
   joinPlatform: 'gomeet' | 'gmeet';
-  joinLink: string;
   feedStatus: WsStatus;
   lastTranscriptAt: number | null;
   audioIngestToken: string | null;
   tokenError: string | null;
   isTokenLoading: boolean;
-  sessionId: string;
   onFetchAudioToken: () => void;
-  onReconnect: () => void;
 }
 
 const AudioStreamIndicator = ({
@@ -548,20 +548,13 @@ const LiveTranscriptPanel = ({
   finalTranscriptCount,
   finalTranscript,
   diarizationSegments,
-  liveRecap,
-  semanticIntent,
-  currentTopicTitle,
-  topicLog,
   joinPlatform,
-  joinLink,
   feedStatus,
   lastTranscriptAt,
   audioIngestToken,
   tokenError,
   isTokenLoading,
-  sessionId,
   onFetchAudioToken,
-  onReconnect,
 }: TranscriptPanelProps) => {
   const speakerPalette = useMemo(
     () => ['#5b8def', '#e66b6b', '#5cc28a', '#f0a35a', '#9c6ade', '#4fb3d4'],
@@ -603,7 +596,7 @@ const LiveTranscriptPanel = ({
 
   return (
     <div className="transcript-panel transcript-panel--glass">
-      <div className="transcript-grid transcript-grid--equal">
+      <div className="transcript-grid transcript-grid--single">
         <div className="transcript-col transcript-col--main">
           <div className="transcript-header">
             <div className="transcript-title">
@@ -612,38 +605,15 @@ const LiveTranscriptPanel = ({
               </div>
               <div className="transcript-title__text">
                 <div className="transcript-title__label">Live Transcript</div>
-                <div className="transcript-title__sub">
-                  <Clock size={12} />
-                  Context cửa sổ 60s
+                <div className="transcript-title__meta">
+                  <div className="transcript-title__sub">
+                    <Clock size={12} />
+                    Context cửa sổ 60s
+                  </div>
+                  <AudioStreamIndicator feedStatus={feedStatus} lastTranscriptAt={lastTranscriptAt} />
                 </div>
               </div>
             </div>
-            <div
-              className="transcript-header__right"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}
-            >
-              <AudioStreamIndicator feedStatus={feedStatus} lastTranscriptAt={lastTranscriptAt} />
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={onReconnect}
-                disabled={feedStatus === 'disabled'}
-                style={{ minWidth: 120 }}
-              >
-                {feedStatus === 'connected' ? 'Làm mới WS' : 'Kết nối WS'}
-              </button>
-            </div>
-          </div>
-
-          <div className="transcript-connection">
-            <span className="pill pill--ghost">
-              Nền tảng: {joinPlatform === 'gomeet' ? 'VNPT GoMeet' : 'Google Meet'}
-            </span>
-            {joinLink && (
-              <a href={joinLink} target="_blank" rel="noopener noreferrer" className="pill pill--accent">
-                <LinkIcon size={12} style={{ marginRight: 6 }} />
-                Mở link cuộc họp
-              </a>
-            )}
           </div>
 
           <div className="transcript-setup">
@@ -718,8 +688,8 @@ const LiveTranscriptPanel = ({
                   </div>
                   <div className="transcript-live-line__text">{finalText}</div>
                 </div>
+              </div>
             </div>
-          </div>
 
           <div className="transcript-live-card" style={{ marginTop: 12 }}>
             <div className="transcript-live-card__header">
@@ -758,8 +728,9 @@ const LiveTranscriptPanel = ({
               Frontend WS · {feedStatus}
             </span>
             <span className="transcript-mini-status__meta">{lastFrameLabel}</span>
-            </div>
+          </div>
 
+          <div className="transcript-live-card">
             <div className="transcript-live-card__section">
               <div className="live-signal-label">Recent utterances</div>
               <div className="topic-log">
@@ -784,53 +755,66 @@ const LiveTranscriptPanel = ({
             </div>
           </div>
         </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-        <div className="transcript-col transcript-col--main">
-          <div className="live-signal-card live-signal-card--stack">
-            <div className="live-signal-card__header">
-              <div className="badge badge--ghost badge--pill">
-                <Sparkles size={14} />
-                Live recap | Semantic Router
-              </div>
-              <span className="meta-chip">SmartBot VNPT</span>
-            </div>
+const LiveSignalPanel = ({
+  liveRecap,
+  semanticIntent,
+  currentTopicTitle,
+  topicLog,
+}: {
+  liveRecap: string | null;
+  semanticIntent: string;
+  currentTopicTitle: string;
+  topicLog: { id: string; time: string; text: string }[];
+}) => {
+  return (
+    <div className="live-signal-card live-signal-card--stack">
+      <div className="live-signal-card__header">
+        <div className="badge badge--ghost badge--pill">
+          <Sparkles size={14} />
+          Live recap | Semantic Router
+        </div>
+        <span className="meta-chip">SmartBot VNPT</span>
+      </div>
 
-            <div className="live-signal-card__section live-signal-card__chat">
-              <div className="live-signal-label">Recap</div>
-              <div className="live-signal-bubble">
-                <div className="live-signal-bubble__content">
-                  <p>{liveRecap || 'Chưa có recap.'}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="live-signal-card__section live-signal-card__inline">
-              <div>
-                <div className="live-signal-label">Intent</div>
-                <div className="pill pill--live">{semanticIntent || 'NO_INTENT'}</div>
-              </div>
-              <div>
-                <div className="live-signal-label">Topic</div>
-                <div className="pill">{currentTopicTitle || 'T0'}</div>
-              </div>
-            </div>
-
-            <div className="live-signal-card__section">
-              <div className="live-signal-label">Topic log (3-5 phút)</div>
-              <div className="topic-log">
-                {topicLog.length === 0 ? (
-                  <div className="empty-state empty-state--inline">Chưa có topic log.</div>
-                ) : (
-                  topicLog.map(item => (
-                    <div key={item.id} className="topic-log__item">
-                      <span className="topic-log__time">{item.time}</span>
-                      <span className="topic-log__text">{item.text}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+      <div className="live-signal-card__section live-signal-card__chat">
+        <div className="live-signal-label">Recap</div>
+        <div className="live-signal-bubble">
+          <div className="live-signal-bubble__content">
+            <p>{liveRecap || 'Chưa có recap.'}</p>
           </div>
+        </div>
+      </div>
+
+      <div className="live-signal-card__section live-signal-card__inline">
+        <div>
+          <div className="live-signal-label">Intent</div>
+          <div className="pill pill--live">{semanticIntent || 'NO_INTENT'}</div>
+        </div>
+        <div>
+          <div className="live-signal-label">Topic</div>
+          <div className="pill">{currentTopicTitle || 'T0'}</div>
+        </div>
+      </div>
+
+      <div className="live-signal-card__section">
+        <div className="live-signal-label">Topic log (3-5 phút)</div>
+        <div className="topic-log">
+          {topicLog.length === 0 ? (
+            <div className="empty-state empty-state--inline">Chưa có topic log.</div>
+          ) : (
+            topicLog.map(item => (
+              <div key={item.id} className="topic-log__item">
+                <span className="topic-log__time">{item.time}</span>
+                <span className="topic-log__text">{item.text}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
