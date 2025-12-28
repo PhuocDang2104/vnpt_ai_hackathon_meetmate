@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.schemas.meeting import (
@@ -346,9 +346,7 @@ async def delete_meeting_video(
 @router.post('/{meeting_id}/trigger-inference')
 async def trigger_inference(
     meeting_id: str,
-    background_tasks: BackgroundTasks,
     template_id: Optional[str] = Query(None, description="Template ID for minutes generation"),
-    enable_diarization: bool = Query(True, description="Enable speaker diarization"),
     db: Session = Depends(get_db)
 ):
     """
@@ -357,16 +355,16 @@ async def trigger_inference(
     Process flow:
     1. Extract audio from video (ffmpeg)
     2. Transcribe with VNPT STT API
-    3. Diarize speakers with external API (if enabled)
+    3. Diarize speakers with external API
     4. Create transcript chunks in database
     5. Generate meeting minutes with selected template
     6. Export PDF (optional)
     
-    This runs asynchronously in the background.
+    Args:
+        meeting_id: Meeting ID
+        template_id: Optional template ID for minutes generation
     """
     from app.services import video_inference_service
-    import logging
-    logger = logging.getLogger(__name__)
     
     # Check meeting exists
     meeting = meeting_service.get_meeting(db, meeting_id)
@@ -377,47 +375,24 @@ async def trigger_inference(
     if not meeting.recording_url:
         raise HTTPException(status_code=400, detail="Meeting does not have a video recording")
     
-    # Wrapper function to run async service in background task
-    async def run_inference_task(db_session, m_id, v_url, t_id, enable_dia):
-        try:
-            # Create a new session for the background task if needed, 
-            # but usually we can pass dependencies if handled correctly.
-            # Ideally, use a context manager for new db session here if the main one closes.
-            # accessible via dependency injection usually closes after request.
-            # For simplicity/safety in FastAPI background tasks, let's assume 
-            # db session might be closed, but if we pass it, it might warn.
-            # Best practice: create new session scope. 
-            pass 
-            # Actually, `video_inference_service.process_meeting_video` takes a db session.
-            # FastAPI's Depends(get_db) session closes after request.
-            # We strictly need a new session context. 
-            # Re-importing SessionLocal to be safe.
-            from app.db.session import SessionLocal
-            with SessionLocal() as task_db:
-                logger.info(f"Background Task: Starting inference for {m_id} (Diarization={enable_dia})")
-                await video_inference_service.process_meeting_video(
-                    db=task_db,
-                    meeting_id=m_id,
-                    video_url=v_url,
-                    template_id=t_id,
-                    enable_diarization=enable_dia,
-                )
-                logger.info(f"Background Task: Inference finished for {m_id}")
-        except Exception as e:
-            logger.error(f"Background Task Failed for {m_id}: {e}", exc_info=True)
-
-    # Add to background tasks
-    background_tasks.add_task(
-        run_inference_task,
-        None, # db passed in wrapper is newly created, so this arg is unused in wrapper logic but service needs it
-        meeting_id,
-        meeting.recording_url,
-        template_id,
-        enable_diarization
-    )
-    
-    return {
-        "status": "processing",
-        "message": "Video processing started in background. Please check back later.",
-        "meeting_id": meeting_id
-    }
+    try:
+        # Process video (this is synchronous for now - can be moved to background job later)
+        result = await video_inference_service.process_meeting_video(
+            db=db,
+            meeting_id=meeting_id,
+            video_url=meeting.recording_url,
+            template_id=template_id,
+        )
+        
+        return {
+            "status": "completed",
+            "message": "Video processing completed successfully",
+            "transcript_count": result.get("transcript_count", 0),
+            "minutes_id": result.get("minutes_id"),
+            "pdf_url": result.get("pdf_url"),
+        }
+        
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Video inference failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Video processing failed: {str(e)}")

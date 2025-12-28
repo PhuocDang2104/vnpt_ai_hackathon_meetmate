@@ -59,7 +59,7 @@ async def diarize_audio(
         raise RuntimeError(f"Failed to read audio file: {e}")
     
     # Prepare request
-    files = {"audio_file": (audio_path.name, audio_bytes, "audio/wav")}
+    files = {"audio": (audio_path.name, audio_bytes, "audio/wav")}
     data = {}
     if min_speakers is not None:
         data["min_speakers"] = min_speakers
@@ -67,12 +67,8 @@ async def diarize_audio(
         data["max_speakers"] = max_speakers
     
     try:
-        async with httpx.AsyncClient(timeout=600.0) as client:  # 10 minute timeout
+        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minute timeout
             response = await client.post(api_url, files=files, data=data)
-            
-            if response.status_code >= 400:
-                logger.error(f"Diarization API Error: {response.status_code} - {response.text}")
-            
             response.raise_for_status()
             result = response.json()
             
