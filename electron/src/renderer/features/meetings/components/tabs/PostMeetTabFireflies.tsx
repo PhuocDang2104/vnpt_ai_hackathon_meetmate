@@ -665,7 +665,7 @@ const CenterPanel = ({
     <!-- Decisions -->
     <div class="section">
       <div class="section-header">
-        <span class="section-icon">⚖️</span>
+        <span class="section-icon"></span>
         <span class="section-title">Các quyết định</span>
         <span class="section-count">${decisions.length}</span>
       </div>
@@ -674,7 +674,7 @@ const CenterPanel = ({
           <div class="item-desc">${d.description}</div>
           <div class="item-meta">
             ${d.rationale ? `<span>${d.rationale}</span>` : ''}
-            ${d.decided_by || d.confirmed_by ? `<span>👤 Quyết định bởi: ${d.decided_by || d.confirmed_by}</span>` : ''}
+            ${d.decided_by || d.confirmed_by ? `<span>Quyết định bởi: ${d.decided_by || d.confirmed_by}</span>` : ''}
           </div>
         </div>
       `).join('')}

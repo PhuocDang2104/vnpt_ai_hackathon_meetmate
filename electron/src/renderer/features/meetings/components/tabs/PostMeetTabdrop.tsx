@@ -1230,7 +1230,18 @@ MeetMate AI Assistant`;
 
       {showEmailModal && (
         <div className="modal-overlay" onClick={() => !isDistributing && setShowEmailModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
+          <div
+            className="modal"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '720px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            }}
+          >
             <div className="modal__header">
               <h2 className="modal__title">Gửi biên bản qua Email</h2>
               <button

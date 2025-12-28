@@ -20,6 +20,10 @@
   --bg-elevated: #ffffff;
   --bg-surface: #f7f7f7;
   --bg-surface-hover: #ededed;
+  /* Additional backgrounds used by Fireflies UI */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f7;
+  --bg-tertiary: #ededed;
 
   --app-background: #ffffff;
   --app-surface: #ffffff;
@@ -2076,7 +2080,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 5000; /* ensure above videos/sidebars */
   padding: var(--space-lg);
   animation: fadeIn 150ms ease;
 }
