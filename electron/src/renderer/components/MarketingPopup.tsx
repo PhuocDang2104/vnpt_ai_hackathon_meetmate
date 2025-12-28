@@ -3,94 +3,94 @@ import { X, Mail, Check } from 'lucide-react';
 import { api } from '../lib/apiClient';
 
 export const MarketingPopup = () => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [email, setEmail] = useState('');
-    const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
-    useEffect(() => {
-        // Auto open after 3 seconds
-        const timer = setTimeout(() => {
-            setIsOpen(true);
-        }, 3000);
+  useEffect(() => {
+    // Auto open after 3 seconds
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+    }, 3000);
 
-        return () => clearTimeout(timer);
-    }, []);
+    return () => clearTimeout(timer);
+  }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!email) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
 
-        setStatus('submitting');
-        setErrorMessage('');
+    setStatus('submitting');
+    setErrorMessage('');
 
-        try {
-            await api.post('/marketing/join', { email }, { skipAuth: true });
-            setStatus('success');
-            setTimeout(() => {
-                setIsOpen(false);
-            }, 3000);
-        } catch (err: any) {
-            console.error('Marketing join failed:', err);
-            setStatus('error');
-            // If error data is available as JSON
-            setErrorMessage(err.data?.detail || 'Có lỗi xảy ra. Vui lòng thử lại.');
-        }
-    };
+    try {
+      await api.post('/marketing/join', { email }, { skipAuth: true });
+      setStatus('success');
+      setTimeout(() => {
+        setIsOpen(false);
+      }, 3000);
+    } catch (err: any) {
+      console.error('Marketing join failed:', err);
+      setStatus('error');
+      // If error data is available as JSON
+      setErrorMessage(err.data?.detail || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    }
+  };
 
-    if (!isOpen) return null;
+  if (!isOpen) return null;
 
-    return (
-        <div className="marketing-popup-overlay">
-            <div className="marketing-popup">
-                <button className="marketing-popup-close" onClick={() => setIsOpen(false)}>
-                    <X size={20} />
-                </button>
+  return (
+    <div className="marketing-popup-overlay">
+      <div className="marketing-popup">
+        <button className="marketing-popup-close" onClick={() => setIsOpen(false)}>
+          <X size={20} />
+        </button>
 
-                {status === 'success' ? (
-                    <div className="marketing-popup-success">
-                        <div className="success-icon">
-                            <Check size={32} />
-                        </div>
-                        <h3>Đăng ký thành công!</h3>
-                        <p>Cảm ơn bạn đã quan tâm đến MeetMate. Chúng tôi sẽ liên hệ sớm nhất.</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="marketing-popup-header">
-                            <div className="icon-wrapper">
-                                <Mail size={24} />
-                            </div>
-                            <h2>Tham gia cùng MeetMate</h2>
-                            <p>Để lại email để nhận thông tin mới nhất và ưu đãi trải nghiệm sớm.</p>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="marketing-popup-form">
-                            <input
-                                type="email"
-                                placeholder="Nhập email của bạn..."
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                disabled={status === 'submitting'}
-                                required
-                            />
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={status === 'submitting'}
-                            >
-                                {status === 'submitting' ? 'Đang gửi...' : 'Đăng ký ngay'}
-                            </button>
-                        </form>
-
-                        {status === 'error' && (
-                            <p className="marketing-error-msg">{errorMessage}</p>
-                        )}
-                    </>
-                )}
+        {status === 'success' ? (
+          <div className="marketing-popup-success">
+            <div className="success-icon">
+              <Check size={32} />
+            </div>
+            <h3>Đăng ký thành công!</h3>
+            <p>Cảm ơn bạn đã quan tâm đến MeetMate. Hãy là những người tiên phong kiến tạo tương lai cùng chúng tôi!</p>
+          </div>
+        ) : (
+          <>
+            <div className="marketing-popup-header">
+              <div className="icon-wrapper">
+                <Mail size={24} />
+              </div>
+              <h2>Tham gia cùng MeetMate</h2>
+              <p>Để lại email để nhận thông tin mới nhất và ưu đãi trải nghiệm sớm.</p>
             </div>
 
-            <style>{`
+            <form onSubmit={handleSubmit} className="marketing-popup-form">
+              <input
+                type="email"
+                placeholder="Nhập email của bạn..."
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={status === 'submitting'}
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={status === 'submitting'}
+              >
+                {status === 'submitting' ? 'Đang gửi...' : 'Đăng ký ngay'}
+              </button>
+            </form>
+
+            {status === 'error' && (
+              <p className="marketing-error-msg">{errorMessage}</p>
+            )}
+          </>
+        )}
+      </div>
+
+      <style>{`
         .marketing-popup-overlay {
           position: fixed;
           top: 0;
@@ -239,6 +239,6 @@ export const MarketingPopup = () => {
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
