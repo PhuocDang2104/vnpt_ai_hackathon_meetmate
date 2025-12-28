@@ -496,6 +496,256 @@ const CenterPanel = ({
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [customEmail, setCustomEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // Open email modal and pre-select participants
+  const openEmailModal = () => {
+    const participantEmails = meeting.participants?.filter(p => p.email).map(p => p.email!) || [];
+    setSelectedParticipants(participantEmails);
+    setShowEmailModal(true);
+  };
+
+  // Toggle participant selection
+  const toggleParticipant = (email: string) => {
+    setSelectedParticipants(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]);
+  };
+
+  // Export to PDF using browser print dialog with professional template
+  const handleExportPDF = () => {
+    if (!minutes) return;
+
+    const formatDate = (d: string | undefined) => d ? new Date(d).toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    const formatTime = (d: string | undefined) => d ? new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+
+    // Parse minutes_markdown for action_items, decisions, risks if available
+    let actionItems: any[] = [];
+    let decisions: any[] = [];
+    let risks: any[] = [];
+    let keyPoints: string[] = [];
+
+    try {
+      const parsed = JSON.parse(minutes.minutes_markdown || '{}');
+      actionItems = parsed.action_items || [];
+      decisions = parsed.decisions || [];
+      risks = parsed.risks || [];
+      keyPoints = parsed.key_points || [];
+    } catch { /* ignore */ }
+
+    const printContent = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Biên bản - ${meeting.title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', 'Roboto', Arial, sans-serif; line-height: 1.6; color: #1f2937; background: #fff; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px; }
+    
+    /* Header */
+    .header { border-bottom: 3px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .logo { font-size: 24px; font-weight: 700; color: #6366f1; }
+    .doc-type { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 8px 20px; border-radius: 20px; font-size: 14px; }
+    .meeting-title { font-size: 26px; font-weight: 700; color: #1a1a2e; margin-bottom: 15px; }
+    
+    /* Info Table */
+    .info-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: #f8fafc; border-radius: 8px; overflow: hidden; }
+    .info-table td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+    .info-table td:first-child { font-weight: 600; color: #4b5563; width: 140px; background: #f1f5f9; }
+    
+    /* Sections */
+    .section { margin-bottom: 30px; page-break-inside: avoid; }
+    .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
+    .section-icon { font-size: 20px; }
+    .section-title { font-size: 18px; font-weight: 600; color: #374151; }
+    .section-count { background: #6366f1; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-left: auto; }
+    
+    /* Summary */
+    .summary-box { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: 10px; border-left: 4px solid #0ea5e9; }
+    .summary-text { white-space: pre-wrap; line-height: 1.8; }
+    
+    /* Key Points */
+    .key-points { list-style: none; }
+    .key-point { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }
+    .key-point:last-child { border-bottom: none; }
+    .key-point::before { content: "→"; color: #6366f1; font-weight: bold; }
+    
+    /* Items Cards */
+    .item-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .item-card.action { border-left: 4px solid #10b981; }
+    .item-card.decision { border-left: 4px solid #6366f1; }
+    .item-card.risk { border-left: 4px solid #f59e0b; }
+    .item-card.risk.critical { border-left-color: #ef4444; }
+    .item-desc { font-weight: 600; margin-bottom: 8px; }
+    .item-meta { display: flex; flex-wrap: wrap; gap: 15px; font-size: 13px; color: #6b7280; }
+    .item-meta span { display: flex; align-items: center; gap: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge.high { background: #fee2e2; color: #dc2626; }
+    .badge.medium { background: #fef3c7; color: #d97706; }
+    .badge.low { background: #d1fae5; color: #059669; }
+    .badge.critical { background: #ef4444; color: white; }
+    
+    /* Footer */
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
+    
+    @media print { 
+      .container { padding: 20px; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-top">
+        <div class="logo">📋 MeetMate</div>
+        <div class="doc-type">BIÊN BẢN CUỘC HỌP</div>
+      </div>
+      <div class="meeting-title">${meeting.title}</div>
+    </div>
+    
+    <!-- Meeting Info -->
+    <table class="info-table">
+      <tr><td>📅 Ngày họp</td><td>${formatDate(meeting.start_time)}</td></tr>
+      <tr><td>⏰ Thời gian</td><td>${formatTime(meeting.start_time)}${meeting.end_time ? ' - ' + formatTime(meeting.end_time) : ''}</td></tr>
+      ${meeting.meeting_type ? '<tr><td>📁 Loại cuộc họp</td><td>' + meeting.meeting_type + '</td></tr>' : ''}
+      ${meeting.participants?.length ? '<tr><td>👥 Người tham gia</td><td>' + meeting.participants.map(p => p.display_name || p.email).join(', ') + '</td></tr>' : ''}
+    </table>
+    
+    <!-- Executive Summary -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📝</span>
+        <span class="section-title">Tóm tắt điều hành</span>
+      </div>
+      <div class="summary-box">
+        <div class="summary-text">${minutes.executive_summary || 'Chưa có tóm tắt.'}</div>
+      </div>
+    </div>
+    
+    ${keyPoints.length ? `
+    <!-- Key Points -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">💡</span>
+        <span class="section-title">Những điểm chính</span>
+        <span class="section-count">${keyPoints.length}</span>
+      </div>
+      <ul class="key-points">
+        ${keyPoints.map(kp => `<li class="key-point">${kp}</li>`).join('')}
+      </ul>
+    </div>` : ''}
+    
+    ${actionItems.length ? `
+    <!-- Action Items -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">✅</span>
+        <span class="section-title">Công việc cần thực hiện</span>
+        <span class="section-count">${actionItems.length}</span>
+      </div>
+      ${actionItems.map((a: any) => `
+        <div class="item-card action">
+          <div class="item-desc">${a.description}</div>
+          <div class="item-meta">
+            <span>👤 ${a.owner || 'Chưa phân công'}</span>
+            ${a.deadline ? `<span>📅 ${a.deadline}</span>` : ''}
+            ${a.priority ? `<span class="badge ${a.priority}">${a.priority.toUpperCase()}</span>` : ''}
+            ${a.created_by ? `<span>📌 Yêu cầu bởi: ${a.created_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    ${decisions.length ? `
+    <!-- Decisions -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">⚖️</span>
+        <span class="section-title">Các quyết định</span>
+        <span class="section-count">${decisions.length}</span>
+      </div>
+      ${decisions.map((d: any) => `
+        <div class="item-card decision">
+          <div class="item-desc">${d.description}</div>
+          <div class="item-meta">
+            ${d.rationale ? `<span>💬 ${d.rationale}</span>` : ''}
+            ${d.decided_by || d.confirmed_by ? `<span>👤 Quyết định bởi: ${d.decided_by || d.confirmed_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    ${risks.length ? `
+    <!-- Risks -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">⚠️</span>
+        <span class="section-title">Rủi ro & Vấn đề</span>
+        <span class="section-count">${risks.length}</span>
+      </div>
+      ${risks.map((r: any) => `
+        <div class="item-card risk ${r.severity}">
+          <div class="item-desc">${r.description}</div>
+          <div class="item-meta">
+            <span class="badge ${r.severity}">${(r.severity || 'medium').toUpperCase()}</span>
+            ${r.mitigation ? `<span>🛡️ ${r.mitigation}</span>` : ''}
+            ${r.raised_by ? `<span>👤 Nêu bởi: ${r.raised_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p>Biên bản được tạo tự động bởi MeetMate AI • ${new Date().toLocaleDateString('vi-VN')}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
+  // Send email to recipients
+  const handleSendEmail = async () => {
+    if (!minutes) return;
+    setIsSendingEmail(true);
+    try {
+      const allRecipients = [...selectedParticipants];
+      if (customEmail.trim()) {
+        allRecipients.push(...customEmail.split(',').map(e => e.trim()).filter(e => e));
+      }
+      if (allRecipients.length === 0) {
+        alert('Vui lòng chọn ít nhất một người nhận.');
+        setIsSendingEmail(false);
+        return;
+      }
+      await minutesApi.distribute({
+        minutes_id: minutes.id,
+        meeting_id: meeting.id,
+        channels: ['email'],
+        recipients: allRecipients,
+      });
+      alert(`Đã gửi biên bản đến ${allRecipients.length} người.`);
+      setShowEmailModal(false);
+      setCustomEmail('');
+    } catch (err: any) {
+      console.error('Send email failed:', err);
+      alert(`Lỗi: ${err.message || 'Không thể gửi email'}`);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleSaveSummary = async () => {
     if (!minutes) return;
@@ -661,10 +911,10 @@ const CenterPanel = ({
               >
                 <Copy size={16} />
               </button>
-              <button className="fireflies-icon-btn" title="Download">
+              <button className="fireflies-icon-btn" onClick={handleExportPDF} title="Xuất PDF / In">
                 <Download size={16} />
               </button>
-              <button className="fireflies-icon-btn" title="Email">
+              <button className="fireflies-icon-btn" onClick={openEmailModal} title="Gửi Email">
                 <Mail size={16} />
               </button>
             </>
@@ -698,6 +948,77 @@ const CenterPanel = ({
           />
         )}
       </div>
+
+      {/* Email Modal with Card UI */}
+      {showEmailModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setShowEmailModal(false)}>
+          <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', padding: '24px', width: '680px', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>📧 Gửi biên bản qua Email</h3>
+
+            {/* Participants Card */}
+            <div style={{ marginBottom: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #6366f115, #8b5cf615)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>👥</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Thành viên cuộc họp</span>
+                <span style={{ marginLeft: 'auto', background: '#6366f1', color: 'white', padding: '2px 10px', borderRadius: '12px', fontSize: '12px' }}>{selectedParticipants.length} đã chọn</span>
+              </div>
+              <div style={{ padding: '8px', maxHeight: '140px', overflowY: 'auto' }}>
+                {meeting.participants && meeting.participants.length > 0 ? meeting.participants.map((p, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', cursor: p.email ? 'pointer' : 'default', borderRadius: '8px', background: p.email && selectedParticipants.includes(p.email) ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.15s' }}>
+                    <input type="checkbox" checked={p.email ? selectedParticipants.includes(p.email) : false} onChange={() => p.email && toggleParticipant(p.email)} disabled={!p.email} style={{ width: '16px', height: '16px', accentColor: '#6366f1' }} />
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '13px' }}>{(p.display_name || p.email || '?').charAt(0).toUpperCase()}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: '13px' }}>{p.display_name || p.email || 'Unknown'}</div>
+                      {p.email && <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{p.email}</div>}
+                    </div>
+                    {!p.email && <span style={{ color: '#ef4444', fontSize: '11px' }}>Không có email</span>}
+                  </label>
+                )) : <p style={{ color: 'var(--text-muted)', margin: '12px', textAlign: 'center' }}>Không có thành viên nào</p>}
+              </div>
+            </div>
+
+            {/* Custom Email Card */}
+            <div style={{ marginBottom: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #f59e0b15, #ef444415)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>✉️</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Email khác (tùy chọn)</span>
+              </div>
+              <div style={{ padding: '12px' }}>
+                <input type="text" value={customEmail} onChange={(e) => setCustomEmail(e.target.value)} placeholder="email1@example.com, email2@example.com"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-primary)' }} />
+              </div>
+            </div>
+
+            {/* PDF Preview Card */}
+            <div style={{ marginBottom: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #10b98115, #14b8a615)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>📄</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Biên bản sẽ gửi</span>
+              </div>
+              <div style={{ padding: '16px', maxHeight: '160px', overflowY: 'auto' }}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <h4 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '15px' }}>📝 {meeting.title}</h4>
+                  <p style={{ fontSize: '11px', color: '#666', margin: '0 0 10px' }}>📅 {meeting.start_time ? new Date(meeting.start_time).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                  <div style={{ fontSize: '12px', color: '#333', lineHeight: 1.5 }}>
+                    <strong>Tóm tắt:</strong> {(minutes?.executive_summary || 'Chưa có').slice(0, 200)}{(minutes?.executive_summary?.length || 0) > 200 ? '...' : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn--ghost" onClick={() => setShowEmailModal(false)}>Hủy</button>
+              <button className="btn btn--primary" onClick={handleSendEmail} disabled={(selectedParticipants.length === 0 && !customEmail.trim()) || isSendingEmail}
+                style={{ minWidth: '140px' }}>
+                {isSendingEmail ? 'Đang gửi...' : `Gửi Email (${selectedParticipants.length + (customEmail.trim() ? customEmail.split(',').filter(e => e.trim()).length : 0)})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
