@@ -249,6 +249,25 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     }
   };
 
+  // Hidden feature: Delete all transcripts for demo
+  const handleDeleteAllTranscripts = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa tất cả transcript? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+    try {
+      const { transcriptsApi } = await import('../../../../lib/api/transcripts');
+      await transcriptsApi.extract(meeting.id); // Using extract to get endpoint structure
+      // Actually call delete
+      const api = (await import('../../../../lib/apiClient')).default;
+      await api.delete(`/transcripts/${meeting.id}`);
+      await loadAllData();
+      alert('Đã xóa tất cả transcript.');
+    } catch (err) {
+      console.error('Delete transcripts failed:', err);
+      alert('Không thể xóa transcript. Vui lòng thử lại.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="fireflies-layout">
@@ -299,6 +318,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         filters={filters}
         meetingId={meeting.id}
         onAddTranscripts={handleAddTranscripts}
+        onDeleteAllTranscripts={handleDeleteAllTranscripts}
       />
     </div>
   );
@@ -688,9 +708,10 @@ interface RightPanelProps {
   filters: FilterState;
   meetingId: string;
   onAddTranscripts?: (transcripts: { speaker: string; start_time: number; text: string }[]) => void;
+  onDeleteAllTranscripts?: () => void;
 }
 
-const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts }: RightPanelProps) => {
+const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts, onDeleteAllTranscripts }: RightPanelProps) => {
   const [searchInTranscript, setSearchInTranscript] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [bulkInput, setBulkInput] = useState('');
@@ -804,7 +825,7 @@ const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts }: Right
                 <div className="fireflies-transcript-header">
                   <div className="fireflies-speaker">
                     <div className="fireflies-speaker-avatar">
-                      {chunk.speaker ? chunk.speaker.charAt(chunk.speaker.length - 1) : '?'}
+                      {chunk.speaker ? chunk.speaker.charAt(0).toUpperCase() : '?'}
                     </div>
                     <span className="fireflies-speaker-name">{chunk.speaker || 'Unknown'}</span>
                   </div>
@@ -868,20 +889,34 @@ const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts }: Right
                 background: 'var(--bg-secondary)',
               }}
             />
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'space-between' }}>
               <button
                 className="btn btn--ghost"
-                onClick={() => setShowAddModal(false)}
+                style={{ color: 'var(--danger)' }}
+                onClick={() => {
+                  if (onDeleteAllTranscripts) {
+                    onDeleteAllTranscripts();
+                    setShowAddModal(false);
+                  }
+                }}
               >
-                Hủy
+                🗑 Xóa tất cả transcript
               </button>
-              <button
-                className="btn btn--primary"
-                onClick={handleBulkAdd}
-                disabled={!bulkInput.trim()}
-              >
-                Thêm Transcript
-              </button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn btn--ghost"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  className="btn btn--primary"
+                  onClick={handleBulkAdd}
+                  disabled={!bulkInput.trim()}
+                >
+                  Thêm Transcript
+                </button>
+              </div>
             </div>
           </div>
         </div>
