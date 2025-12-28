@@ -21,6 +21,12 @@ class TranscriptChunkCreate(TranscriptChunkBase):
     speaker_user_id: Optional[str] = None
 
 
+# Schema for batch input - meeting_id comes from URL path
+class TranscriptChunkBatchInput(TranscriptChunkBase):
+    speaker_user_id: Optional[str] = None
+
+
+
 class TranscriptChunkUpdate(BaseModel):
     text: Optional[str] = None
     speaker: Optional[str] = None

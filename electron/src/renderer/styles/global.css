@@ -9786,14 +9786,11 @@ a {
    ============================================ */
 
 .about-page {
-  background: var(--bg-base);
-  min-height: 100vh;
-}
-
-.about-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-xl);
+  background: var(--bg-base);
+  min-height: 100vh;
 }
 
 /* Hero Section */
@@ -10233,12 +10230,10 @@ a {
 }
 
 .about-footer__content {
-  max-width: 1200px;
-  margin: 0 auto var(--space-lg);
-  padding: 0 var(--space-xl);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: var(--space-lg);
 }
 
 .about-footer__brand h3 {

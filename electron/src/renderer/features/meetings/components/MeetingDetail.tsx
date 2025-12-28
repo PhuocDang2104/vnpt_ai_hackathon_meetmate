@@ -37,7 +37,7 @@ type MeetingTabType = 'pre' | 'post';
 export const MeetingDetail = () => {
   const { meetingId } = useParams<{ meetingId: string }>();
   const navigate = useNavigate();
-  
+
   const [meeting, setMeeting] = useState<MeetingWithParticipants | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export const MeetingDetail = () => {
   const [gomeetInitError, setGomeetInitError] = useState<string | null>(null);
   const [isGoMeetLoading, setIsGoMeetLoading] = useState(false);
   const { setOverride, clearOverride } = useChatContext();
-  
+
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -68,7 +68,7 @@ export const MeetingDetail = () => {
     location: '',
   });
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -95,10 +95,10 @@ export const MeetingDetail = () => {
 
   const fetchMeeting = useCallback(async () => {
     if (!meetingId) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const data = await meetingsApi.get(meetingId);
       setMeeting(data);
@@ -151,6 +151,17 @@ export const MeetingDetail = () => {
       fetchMeeting();
     } catch (err) {
       console.error('Failed to end meeting:', err);
+    }
+  };
+
+  const handleMarkCompleted = async () => {
+    if (!meetingId) return;
+    try {
+      await meetingsApi.updatePhase(meetingId, 'post');
+      setActiveTab('post');
+      fetchMeeting();
+    } catch (err) {
+      console.error('Failed to mark meeting as completed:', err);
     }
   };
 
@@ -328,14 +339,14 @@ export const MeetingDetail = () => {
   // Open edit modal with current meeting data
   const handleOpenEdit = () => {
     if (!meeting) return;
-    
+
     // Format datetime for input fields
     const formatDateTimeLocal = (dateStr: string | undefined) => {
       if (!dateStr) return '';
       const date = new Date(dateStr);
       return date.toISOString().slice(0, 16);
     };
-    
+
     setEditForm({
       title: meeting.title || '',
       description: meeting.description || '',
@@ -350,7 +361,7 @@ export const MeetingDetail = () => {
   // Save edited meeting
   const handleSaveEdit = async () => {
     if (!meetingId) return;
-    
+
     setIsSaving(true);
     try {
       const updateData: MeetingUpdate = {
@@ -361,7 +372,7 @@ export const MeetingDetail = () => {
         teams_link: editForm.teams_link || undefined,
         location: editForm.location || undefined,
       };
-      
+
       await meetingsApi.update(meetingId, updateData);
       setShowEditModal(false);
       fetchMeeting();
@@ -376,7 +387,7 @@ export const MeetingDetail = () => {
   // Delete meeting
   const handleDelete = async () => {
     if (!meetingId) return;
-    
+
     setIsDeleting(true);
     try {
       await meetingsApi.delete(meetingId);
@@ -413,7 +424,7 @@ export const MeetingDetail = () => {
 
   const startTime = meeting.start_time ? new Date(meeting.start_time) : null;
   const endTime = meeting.end_time ? new Date(meeting.end_time) : null;
-  
+
   // Determine if meeting is currently live based on time
   const now = new Date();
   const isLiveByTime = startTime && endTime && now >= startTime && now <= endTime;
@@ -442,8 +453,8 @@ export const MeetingDetail = () => {
           </button>
           <div className="meeting-detail-v2__header-info">
             <div className="meeting-detail-v2__header-badges">
-                <span className={`badge badge--${(meeting.phase === 'in' || isLiveByTime) ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
-                  {(meeting.phase === 'in' || isLiveByTime) && <span className="live-dot"></span>}
+              <span className={`badge badge--${(meeting.phase === 'in' || isLiveByTime) ? 'accent' : meeting.phase === 'post' ? 'success' : 'info'}`}>
+                {(meeting.phase === 'in' || isLiveByTime) && <span className="live-dot"></span>}
                 {isLiveByTime && meeting.phase === 'pre' ? 'LIVE' : (MEETING_PHASE_LABELS[meeting.phase as keyof typeof MEETING_PHASE_LABELS] || meeting.phase)}
               </span>
               <span className="badge badge--neutral">{MEETING_TYPE_LABELS[meeting.meeting_type as keyof typeof MEETING_TYPE_LABELS] || meeting.meeting_type}</span>
@@ -451,7 +462,7 @@ export const MeetingDetail = () => {
             <h1 className="meeting-detail-v2__title">{meeting.title}</h1>
           </div>
         </div>
-        
+
         <div className="meeting-detail-v2__header-right">
           <div className="meeting-detail-v2__meta-compact">
             {startTime && (
@@ -471,7 +482,7 @@ export const MeetingDetail = () => {
               {meeting.participants?.length || 0}
             </span>
           </div>
-          
+
           <div className="meeting-detail-v2__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Utility */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -494,10 +505,10 @@ export const MeetingDetail = () => {
                 </button>
               )}
               {meeting.phase === 'pre' && (
-                <button 
-                  className="btn btn--ghost btn--icon btn--sm" 
+                <button
+                  className="btn btn--ghost btn--icon btn--sm"
                   style={{ padding: '6px', width: '32px', height: '32px', color: 'var(--error)' }}
-                  onClick={() => setShowDeleteConfirm(true)} 
+                  onClick={() => setShowDeleteConfirm(true)}
                   title="Xóa cuộc họp"
                 >
                   <Trash2 size={16} />
@@ -532,21 +543,28 @@ export const MeetingDetail = () => {
                   Đang diễn ra - Tham gia
                 </button>
               )}
-              
+
               {meeting.phase === 'pre' && !isLiveByTime && !isEnded && (
                 <button className="btn btn--primary" onClick={handleStartMeeting}>
                   <Play size={16} />
                   Bắt đầu họp
                 </button>
               )}
-              
+
+              {meeting.phase === 'pre' && (
+                <button className="btn btn--secondary" onClick={handleMarkCompleted} title="Đánh dấu cuộc họp đã hoàn thành (bỏ qua Live)">
+                  <CheckSquare size={16} />
+                  Đánh dấu hoàn thành
+                </button>
+              )}
+
               {meeting.phase === 'in' && (
                 <button className="btn btn--primary" onClick={handleEndMeeting}>
                   <CheckSquare size={16} />
                   Kết thúc họp
                 </button>
               )}
-              
+
               {meeting.phase === 'post' && (
                 <span className="badge badge--success" style={{ padding: '8px 16px' }}>
                   <CheckSquare size={16} style={{ marginRight: '6px' }} />
@@ -586,13 +604,13 @@ export const MeetingDetail = () => {
       {/* Tab Content */}
       <main className="meeting-detail-v2__content">
         {activeTab === 'pre' && (
-          <PreMeetTab 
-            meeting={meeting} 
+          <PreMeetTab
+            meeting={meeting}
             onRefresh={fetchMeeting}
           />
         )}
         {activeTab === 'post' && (
-          <PostMeetTabFireflies 
+          <PostMeetTabFireflies
             meeting={meeting}
             onRefresh={fetchMeeting}
           />
@@ -612,7 +630,7 @@ export const MeetingDetail = () => {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="modal__body">
               <div className="form-group">
                 <label className="form-label">Tiêu đề cuộc họp</label>
@@ -624,7 +642,7 @@ export const MeetingDetail = () => {
                   placeholder="Nhập tiêu đề..."
                 />
               </div>
-              
+
               <div className="form-group">
                 <label className="form-label">Mô tả</label>
                 <textarea
@@ -635,7 +653,7 @@ export const MeetingDetail = () => {
                   rows={3}
                 />
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-base)' }}>
                 <div className="form-group">
                   <label className="form-label">
@@ -649,7 +667,7 @@ export const MeetingDetail = () => {
                     onChange={e => setEditForm({ ...editForm, start_time: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label className="form-label">
                     <Clock size={14} style={{ marginRight: '6px' }} />
@@ -663,7 +681,7 @@ export const MeetingDetail = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="form-group">
                 <label className="form-label">
                   <Video size={14} style={{ marginRight: '6px' }} />
@@ -677,7 +695,7 @@ export const MeetingDetail = () => {
                   placeholder="https://teams.microsoft.com/..."
                 />
               </div>
-              
+
               <div className="form-group">
                 <label className="form-label">
                   <MapPin size={14} style={{ marginRight: '6px' }} />
@@ -692,13 +710,13 @@ export const MeetingDetail = () => {
                 />
               </div>
             </div>
-            
+
             <div className="modal__footer">
               <button className="btn btn--secondary" onClick={() => setShowEditModal(false)}>
                 Hủy
               </button>
-              <button 
-                className="btn btn--primary" 
+              <button
+                className="btn btn--primary"
                 onClick={handleSaveEdit}
                 disabled={isSaving || !editForm.title}
               >
@@ -732,7 +750,7 @@ export const MeetingDetail = () => {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="modal__body">
               <p style={{ marginBottom: 'var(--space-base)' }}>
                 Bạn có chắc chắn muốn xóa cuộc họp này?
@@ -747,13 +765,13 @@ export const MeetingDetail = () => {
                 Hành động này không thể hoàn tác.
               </p>
             </div>
-            
+
             <div className="modal__footer">
               <button className="btn btn--secondary" onClick={() => setShowDeleteConfirm(false)}>
                 Hủy
               </button>
-              <button 
-                className="btn btn--error" 
+              <button
+                className="btn btn--error"
                 onClick={handleDelete}
                 disabled={isDeleting}
                 style={{ background: 'var(--error)' }}

@@ -92,42 +92,6 @@ def get_latest_minutes(db: Session, meeting_id: str) -> Optional[MeetingMinutesR
     )
 
 
-def get_minutes_by_id(db: Session, minutes_id: str) -> Optional[MeetingMinutesResponse]:
-    """Get minutes by specific ID"""
-    query = text("""
-        SELECT 
-            id::text, meeting_id::text, version, minutes_text,
-            minutes_html, minutes_markdown, minutes_doc_url,
-            executive_summary, generated_at, edited_by::text,
-            edited_at, status, approved_by::text, approved_at
-        FROM meeting_minutes
-        WHERE id = :minutes_id
-    """)
-    
-    result = db.execute(query, {'minutes_id': minutes_id})
-    row = result.fetchone()
-    
-    if not row:
-        return None
-    
-    return MeetingMinutesResponse(
-        id=row[0],
-        meeting_id=row[1],
-        version=row[2],
-        minutes_text=row[3],
-        minutes_html=row[4],
-        minutes_markdown=row[5],
-        minutes_doc_url=row[6],
-        executive_summary=row[7],
-        generated_at=row[8],
-        edited_by=row[9],
-        edited_at=row[10],
-        status=row[11],
-        approved_by=row[12],
-        approved_at=row[13]
-    )
-
-
 def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesResponse:
     """Create new meeting minutes"""
     minutes_id = str(uuid4())

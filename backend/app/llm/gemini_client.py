@@ -301,69 +301,104 @@ Trả về đúng JSON, không kèm text khác:
         return {"summary": summary, "key_points": key_points}
     
     async def generate_minutes_json(self, transcript: str) -> Dict[str, Any]:
-        """Generate comprehensive minutes in strict JSON format"""
-        prompt = f"""Phân tích nội dung cuộc họp (transcript) bên dưới và trích xuất thông tin để tạo biên bản họp.
-        
-        Transcript:
-        {transcript[:15000]}
+        """Generate comprehensive minutes in strict JSON format with rich content"""
+        prompt = f"""Bạn là trợ lý chuyên nghiệp tạo biên bản cuộc họp cho doanh nghiệp.
+Phân tích nội dung cuộc họp (transcript) bên dưới và tạo biên bản chi tiết.
 
-        Yêu cầu Output (JSON Strict Mode):
-        Hãy trả về MỘT JSON Object duy nhất với cấu trúc sau (không kèm markdown block ```json ... ```):
+TRANSCRIPT CUỘC HỌP:
+{transcript[:15000]}
+
+YÊU CẦU OUTPUT (JSON Strict Mode):
+Trả về MỘT JSON Object duy nhất (KHÔNG kèm markdown block ```json```) với cấu trúc:
+
+{{
+    "executive_summary": "Tóm tắt điều hành 2-4 đoạn văn. Bắt đầu bằng mục đích cuộc họp, các nội dung chính đã thảo luận, kết quả đạt được và những điều cần theo dõi.",
+    
+    "key_points": [
+        "Điểm thảo luận quan trọng 1 - mô tả ngắn gọn nội dung và ai đề cập",
+        "Điểm thảo luận quan trọng 2 - kết quả hoặc kết luận",
+        "Điểm thảo luận quan trọng 3"
+    ],
+    
+    "action_items": [
         {{
-            "executive_summary": "Tóm tắt quản trị ngắn gọn (2-3 đoạn), tổng quan về cuộc họp.",
-            "key_points": [
-                "Điểm chính 1",
-                "Điểm chính 2"
-            ],
-            "action_items": [
-                {{
-                    "description": "Mô tả hành động cụ thể",
-                    "owner": "Tên người được giao (nếu có)",
-                    "deadline": "YYYY-MM-DD (nếu có), hoặc null",
-                    "priority": "high/medium/low"
-                }}
-            ],
-            "decisions": [
-                {{
-                    "description": "Nội dung quyết định",
-                    "rationale": "Lý do hoặc bối cảnh ra quyết định",
-                    "confirmed_by": "Người chốt (nếu có)"
-                }}
-            ],
-            "risks": [
-                {{
-                    "description": "Mô tả rủi ro hoặc vấn đề tồn đọng",
-                    "severity": "critical/high/medium/low",
-                    "mitigation": "Hướng giải quyết (nếu có)"
-                }}
-            ]
+            "description": "Mô tả chi tiết công việc cần thực hiện",
+            "owner": "Tên người được giao (trích từ transcript, nếu không rõ ghi 'Chưa phân công')",
+            "deadline": "YYYY-MM-DD nếu đề cập, hoặc 'Sớm nhất có thể' nếu urgent, hoặc null",
+            "priority": "high/medium/low - dựa vào mức độ nhấn mạnh trong cuộc họp",
+            "created_by": "Tên người tạo ra yêu cầu này trong cuộc họp"
         }}
-        """
+    ],
+    
+    "decisions": [
+        {{
+            "description": "Nội dung quyết định rõ ràng, cụ thể",
+            "rationale": "Lý do dẫn đến quyết định này (tóm tắt thảo luận)",
+            "decided_by": "Tên người chốt quyết định cuối cùng",
+            "approved_by": "Những người đồng ý/phê duyệt (nếu có)"
+        }}
+    ],
+    
+    "risks": [
+        {{
+            "description": "Mô tả rủi ro hoặc vấn đề tiềm ẩn được nêu ra",
+            "severity": "critical/high/medium/low",
+            "mitigation": "Biện pháp giảm thiểu đã thảo luận",
+            "raised_by": "Người nêu ra rủi ro này"
+        }}
+    ],
+    
+    "next_steps": [
+        "Bước tiếp theo 1 cần thực hiện sau cuộc họp",
+        "Bước tiếp theo 2"
+    ],
+    
+    "attendees_mentioned": [
+        "Tên người tham gia được nhắc đến trong transcript"
+    ]
+}}
+
+LƯU Ý QUAN TRỌNG:
+- Trích xuất TẤT CẢ thông tin có trong transcript, không bỏ sót
+- Với mỗi action/decision/risk, PHẢI ghi rõ ai là người tạo/đề xuất/quyết định
+- Nếu không xác định được người, ghi "Không rõ" thay vì bỏ trống
+- Priority: high = được nhấn mạnh nhiều lần, medium = đề cập bình thường, low = đề cập qua
+- executive_summary phải viết như văn bản chuyên nghiệp, có đầu có đuôi
+"""
         
         response = await self.chat.chat(prompt)
         
         # Robust JSON extraction
         try:
-            # Try parsing directly
             return json.loads(response)
         except json.JSONDecodeError:
             import re
             # Try to find JSON block match
-            match = re.search(r'\{.*\}', response, re.DOTALL)
-            if match:
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
                 try:
-                    return json.loads(match.group(0))
+                    return json.loads(json_match.group(0))
                 except:
                     pass
             
-            # Fallback empty structure
-            print(f"[Gemini] Failed to parse JSON minutes from: {response[:100]}...")
+            # Extract markdown code block if present  
+            code_block = re.search(r'```(?:json)?\s*([\s\S]*?)```', response)
+            if code_block:
+                try:
+                    return json.loads(code_block.group(1))
+                except:
+                    pass
+            
+            # Fallback structure with raw response as summary
+            print(f"[AI] Failed to parse JSON minutes, using fallback")
             return {
-                "executive_summary": response[:500], # Fallback to raw text as summary
+                "executive_summary": response[:1000],
                 "key_points": [],
                 "action_items": [],
                 "decisions": [],
-                "risks": []
+                "risks": [],
+                "next_steps": [],
+                "attendees_mentioned": []
             }
     
     async def generate_summary(self, transcript: str) -> str:

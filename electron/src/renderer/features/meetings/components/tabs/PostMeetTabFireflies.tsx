@@ -28,7 +28,6 @@ import {
   Play,
   Loader,
   Trash2,
-  Loader2 // Import Loader2
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
@@ -36,7 +35,6 @@ import { transcriptsApi } from '../../../../lib/api/transcripts';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
 import { meetingsApi } from '../../../../lib/api/meetings';
 import { minutesTemplateApi, type MinutesTemplate } from '../../../../lib/api/minutes_template';
-import { MinutesEmailModal } from '../modals/MinutesEmailModal';
 
 interface PostMeetTabFirefliesProps {
   meeting: MeetingWithParticipants;
@@ -101,10 +99,6 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     searchQuery: '',
   });
 
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-
-  // ... (SpeakerStats state is here)
-
   const [speakerStats, setSpeakerStats] = useState<SpeakerStats[]>([]);
 
   useEffect(() => {
@@ -112,17 +106,41 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     loadTemplates();
   }, [meeting.id]);
 
-  // ... (loadTemplates is here)
   const loadTemplates = async () => {
-    // ... code for loadTemplates
     setTemplatesLoading(true);
     try {
-      // ... (truncated for brevity, assuming existing code is fine here)
       const templatesList = await minutesTemplateApi.list({ is_active: true });
-      // ... (rest of loadTemplates logic)
-      setTemplates(templatesList.templates || []);
+
+      console.log('Templates loaded:', templatesList);
+
+      if (templatesList.templates && templatesList.templates.length > 0) {
+        setTemplates(templatesList.templates);
+
+        // Try to get default template
+        try {
+          const defaultTmpl = await minutesTemplateApi.getDefault();
+          if (defaultTmpl) {
+            setDefaultTemplate(defaultTmpl);
+            setSelectedTemplateId(defaultTmpl.id);
+            console.log('Default template selected:', defaultTmpl.id);
+          } else {
+            // If no default, select first template
+            setSelectedTemplateId(templatesList.templates[0].id);
+            console.log('First template selected:', templatesList.templates[0].id);
+          }
+        } catch (defaultErr) {
+          // If default fails, just select first template
+          console.warn('Could not get default template:', defaultErr);
+          setSelectedTemplateId(templatesList.templates[0].id);
+          console.log('First template selected (fallback):', templatesList.templates[0].id);
+        }
+      } else {
+        console.warn('No templates found');
+        setTemplates([]);
+      }
     } catch (err) {
-      console.error('Load templates failed', err);
+      console.error('Load templates failed:', err);
+      setTemplates([]);
     } finally {
       setTemplatesLoading(false);
     }
@@ -134,9 +152,9 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       const [minutesData, transcriptData, actionsData, decisionsData, risksData] = await Promise.all([
         minutesApi.getLatest(meeting.id).catch(() => null),
         transcriptsApi.list(meeting.id).catch(() => ({ chunks: [] })),
-        itemsApi.listActions(meeting.id).catch(() => ({ items: [] })),
-        itemsApi.listDecisions(meeting.id).catch(() => ({ items: [] })),
-        itemsApi.listRisks(meeting.id).catch(() => ({ items: [] })),
+        itemsApi.listActions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
+        itemsApi.listDecisions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
+        itemsApi.listRisks({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
       ]);
 
       setMinutes(minutesData);
@@ -146,11 +164,11 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       setRisks(risksData.items || []);
 
       // Calculate speaker stats
-      if (transcriptData.chunks) {
+      if (transcriptData.chunks && transcriptData.chunks.length > 0) {
         calculateSpeakerStats(transcriptData.chunks);
       }
     } catch (err) {
-      console.error('Initial load failed:', err);
+      console.error('Load data failed:', err);
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +223,51 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     }
   };
 
+  // Hidden feature: Add transcripts manually for demo
+  const handleAddTranscripts = async (newTranscripts: { speaker: string; start_time: number; text: string }[]) => {
+    try {
+      // Import transcript API
+      const { transcriptsApi } = await import('../../../../lib/api/transcripts');
+
+      // Create transcript chunks with proper format
+      const chunks = newTranscripts.map((t, index) => ({
+        chunk_index: index,
+        speaker: t.speaker,
+        start_time: t.start_time,
+        end_time: t.start_time + 5,
+        text: t.text,
+      }));
+
+      // Use batch ingest for efficiency
+      await transcriptsApi.ingestBatch(meeting.id, chunks);
+
+      // Reload transcripts
+      await loadAllData();
+    } catch (err) {
+      console.error('Add transcript failed:', err);
+      alert('Không thể thêm transcript. Vui lòng thử lại.');
+    }
+  };
+
+  // Hidden feature: Delete all transcripts for demo
+  const handleDeleteAllTranscripts = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa tất cả transcript? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+    try {
+      const { transcriptsApi } = await import('../../../../lib/api/transcripts');
+      await transcriptsApi.extract(meeting.id); // Using extract to get endpoint structure
+      // Actually call delete
+      const api = (await import('../../../../lib/apiClient')).default;
+      await api.delete(`/transcripts/${meeting.id}`);
+      await loadAllData();
+      alert('Đã xóa tất cả transcript.');
+    } catch (err) {
+      console.error('Delete transcripts failed:', err);
+      alert('Không thể xóa transcript. Vui lòng thử lại.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="fireflies-layout">
@@ -247,11 +310,16 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         onSelectTemplate={setSelectedTemplateId}
         defaultTemplate={defaultTemplate}
         templatesLoading={templatesLoading}
-        onEmailClick={() => setIsEmailModalOpen(true)}
       />
 
       {/* Right - Transcript */}
-      <RightPanel transcripts={transcripts} filters={filters} />
+      <RightPanel
+        transcripts={transcripts}
+        filters={filters}
+        meetingId={meeting.id}
+        onAddTranscripts={handleAddTranscripts}
+        onDeleteAllTranscripts={handleDeleteAllTranscripts}
+      />
     </div>
   );
 };
@@ -403,7 +471,6 @@ interface CenterPanelProps {
   onSelectTemplate: (templateId: string | null) => void;
   defaultTemplate: MinutesTemplate | null;
   templatesLoading: boolean;
-  onEmailClick: () => void;
 }
 
 const CenterPanel = ({
@@ -425,11 +492,260 @@ const CenterPanel = ({
   onSelectTemplate,
   defaultTemplate,
   templatesLoading,
-  onEmailClick,
 }: CenterPanelProps) => {
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [customEmail, setCustomEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // Open email modal and pre-select participants
+  const openEmailModal = () => {
+    const participantEmails = meeting.participants?.filter(p => p.email).map(p => p.email!) || [];
+    setSelectedParticipants(participantEmails);
+    setShowEmailModal(true);
+  };
+
+  // Toggle participant selection
+  const toggleParticipant = (email: string) => {
+    setSelectedParticipants(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]);
+  };
+
+  // Export to PDF using browser print dialog with professional template
+  const handleExportPDF = () => {
+    if (!minutes) return;
+
+    const formatDate = (d: string | undefined) => d ? new Date(d).toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    const formatTime = (d: string | undefined) => d ? new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+
+    // Parse minutes_markdown for action_items, decisions, risks if available
+    let actionItems: any[] = [];
+    let decisions: any[] = [];
+    let risks: any[] = [];
+    let keyPoints: string[] = [];
+
+    try {
+      const parsed = JSON.parse(minutes.minutes_markdown || '{}');
+      actionItems = parsed.action_items || [];
+      decisions = parsed.decisions || [];
+      risks = parsed.risks || [];
+      keyPoints = parsed.key_points || [];
+    } catch { /* ignore */ }
+
+    const printContent = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Biên bản - ${meeting.title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', 'Roboto', Arial, sans-serif; line-height: 1.6; color: #1f2937; background: #fff; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px; }
+    
+    /* Header */
+    .header { border-bottom: 3px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .logo { font-size: 24px; font-weight: 700; color: #6366f1; }
+    .doc-type { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 8px 20px; border-radius: 20px; font-size: 14px; }
+    .meeting-title { font-size: 26px; font-weight: 700; color: #1a1a2e; margin-bottom: 15px; }
+    
+    /* Info Table */
+    .info-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: #f8fafc; border-radius: 8px; overflow: hidden; }
+    .info-table td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+    .info-table td:first-child { font-weight: 600; color: #4b5563; width: 140px; background: #f1f5f9; }
+    
+    /* Sections */
+    .section { margin-bottom: 30px; page-break-inside: avoid; }
+    .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
+    .section-icon { font-size: 20px; }
+    .section-title { font-size: 18px; font-weight: 600; color: #374151; }
+    .section-count { background: #6366f1; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-left: auto; }
+    
+    /* Summary */
+    .summary-box { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: 10px; border-left: 4px solid #0ea5e9; }
+    .summary-text { white-space: pre-wrap; line-height: 1.8; }
+    
+    /* Key Points */
+    .key-points { list-style: none; }
+    .key-point { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }
+    .key-point:last-child { border-bottom: none; }
+    .key-point::before { content: "→"; color: #6366f1; font-weight: bold; }
+    
+    /* Items Cards */
+    .item-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .item-card.action { border-left: 4px solid #10b981; }
+    .item-card.decision { border-left: 4px solid #6366f1; }
+    .item-card.risk { border-left: 4px solid #f59e0b; }
+    .item-card.risk.critical { border-left-color: #ef4444; }
+    .item-desc { font-weight: 600; margin-bottom: 8px; }
+    .item-meta { display: flex; flex-wrap: wrap; gap: 15px; font-size: 13px; color: #6b7280; }
+    .item-meta span { display: flex; align-items: center; gap: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge.high { background: #fee2e2; color: #dc2626; }
+    .badge.medium { background: #fef3c7; color: #d97706; }
+    .badge.low { background: #d1fae5; color: #059669; }
+    .badge.critical { background: #ef4444; color: white; }
+    
+    /* Footer */
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
+    
+    @media print { 
+      .container { padding: 20px; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-top">
+        <div class="logo">📋 MeetMate</div>
+        <div class="doc-type">BIÊN BẢN CUỘC HỌP</div>
+      </div>
+      <div class="meeting-title">${meeting.title}</div>
+    </div>
+    
+    <!-- Meeting Info -->
+    <table class="info-table">
+      <tr><td>📅 Ngày họp</td><td>${formatDate(meeting.start_time)}</td></tr>
+      <tr><td>⏰ Thời gian</td><td>${formatTime(meeting.start_time)}${meeting.end_time ? ' - ' + formatTime(meeting.end_time) : ''}</td></tr>
+      ${meeting.meeting_type ? '<tr><td>📁 Loại cuộc họp</td><td>' + meeting.meeting_type + '</td></tr>' : ''}
+      ${meeting.participants?.length ? '<tr><td>👥 Người tham gia</td><td>' + meeting.participants.map(p => p.display_name || p.email).join(', ') + '</td></tr>' : ''}
+    </table>
+    
+    <!-- Executive Summary -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📝</span>
+        <span class="section-title">Tóm tắt điều hành</span>
+      </div>
+      <div class="summary-box">
+        <div class="summary-text">${minutes.executive_summary || 'Chưa có tóm tắt.'}</div>
+      </div>
+    </div>
+    
+    ${keyPoints.length ? `
+    <!-- Key Points -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">💡</span>
+        <span class="section-title">Những điểm chính</span>
+        <span class="section-count">${keyPoints.length}</span>
+      </div>
+      <ul class="key-points">
+        ${keyPoints.map(kp => `<li class="key-point">${kp}</li>`).join('')}
+      </ul>
+    </div>` : ''}
+    
+    ${actionItems.length ? `
+    <!-- Action Items -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">✅</span>
+        <span class="section-title">Công việc cần thực hiện</span>
+        <span class="section-count">${actionItems.length}</span>
+      </div>
+      ${actionItems.map((a: any) => `
+        <div class="item-card action">
+          <div class="item-desc">${a.description}</div>
+          <div class="item-meta">
+            <span>👤 ${a.owner || 'Chưa phân công'}</span>
+            ${a.deadline ? `<span>📅 ${a.deadline}</span>` : ''}
+            ${a.priority ? `<span class="badge ${a.priority}">${a.priority.toUpperCase()}</span>` : ''}
+            ${a.created_by ? `<span>📌 Yêu cầu bởi: ${a.created_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    ${decisions.length ? `
+    <!-- Decisions -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">⚖️</span>
+        <span class="section-title">Các quyết định</span>
+        <span class="section-count">${decisions.length}</span>
+      </div>
+      ${decisions.map((d: any) => `
+        <div class="item-card decision">
+          <div class="item-desc">${d.description}</div>
+          <div class="item-meta">
+            ${d.rationale ? `<span>💬 ${d.rationale}</span>` : ''}
+            ${d.decided_by || d.confirmed_by ? `<span>👤 Quyết định bởi: ${d.decided_by || d.confirmed_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    ${risks.length ? `
+    <!-- Risks -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">⚠️</span>
+        <span class="section-title">Rủi ro & Vấn đề</span>
+        <span class="section-count">${risks.length}</span>
+      </div>
+      ${risks.map((r: any) => `
+        <div class="item-card risk ${r.severity}">
+          <div class="item-desc">${r.description}</div>
+          <div class="item-meta">
+            <span class="badge ${r.severity}">${(r.severity || 'medium').toUpperCase()}</span>
+            ${r.mitigation ? `<span>🛡️ ${r.mitigation}</span>` : ''}
+            ${r.raised_by ? `<span>👤 Nêu bởi: ${r.raised_by}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p>Biên bản được tạo tự động bởi MeetMate AI • ${new Date().toLocaleDateString('vi-VN')}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
+  // Send email to recipients
+  const handleSendEmail = async () => {
+    if (!minutes) return;
+    setIsSendingEmail(true);
+    try {
+      const allRecipients = [...selectedParticipants];
+      if (customEmail.trim()) {
+        allRecipients.push(...customEmail.split(',').map(e => e.trim()).filter(e => e));
+      }
+      if (allRecipients.length === 0) {
+        alert('Vui lòng chọn ít nhất một người nhận.');
+        setIsSendingEmail(false);
+        return;
+      }
+      await minutesApi.distribute({
+        minutes_id: minutes.id,
+        meeting_id: meeting.id,
+        channels: ['email'],
+        recipients: allRecipients,
+      });
+      alert(`Đã gửi biên bản đến ${allRecipients.length} người.`);
+      setShowEmailModal(false);
+      setCustomEmail('');
+    } catch (err: any) {
+      console.error('Send email failed:', err);
+      alert(`Lỗi: ${err.message || 'Không thể gửi email'}`);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleSaveSummary = async () => {
     if (!minutes) return;
@@ -471,7 +787,7 @@ const CenterPanel = ({
         // Refresh meeting data to load new transcripts
         await onRefresh();
 
-        alert(`Video đã được tải lên và xử lý thành công.Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
+        alert(`Video đã được tải lên và xử lý thành công. Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
       } catch (inferenceErr: any) {
         console.error('Video inference failed:', inferenceErr);
         alert(`Video đã được tải lên nhưng xử lý gặp lỗi: ${inferenceErr.message || 'Không thể tạo transcript'}. Vui lòng kiểm tra logs backend.`);
@@ -480,7 +796,7 @@ const CenterPanel = ({
       }
     } catch (err: any) {
       console.error('Upload video failed:', err);
-      alert(`Lỗi: ${err.message || 'Không thể tải lên video'} `);
+      alert(`Lỗi: ${err.message || 'Không thể tải lên video'}`);
     } finally {
       setIsUploadingVideo(false);
     }
@@ -522,6 +838,17 @@ const CenterPanel = ({
     }
   };
 
+  const handleSetLocalUrl = async (url: string) => {
+    try {
+      await meetingsApi.update(meeting.id, { recording_url: url });
+      await onRefresh();
+      alert('Đã lưu URL video thành công.');
+    } catch (err: any) {
+      console.error('Set local URL failed:', err);
+      alert(`Lỗi: ${err.message || 'Không thể lưu URL video'}`);
+    }
+  };
+
   const handleVideoDelete = async () => {
     if (!meeting.recording_url) return;
 
@@ -541,7 +868,7 @@ const CenterPanel = ({
       alert('Video đã được xóa thành công.');
     } catch (err: any) {
       console.error('Delete video failed:', err);
-      alert(`Lỗi: ${err.message || 'Không thể xóa video'} `);
+      alert(`Lỗi: ${err.message || 'Không thể xóa video'}`);
     }
   };
 
@@ -552,6 +879,7 @@ const CenterPanel = ({
         recordingUrl={meeting.recording_url}
         onUpload={handleVideoUpload}
         onDelete={handleVideoDelete}
+        onSetLocalUrl={handleSetLocalUrl}
         isUploading={isUploadingVideo}
         isProcessing={isProcessingVideo}
         dragActive={dragActive}
@@ -583,14 +911,10 @@ const CenterPanel = ({
               >
                 <Copy size={16} />
               </button>
-              <button className="fireflies-icon-btn" title="Download">
+              <button className="fireflies-icon-btn" onClick={handleExportPDF} title="Xuất PDF / In">
                 <Download size={16} />
               </button>
-              <button
-                className="fireflies-icon-btn"
-                title="Email & PDF"
-                onClick={onEmailClick}
-              >
+              <button className="fireflies-icon-btn" onClick={openEmailModal} title="Gửi Email">
                 <Mail size={16} />
               </button>
             </>
@@ -608,251 +932,92 @@ const CenterPanel = ({
         </div>
       </div>
 
-      {/* Template Selector */}
-      {!minutes && templates.length > 0 && (
-        <div className="fireflies-template-selector">
-          <label className="fireflies-template-label">
-            <span>Template biên bản:</span>
-          </label>
-          <select
-            className="fireflies-template-select"
-            value={selectedTemplateId || ''}
-            onChange={(e) => {
-              const templateId = e.target.value || null;
-              console.log('Template selected:', templateId);
-              onSelectTemplate(templateId);
-            }}
-            disabled={isGenerating || templatesLoading}
-          >
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name} {template.is_default ? '(Mặc định)' : ''}
-              </option>
-            ))}
-          </select>
-          {selectedTemplateId && (() => {
-            const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
-            if (!selectedTemplate) return null;
-
-            return (
-              <div className="fireflies-template-info" style={{ marginTop: 16 }}>
-                {selectedTemplate.description && (
-                  <div
-                    className="fireflies-template-description"
-                    style={{
-                      fontSize: '13px',
-                      color: 'var(--text-secondary)',
-                      marginBottom: 20,
-                      padding: '12px 16px',
-                      background: 'rgba(245, 158, 11, 0.05)',
-                      borderLeft: '3px solid var(--accent)',
-                      borderRadius: '0 8px 8px 0',
-                      fontStyle: 'italic'
-                    }}
-                  >
-                    {selectedTemplate.description}
-                  </div>
-                )}
-
-                {selectedTemplate.structure?.sections && selectedTemplate.structure.sections.length > 0 && (
-                  <div className="fireflies-template-fields">
-                    <div
-                      className="fireflies-template-fields__title"
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        color: 'var(--text-muted)',
-                        marginBottom: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8
-                      }}
-                    >
-                      <span>Cấu trúc biên bản</span>
-                      <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
-                    </div>
-
-                    <div
-                      className="fireflies-template-fields__list"
-                      style={{
-                        display: 'grid',
-                        gap: 12,
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))'
-                      }}
-                    >
-                      {selectedTemplate.structure.sections
-                        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                        .map((section: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="fireflies-template-field-item"
-                            style={{
-                              background: 'var(--bg-elevated)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--radius-md)',
-                              padding: '16px',
-                              boxShadow: 'var(--card-shadow-soft)',
-                              transition: 'transform 0.2s, box-shadow 0.2s',
-                              cursor: 'default'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = 'var(--card-shadow)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = 'var(--card-shadow-soft)';
-                            }}
-                          >
-                            <div
-                              className="fireflies-template-field-item__title"
-                              style={{
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                marginBottom: 12,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                              }}
-                            >
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-                                {section.title || section.id}
-                              </span>
-                              {section.required && (
-                                <span
-                                  style={{
-                                    fontSize: '9px',
-                                    textTransform: 'uppercase',
-                                    padding: '2px 6px',
-                                    borderRadius: 4,
-                                    background: 'var(--error-subtle)',
-                                    color: 'var(--error)',
-                                    fontWeight: 700
-                                  }}
-                                >
-                                  Required
-                                </span>
-                              )}
-                            </div>
-
-                            {section.fields && section.fields.length > 0 && (
-                              <div
-                                className="fireflies-template-field-item__fields"
-                                style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: 8
-                                }}
-                              >
-                                {section.fields.map((field: any, fieldIdx: number) => (
-                                  <div
-                                    key={fieldIdx}
-                                    className="fireflies-template-field-item__field"
-                                    style={{
-                                      fontSize: '13px',
-                                      color: 'var(--text-secondary)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 8,
-                                      padding: '6px 10px',
-                                      background: 'var(--bg-surface)',
-                                      borderRadius: 6,
-                                      border: '1px solid transparent'
-                                    }}
-                                  >
-                                    <div style={{ padding: 2, background: 'var(--text-muted)', borderRadius: '50%' }} />
-                                    <span style={{ flex: 1 }}>{field.label || field.id}</span>
-                                    {field.required && (
-                                      <span style={{ color: 'var(--error)', fontSize: '14px', lineHeight: 1 }}>•</span>
-                                    )}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: 3 }}>
-                                      {field.type}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedTemplate.meeting_types && selectedTemplate.meeting_types.length > 0 && (
-                  <div
-                    className="fireflies-template-meta"
-                    style={{
-                      marginTop: 16,
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8
-                    }}
-                  >
-                    <Tag size={12} />
-                    <span className="fireflies-template-meta__label">Áp dụng cho:</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {selectedTemplate.meeting_types.map(t => (
-                        <span key={t} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 99, fontSize: '11px' }}>
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-      {templatesLoading && (
-        <div className="fireflies-template-selector">
-          <span className="fireflies-template-label">Đang tải templates...</span>
-        </div>
-      )}
-      {!templatesLoading && templates.length === 0 && (
-        <div className="fireflies-template-selector">
-          <span className="fireflies-template-label" style={{ color: 'var(--text-muted)' }}>
-            Không có template nào. Vui lòng tạo template trong cài đặt.
-          </span>
-        </div>
-      )}
 
       {/* Content */}
       <div className="fireflies-center-content">
         {!minutes ? (
           <EmptyAIContent onGenerate={onGenerate} isGenerating={isGenerating} />
         ) : (
-          <MinutesDisplay
+          <SummaryContent
             minutes={minutes}
-            actionItems={actionItems}
-            decisions={decisions}
-            risks={risks}
             isEditing={isEditingSummary}
             editContent={editContent}
             setEditContent={setEditContent}
             onSave={handleSaveSummary}
             onCancel={() => setIsEditingSummary(false)}
-            onEdit={() => setIsEditingSummary(true)}
           />
         )}
       </div>
 
-      {/* Email Modal */}
-      {minutes && (
-        <MinutesEmailModal
-          isOpen={isEmailModalOpen}
-          onClose={() => setIsEmailModalOpen(false)}
-          meetingId={meeting.id}
-          minutesId={minutes.id}
-          meetingTitle={meeting.title}
-          participants={meeting.participants}
-        />
+      {/* Email Modal with Card UI */}
+      {showEmailModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setShowEmailModal(false)}>
+          <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', padding: '24px', width: '680px', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>📧 Gửi biên bản qua Email</h3>
+
+            {/* Participants Card */}
+            <div style={{ marginBottom: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #6366f115, #8b5cf615)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>👥</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Thành viên cuộc họp</span>
+                <span style={{ marginLeft: 'auto', background: '#6366f1', color: 'white', padding: '2px 10px', borderRadius: '12px', fontSize: '12px' }}>{selectedParticipants.length} đã chọn</span>
+              </div>
+              <div style={{ padding: '8px', maxHeight: '140px', overflowY: 'auto' }}>
+                {meeting.participants && meeting.participants.length > 0 ? meeting.participants.map((p, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', cursor: p.email ? 'pointer' : 'default', borderRadius: '8px', background: p.email && selectedParticipants.includes(p.email) ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.15s' }}>
+                    <input type="checkbox" checked={p.email ? selectedParticipants.includes(p.email) : false} onChange={() => p.email && toggleParticipant(p.email)} disabled={!p.email} style={{ width: '16px', height: '16px', accentColor: '#6366f1' }} />
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '13px' }}>{(p.display_name || p.email || '?').charAt(0).toUpperCase()}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: '13px' }}>{p.display_name || p.email || 'Unknown'}</div>
+                      {p.email && <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{p.email}</div>}
+                    </div>
+                    {!p.email && <span style={{ color: '#ef4444', fontSize: '11px' }}>Không có email</span>}
+                  </label>
+                )) : <p style={{ color: 'var(--text-muted)', margin: '12px', textAlign: 'center' }}>Không có thành viên nào</p>}
+              </div>
+            </div>
+
+            {/* Custom Email Card */}
+            <div style={{ marginBottom: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #f59e0b15, #ef444415)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>✉️</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Email khác (tùy chọn)</span>
+              </div>
+              <div style={{ padding: '12px' }}>
+                <input type="text" value={customEmail} onChange={(e) => setCustomEmail(e.target.value)} placeholder="email1@example.com, email2@example.com"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-primary)' }} />
+              </div>
+            </div>
+
+            {/* PDF Preview Card */}
+            <div style={{ marginBottom: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #10b98115, #14b8a615)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>📄</span>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>Biên bản sẽ gửi</span>
+              </div>
+              <div style={{ padding: '16px', maxHeight: '160px', overflowY: 'auto' }}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <h4 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '15px' }}>📝 {meeting.title}</h4>
+                  <p style={{ fontSize: '11px', color: '#666', margin: '0 0 10px' }}>📅 {meeting.start_time ? new Date(meeting.start_time).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                  <div style={{ fontSize: '12px', color: '#333', lineHeight: 1.5 }}>
+                    <strong>Tóm tắt:</strong> {(minutes?.executive_summary || 'Chưa có').slice(0, 200)}{(minutes?.executive_summary?.length || 0) > 200 ? '...' : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn--ghost" onClick={() => setShowEmailModal(false)}>Hủy</button>
+              <button className="btn btn--primary" onClick={handleSendEmail} disabled={(selectedParticipants.length === 0 && !customEmail.trim()) || isSendingEmail}
+                style={{ minWidth: '140px' }}>
+                {isSendingEmail ? 'Đang gửi...' : `Gửi Email (${selectedParticipants.length + (customEmail.trim() ? customEmail.split(',').filter(e => e.trim()).length : 0)})`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -862,10 +1027,15 @@ const CenterPanel = ({
 interface RightPanelProps {
   transcripts: TranscriptChunk[];
   filters: FilterState;
+  meetingId: string;
+  onAddTranscripts?: (transcripts: { speaker: string; start_time: number; text: string }[]) => void;
+  onDeleteAllTranscripts?: () => void;
 }
 
-const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
+const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts, onDeleteAllTranscripts }: RightPanelProps) => {
   const [searchInTranscript, setSearchInTranscript] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [bulkInput, setBulkInput] = useState('');
 
   const filteredTranscripts = transcripts.filter((t) => {
     // Apply search filter
@@ -889,14 +1059,60 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')} `;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Parse bulk input format: "Speaker: Text" on each line
+  const handleBulkAdd = async () => {
+    if (!bulkInput.trim()) return;
+
+    const lines = bulkInput.split('\n').filter(line => line.trim());
+    const newTranscripts: { speaker: string; start_time: number; text: string }[] = [];
+    let currentTime = 0;
+
+    for (const line of lines) {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const speaker = line.substring(0, colonIndex).trim();
+        const text = line.substring(colonIndex + 1).trim();
+        if (speaker && text) {
+          newTranscripts.push({
+            speaker,
+            start_time: currentTime,
+            text,
+          });
+          // Estimate time based on text length (~150 words per minute)
+          const wordCount = text.split(' ').length;
+          currentTime += Math.max(5, Math.round(wordCount / 2.5));
+        }
+      }
+    }
+
+    if (newTranscripts.length > 0 && onAddTranscripts) {
+      onAddTranscripts(newTranscripts);
+      setBulkInput('');
+      setShowAddModal(false);
+      alert(`Đã thêm ${newTranscripts.length} transcript entries.`);
+    }
+  };
+
+  // Hidden trigger: Shift + Click on title
+  const handleTitleClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      setShowAddModal(true);
+    }
   };
 
   return (
     <div className="fireflies-right-panel">
       {/* Header */}
       <div className="fireflies-right-header">
-        <h3 className="fireflies-right-title">
+        <h3
+          className="fireflies-right-title"
+          onClick={handleTitleClick}
+          style={{ cursor: 'pointer' }}
+          title="Shift+Click để thêm transcript thủ công"
+        >
           <span>📝</span>
           Transcript
         </h3>
@@ -926,11 +1142,11 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
               searchInTranscript && chunk.text.toLowerCase().includes(searchInTranscript.toLowerCase());
 
             return (
-              <div key={chunk.id} className={`fireflies - transcript - item ${matchesSearch ? 'highlight' : ''} `}>
+              <div key={chunk.id} className={`fireflies-transcript-item ${matchesSearch ? 'highlight' : ''}`}>
                 <div className="fireflies-transcript-header">
                   <div className="fireflies-speaker">
                     <div className="fireflies-speaker-avatar">
-                      {chunk.speaker ? chunk.speaker.charAt(chunk.speaker.length - 1) : '?'}
+                      {chunk.speaker ? chunk.speaker.charAt(0).toUpperCase() : '?'}
                     </div>
                     <span className="fireflies-speaker-name">{chunk.speaker || 'Unknown'}</span>
                   </div>
@@ -944,6 +1160,88 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
           })
         )}
       </div>
+
+      {/* Hidden Add Transcript Modal */}
+      {showAddModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-primary)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              width: '600px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '18px' }}>🎭 Demo Mode - Thêm Transcript Thủ Công</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Nhập transcript theo format: <code>Tên người: Nội dung nói</code> (mỗi dòng một phát ngôn)
+            </p>
+            <textarea
+              value={bulkInput}
+              onChange={(e) => setBulkInput(e.target.value)}
+              placeholder={`Quân: Ok, mình khai mạc phiên họp Hội đồng quản trị về dự án ORION giai đoạn 1 nhé.\nĐạt: Em chuyển sang phần ngân sách để Hội đồng quản trị nắm bức tranh tổng quan nhé.\nPhước: Có 2 rủi ro mức độ đỏ cần điều kiện bắt buộc.`}
+              style={{
+                width: '100%',
+                height: '300px',
+                padding: '12px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                resize: 'vertical',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+                background: 'var(--bg-secondary)',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'space-between' }}>
+              <button
+                className="btn btn--ghost"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => {
+                  if (onDeleteAllTranscripts) {
+                    onDeleteAllTranscripts();
+                    setShowAddModal(false);
+                  }
+                }}
+              >
+                🗑 Xóa tất cả transcript
+              </button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn btn--ghost"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  className="btn btn--primary"
+                  onClick={handleBulkAdd}
+                  disabled={!bulkInput.trim()}
+                >
+                  Thêm Transcript
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -953,6 +1251,7 @@ interface VideoSectionProps {
   recordingUrl?: string | null;
   onUpload: (file: File) => void;
   onDelete: () => void;
+  onSetLocalUrl: (url: string) => void;
   isUploading: boolean;
   isProcessing: boolean;
   dragActive: boolean;
@@ -965,6 +1264,7 @@ const VideoSection = ({
   recordingUrl,
   onUpload,
   onDelete,
+  onSetLocalUrl,
   isUploading,
   isProcessing,
   dragActive,
@@ -972,6 +1272,17 @@ const VideoSection = ({
   onDrop,
   onFileInput,
 }: VideoSectionProps) => {
+  const [localUrlInput, setLocalUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+
+  const handleSetLocalUrl = () => {
+    if (localUrlInput.trim()) {
+      onSetLocalUrl(localUrlInput.trim());
+      setLocalUrlInput('');
+      setShowUrlInput(false);
+    }
+  };
+
   if (recordingUrl) {
     // Show video player
     return (
@@ -1014,7 +1325,7 @@ const VideoSection = ({
         </div>
       </div>
       <div
-        className={`fireflies - video - upload ${dragActive ? 'drag-active' : ''} ${isUploading || isProcessing ? 'uploading' : ''} `}
+        className={`fireflies-video-upload ${dragActive ? 'drag-active' : ''} ${isUploading || isProcessing ? 'uploading' : ''}`}
         onDragEnter={onDrag}
         onDragLeave={onDrag}
         onDragOver={onDrag}
@@ -1059,6 +1370,51 @@ const VideoSection = ({
               <Upload size={16} style={{ marginRight: 6 }} />
               Chọn file video
             </label>
+
+            {/* Local URL Input Toggle */}
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              {!showUrlInput ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setShowUrlInput(true)}
+                  style={{ fontSize: 12 }}
+                >
+                  Hoặc nhập URL video trực tiếp
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="http://localhost:8000/files/video.mp4"
+                    value={localUrlInput}
+                    onChange={(e) => setLocalUrlInput(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: 13,
+                      width: 280,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={handleSetLocalUrl}
+                    disabled={!localUrlInput.trim()}
+                  >
+                    Lưu
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => setShowUrlInput(false)}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -1107,8 +1463,8 @@ const FilterChip = ({
 }) => {
   return (
     <button
-      className={`fireflies - filter - chip ${active ? 'active' : ''} `}
-      style={{ borderColor: active ? color : undefined, background: active ? `${color} 15` : undefined }}
+      className={`fireflies-filter-chip ${active ? 'active' : ''}`}
+      style={{ borderColor: active ? color : undefined, background: active ? `${color}15` : undefined }}
       onClick={onClick}
     >
       <div className="fireflies-filter-chip__icon" style={{ color }}>
@@ -1139,7 +1495,7 @@ const SentimentBar = ({ sentiment, percentage }: { sentiment: 'positive' | 'neut
         <span className="sentiment-bar__percentage">{percentage}%</span>
       </div>
       <div className="sentiment-bar__track">
-        <div className="sentiment-bar__fill" style={{ width: `${percentage}% `, background: config.color }} />
+        <div className="sentiment-bar__fill" style={{ width: `${percentage}%`, background: config.color }} />
       </div>
     </div>
   );
@@ -1153,7 +1509,7 @@ const SpeakerCard = ({ stat }: { stat: SpeakerStats }) => {
         <span className="speaker-card__time">{Math.floor(stat.talk_time)} words</span>
       </div>
       <div className="speaker-card__bar">
-        <div className="speaker-card__fill" style={{ width: `${stat.percentage}% ` }} />
+        <div className="speaker-card__fill" style={{ width: `${stat.percentage}%` }} />
       </div>
       <span className="speaker-card__percentage">{stat.percentage.toFixed(1)}%</span>
     </div>
@@ -1170,72 +1526,7 @@ const TopicChip = ({ label, count }: { label: string; count: number }) => {
   );
 };
 
-// ==================== Minutes Display ====================
-
-const MinutesDisplay = ({
-  minutes,
-  actionItems,
-  decisions,
-  risks,
-  isEditing,
-  editContent,
-  setEditContent,
-  onSave,
-  onCancel,
-  onEdit,
-}: {
-  minutes: MeetingMinutes;
-  actionItems: ActionItem[];
-  decisions: DecisionItem[];
-  risks: RiskItem[];
-  isEditing: boolean;
-  editContent: string;
-  setEditContent: (content: string) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onEdit: () => void;
-}) => {
-  return (
-    <div className="fireflies-minutes-display" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Summary Section */}
-      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 18 }}>📝</span> Executive Summary
-          </h3>
-          <button
-            className="btn btn--sm btn--ghost"
-            onClick={onEdit}
-            title="Edit Summary"
-          >
-            <Edit3 size={14} />
-          </button>
-        </div>
-        <SummaryContent
-          minutes={minutes}
-          isEditing={isEditing}
-          editContent={editContent}
-          setEditContent={setEditContent}
-          onSave={onSave}
-          onCancel={onCancel}
-        />
-      </div>
-
-      {/* Action Items Section */}
-      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>✅</span> Action Items
-        </h3>
-        <ActionItemsContent items={actionItems} />
-      </div>
-
-      {/* Decisions & Risks Section */}
-      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <DecisionsContent items={decisions} risks={risks} />
-      </div>
-    </div>
-  );
-};
+// ==================== Summary Content ====================
 const SummaryContent = ({
   minutes,
   isEditing,
@@ -1324,7 +1615,7 @@ const ActionItemsContent = ({ items }: { items: ActionItem[] }) => {
                     {new Date(item.due_date).toLocaleDateString('vi-VN')}
                   </span>
                 )}
-                <span className={`fireflies - priority fireflies - priority--${item.priority} `}>
+                <span className={`fireflies-priority fireflies-priority--${item.priority}`}>
                   {item.priority}
                 </span>
               </div>
@@ -1362,7 +1653,7 @@ const DecisionsContent = ({ items, risks }: { items: DecisionItem[]; risks: Risk
           <h4 className="fireflies-group-title">⚠️ Identified Risks</h4>
           {risks.map((item) => (
             <div key={item.id} className="fireflies-risk-item">
-              <div className={`fireflies - risk - badge fireflies - risk - badge--${item.severity} `}>
+              <div className={`fireflies-risk-badge fireflies-risk-badge--${item.severity}`}>
                 {item.severity}
               </div>
               <div className="fireflies-risk-content">
@@ -1382,31 +1673,23 @@ const DecisionsContent = ({ items, risks }: { items: DecisionItem[]; risks: Risk
 };
 
 const EmptyAIContent = ({ onGenerate, isGenerating }: { onGenerate: () => void; isGenerating: boolean }) => {
-  // Auto-generate on mount
-  useEffect(() => {
-    if (!isGenerating) {
-      onGenerate();
-    }
-  }, []);
-
   return (
     <div className="fireflies-empty-ai">
       <div className="fireflies-empty-ai__icon">
         <Sparkles size={64} strokeWidth={1} />
       </div>
-      <h3 className="fireflies-empty-ai__title">Generating Meeting Summary with AI...</h3>
+      <h3 className="fireflies-empty-ai__title">Generate Meeting Summary with AI</h3>
       <p className="fireflies-empty-ai__description">
-        AI is analyzing the transcript to generate:
+        AI will analyze the transcript and generate:
         <br />• Executive summary
         <br />• Action items with owners
         <br />• Key decisions and impacts
         <br />• Identified risks
       </p>
-
-      <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent)' }} />
-        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Processing transcript...</span>
-      </div>
+      <button className="btn btn--primary btn--lg" onClick={onGenerate} disabled={isGenerating}>
+        <Sparkles size={18} style={{ marginRight: 8 }} />
+        {isGenerating ? 'Generating AI Summary...' : 'Generate with AI'}
+      </button>
     </div>
   );
 };

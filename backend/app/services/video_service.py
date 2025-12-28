@@ -274,21 +274,18 @@ async def delete_meeting_video(db: Session, meeting_id: str) -> bool:
         except Exception as e:
             logger.warning(f"Failed to delete meeting minutes: {e}", exc_info=True)
         
-        # 4. Clear recording_url from database
-        from app.schemas.meeting import MeetingUpdate
-        updated_meeting = meeting_service.update_meeting(
-            db,
-            meeting_id,
-            MeetingUpdate(recording_url=None)
-        )
-        
-        if updated_meeting:
-            # Commit all changes together (transcript chunks, minutes, recording_url)
+        # 4. Clear recording_url from database using direct SQL (MeetingUpdate skips None values)
+        try:
+            db.execute(
+                text("UPDATE meeting SET recording_url = NULL WHERE id = :meeting_id"),
+                {'meeting_id': meeting_id}
+            )
             db.commit()
             logger.info(f"Successfully deleted video and cleared metadata for meeting {meeting_id}")
             return True
-        else:
+        except Exception as e:
             db.rollback()
+            logger.error(f"Failed to clear recording_url: {e}", exc_info=True)
             return False
             
     except Exception as e:
