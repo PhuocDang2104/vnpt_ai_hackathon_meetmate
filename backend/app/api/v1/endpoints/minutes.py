@@ -156,6 +156,21 @@ def render_minutes_html(
     return HTMLResponse(content=html, status_code=200)
 
 
+@router.get('/render-full/{minutes_id}', response_class=HTMLResponse)
+def render_minutes_full_page(
+    minutes_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Render a styled full-page HTML for print/export (includes meeting metadata).
+    """
+    try:
+        html = minutes_service.render_minutes_full_page(db, minutes_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    return HTMLResponse(content=html, status_code=200)
+
+
 # ============================================
 # AI-Powered Generation
 # ============================================

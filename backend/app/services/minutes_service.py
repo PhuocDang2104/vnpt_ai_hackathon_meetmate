@@ -15,6 +15,9 @@ from app.schemas.minutes import (
 )
 from app.services import transcript_service, action_item_service
 from app.utils.markdown_utils import render_markdown_to_html
+from app.services import meeting_service, participant_service
+from pathlib import Path
+from datetime import timezone
 
 
 def _hydrate_minutes_html(minutes: MeetingMinutesResponse) -> MeetingMinutesResponse:
@@ -160,6 +163,67 @@ def render_minutes_html_content(minutes: MeetingMinutesResponse) -> str:
         from html import escape
         return f"<pre style=\"white-space: pre-wrap; font-family: sans-serif;\">{escape(minutes.minutes_text)}</pre>"
     return "<p>Chưa có nội dung biên bản.</p>"
+
+
+def render_minutes_full_page(db: Session, minutes_id: str) -> str:
+    """
+    Build a styled HTML page for export/print, including meta info.
+    """
+    minutes = get_minutes_by_id(db, minutes_id)
+    if not minutes:
+        raise ValueError("Minutes not found")
+
+    meeting = meeting_service.get_meeting(db, minutes.meeting_id)
+    participants = participant_service.list_participants(db, minutes.meeting_id) if meeting else None
+
+    title = meeting.title if meeting else "Biên bản cuộc họp"
+    start = getattr(meeting, "start_time", None)
+    end = getattr(meeting, "end_time", None)
+    def _fmt_time(dt):
+        if not dt:
+            return ""
+        if isinstance(dt, str):
+            try:
+                from datetime import datetime
+                return datetime.fromisoformat(dt.replace("Z", "+00:00")).strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                return dt
+        if getattr(dt, "tzinfo", None) is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%d/%m/%Y %H:%M")
+
+    date_str = _fmt_time(start).split(" ")[0] if start else ""
+    time_str = ""
+    if start and end:
+        time_str = f"{_fmt_time(start).split(' ')[1]} - {_fmt_time(end).split(' ')[1]}"
+    elif start:
+        time_str = _fmt_time(start)
+
+    participants_names = ""
+    if participants and participants.participants:
+        names = []
+        for p in participants.participants:
+            name = p.display_name or p.email or "Thành viên"
+            names.append(name)
+        participants_names = ", ".join(names)
+
+    template_path = Path(__file__).parent.parent / "templates" / "minutes_export.html"
+    template_html = template_path.read_text(encoding="utf-8")
+
+    content_html = render_minutes_html_content(minutes)
+    exec_summary_html = minutes.executive_summary or "<p>Chưa có tóm tắt.</p>"
+
+    filled = (
+        template_html
+        .replace("{{title}}", title)
+        .replace("{{date}}", date_str or "N/A")
+        .replace("{{time}}", time_str or "N/A")
+        .replace("{{type}}", getattr(meeting, "meeting_type", "") if meeting else "")
+        .replace("{{participants}}", participants_names or "N/A")
+        .replace("{{executive_summary}}", exec_summary_html if exec_summary_html.startswith("<") else f"<p>{exec_summary_html}</p>")
+        .replace("{{minutes_content}}", content_html)
+    )
+    return filled
 
 
 def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesResponse:
