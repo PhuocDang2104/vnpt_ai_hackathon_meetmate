@@ -199,10 +199,11 @@ def add_participant(
 @router.patch('/{meeting_id}/phase', response_model=Meeting)
 def update_meeting_phase(
     meeting_id: str,
-    phase: str,
+    body: dict,
     db: Session = Depends(get_db)
 ):
     """Update meeting phase (pre -> in -> post)"""
+    phase = body.get('phase')
     if phase not in ['pre', 'in', 'post']:
         raise HTTPException(status_code=400, detail="Invalid phase. Must be: pre, in, post")
     
