@@ -31,7 +31,7 @@ def list_meetings(
             meeting_type, phase,
             project_id::text, department_id::text,
             location, teams_link, recording_url,
-            created_at, updated_at
+            created_at
         FROM meeting
         WHERE 1=1
     """
@@ -81,7 +81,6 @@ def list_meetings(
             teams_link=row[11],
             recording_url=row[12],
             created_at=row[13],
-            updated_at=row[14]
         ))
     
     return meetings, total
@@ -117,17 +116,17 @@ def create_meeting(db: Session, payload: MeetingCreate) -> Meeting:
             id, title, description, organizer_id,
             start_time, end_time, meeting_type, phase,
             project_id, department_id, location, teams_link,
-            created_at, updated_at
+            created_at
         ) VALUES (
             :id, :title, :description, :organizer_id,
             :start_time, :end_time, :meeting_type, 'pre',
             :project_id, :department_id, :location, :teams_link,
-            :created_at, :updated_at
+            :created_at
         )
         RETURNING id::text, title, description, organizer_id::text,
                   start_time, end_time, meeting_type, phase,
                   project_id::text, department_id::text, location, teams_link,
-                  created_at, updated_at
+                  created_at
     """)
     
     result = db.execute(query, {
@@ -143,7 +142,6 @@ def create_meeting(db: Session, payload: MeetingCreate) -> Meeting:
         'location': payload.location,
         'teams_link': payload.teams_link,
         'created_at': now,
-        'updated_at': now
     })
     
     db.commit()
@@ -171,7 +169,6 @@ def create_meeting(db: Session, payload: MeetingCreate) -> Meeting:
         location=row[10],
         teams_link=row[11],
         created_at=row[12],
-        updated_at=row[13]
     )
 
 
@@ -187,7 +184,7 @@ def get_meeting(db: Session, meeting_id: str) -> Optional[MeetingWithParticipant
             m.meeting_type, m.phase,
             m.project_id::text, m.department_id::text,
             m.location, m.teams_link, m.recording_url,
-            m.created_at, m.updated_at
+            m.created_at
         FROM meeting m
         WHERE m.id = :meeting_id
     """)
@@ -213,7 +210,6 @@ def get_meeting(db: Session, meeting_id: str) -> Optional[MeetingWithParticipant
         teams_link=row[11],
         recording_url=row[12],
         created_at=row[13],
-        updated_at=row[14],
         participants=[]
     )
     
@@ -245,7 +241,7 @@ def update_meeting(db: Session, meeting_id: str, payload: MeetingUpdate) -> Opti
     
     # Build dynamic update query
     update_fields = []
-    params = {'meeting_id': meeting_id, 'updated_at': datetime.utcnow()}
+    params = {'meeting_id': meeting_id}
     
     if payload.title is not None:
         update_fields.append("title = :title")
@@ -286,8 +282,6 @@ def update_meeting(db: Session, meeting_id: str, payload: MeetingUpdate) -> Opti
     if not update_fields:
         return get_meeting(db, meeting_id)
     
-    update_fields.append("updated_at = :updated_at")
-    
     query = text(f"""
         UPDATE meeting 
         SET {', '.join(update_fields)}
@@ -295,7 +289,7 @@ def update_meeting(db: Session, meeting_id: str, payload: MeetingUpdate) -> Opti
         RETURNING id::text, title, description, organizer_id::text,
                   start_time, end_time, meeting_type, phase,
                   project_id::text, department_id::text, location, teams_link,
-                  recording_url, created_at, updated_at
+                  recording_url, created_at
     """)
     
     result = db.execute(query, params)
@@ -320,7 +314,6 @@ def update_meeting(db: Session, meeting_id: str, payload: MeetingUpdate) -> Opti
         teams_link=row[11],
         recording_url=row[12],
         created_at=row[13],
-        updated_at=row[14]
     )
 
 
@@ -354,7 +347,7 @@ def update_phase(db: Session, meeting_id: str, phase: str) -> Optional[Meeting]:
     """Update meeting phase"""
     query = text("""
         UPDATE meeting 
-        SET phase = :phase, updated_at = :updated_at
+        SET phase = :phase
         WHERE id = :meeting_id
         RETURNING id::text
     """)
@@ -362,7 +355,6 @@ def update_phase(db: Session, meeting_id: str, phase: str) -> Optional[Meeting]:
     result = db.execute(query, {
         'meeting_id': meeting_id,
         'phase': phase,
-        'updated_at': datetime.utcnow()
     })
     db.commit()
     

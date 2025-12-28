@@ -77,17 +77,17 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [decisions, setDecisions] = useState<DecisionItem[]>([]);
   const [risks, setRisks] = useState<RiskItem[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isProcessingVideo, setIsProcessingVideo] = useState(false);
-  
+
   const [templates, setTemplates] = useState<MinutesTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [defaultTemplate, setDefaultTemplate] = useState<MinutesTemplate | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
-  
+
   const [filters, setFilters] = useState<FilterState>({
     questions: false,
     dates: false,
@@ -105,17 +105,17 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     loadAllData();
     loadTemplates();
   }, [meeting.id]);
-  
+
   const loadTemplates = async () => {
     setTemplatesLoading(true);
     try {
       const templatesList = await minutesTemplateApi.list({ is_active: true });
-      
+
       console.log('Templates loaded:', templatesList);
-      
+
       if (templatesList.templates && templatesList.templates.length > 0) {
         setTemplates(templatesList.templates);
-        
+
         // Try to get default template
         try {
           const defaultTmpl = await minutesTemplateApi.getDefault();
@@ -298,12 +298,12 @@ const LeftPanel = ({ filters, setFilters, actionItems, speakerStats, transcripts
   const questionsCount = transcripts.filter((t) => t.text.includes('?')).length;
 
   // Extract dates/times mentions (simple heuristic)
-  const datesCount = transcripts.filter((t) => 
+  const datesCount = transcripts.filter((t) =>
     /\b\d{1,2}\/\d{1,2}|\b(thứ|ngày|tháng|tuần|quý)\b/i.test(t.text)
   ).length;
 
   // Count metrics mentions (numbers + units)
-  const metricsCount = transcripts.filter((t) => 
+  const metricsCount = transcripts.filter((t) =>
     /\d+\s?(triệu|nghìn|tỷ|%|người|đơn|vị)/i.test(t.text)
   ).length;
 
@@ -470,22 +470,22 @@ const CenterPanel = ({
     try {
       // Upload video
       const result = await meetingsApi.uploadVideo(meeting.id, file);
-      
+
       // Update meeting with recording_url
       await meetingsApi.update(meeting.id, { recording_url: result.recording_url });
-      
+
       // Trigger inference (transcription + diarization)
       setIsProcessingVideo(true);
       try {
         const inferenceResult = await meetingsApi.triggerInference(meeting.id);
         console.log('Video inference result:', inferenceResult);
-        
+
         // Wait a bit for processing to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Refresh meeting data to load new transcripts
         await onRefresh();
-        
+
         alert(`Video đã được tải lên và xử lý thành công. Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
       } catch (inferenceErr: any) {
         console.error('Video inference failed:', inferenceErr);
@@ -537,22 +537,33 @@ const CenterPanel = ({
     }
   };
 
+  const handleSetLocalUrl = async (url: string) => {
+    try {
+      await meetingsApi.update(meeting.id, { recording_url: url });
+      await onRefresh();
+      alert('Đã lưu URL video thành công.');
+    } catch (err: any) {
+      console.error('Set local URL failed:', err);
+      alert(`Lỗi: ${err.message || 'Không thể lưu URL video'}`);
+    }
+  };
+
   const handleVideoDelete = async () => {
     if (!meeting.recording_url) return;
-    
+
     if (!confirm('Bạn có chắc chắn muốn xóa video này? Hành động này không thể hoàn tác.')) {
       return;
     }
 
     try {
       await meetingsApi.deleteVideo(meeting.id);
-      
+
       // Update meeting to clear recording_url
       await meetingsApi.update(meeting.id, { recording_url: null });
-      
+
       // Refresh meeting data
       await onRefresh();
-      
+
       alert('Video đã được xóa thành công.');
     } catch (err: any) {
       console.error('Delete video failed:', err);
@@ -567,6 +578,7 @@ const CenterPanel = ({
         recordingUrl={meeting.recording_url}
         onUpload={handleVideoUpload}
         onDelete={handleVideoDelete}
+        onSetLocalUrl={handleSetLocalUrl}
         isUploading={isUploadingVideo}
         isProcessing={isProcessingVideo}
         dragActive={dragActive}
@@ -644,7 +656,7 @@ const CenterPanel = ({
           {selectedTemplateId && (() => {
             const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
             if (!selectedTemplate) return null;
-            
+
             return (
               <div className="fireflies-template-info">
                 {selectedTemplate.description && (
@@ -823,6 +835,7 @@ interface VideoSectionProps {
   recordingUrl?: string | null;
   onUpload: (file: File) => void;
   onDelete: () => void;
+  onSetLocalUrl: (url: string) => void;
   isUploading: boolean;
   isProcessing: boolean;
   dragActive: boolean;
@@ -835,6 +848,7 @@ const VideoSection = ({
   recordingUrl,
   onUpload,
   onDelete,
+  onSetLocalUrl,
   isUploading,
   isProcessing,
   dragActive,
@@ -842,6 +856,17 @@ const VideoSection = ({
   onDrop,
   onFileInput,
 }: VideoSectionProps) => {
+  const [localUrlInput, setLocalUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+
+  const handleSetLocalUrl = () => {
+    if (localUrlInput.trim()) {
+      onSetLocalUrl(localUrlInput.trim());
+      setLocalUrlInput('');
+      setShowUrlInput(false);
+    }
+  };
+
   if (recordingUrl) {
     // Show video player
     return (
@@ -898,7 +923,7 @@ const VideoSection = ({
           id="video-upload-input"
           disabled={isUploading || isProcessing}
         />
-        
+
         {isUploading ? (
           <div className="fireflies-upload-status">
             <Loader size={32} className="spinner" />
@@ -929,6 +954,51 @@ const VideoSection = ({
               <Upload size={16} style={{ marginRight: 6 }} />
               Chọn file video
             </label>
+
+            {/* Local URL Input Toggle */}
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              {!showUrlInput ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setShowUrlInput(true)}
+                  style={{ fontSize: 12 }}
+                >
+                  Hoặc nhập URL video trực tiếp
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="http://localhost:8000/files/video.mp4"
+                    value={localUrlInput}
+                    onChange={(e) => setLocalUrlInput(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: 13,
+                      width: 280,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={handleSetLocalUrl}
+                    disabled={!localUrlInput.trim()}
+                  >
+                    Lưu
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => setShowUrlInput(false)}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
