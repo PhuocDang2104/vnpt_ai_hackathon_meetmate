@@ -9,11 +9,18 @@ import {
   FileText,
   CheckSquare,
   ArrowRight,
+  Info,
+  Map,
+  BadgeDollarSign,
+  Mail,
+  LogIn,
   Github,
   ExternalLink,
 } from 'lucide-react';
 import BackgroundRippleEffect from '../../components/ui/background-ripple-effect';
+import FloatingNavbar from '../../components/ui/floating-navbar';
 import { MarketingPopup } from '../../components/MarketingPopup';
+import ContactEmailForm from '../../components/ui/contact-email-form';
 
 export const Landing: React.FC = () => {
   useEffect(() => {
@@ -54,8 +61,17 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="landing-page">
+    <div className="landing-page public-page">
       <MarketingPopup />
+      <FloatingNavbar
+        navItems={[
+          { name: 'About', to: '/about', icon: <Info size={18} /> },
+          { name: 'Lộ trình', to: '/roadmap', icon: <Map size={18} /> },
+          { name: 'Pricing', to: '/pricing', icon: <BadgeDollarSign size={18} /> },
+          { name: 'Contact', onClick: () => scrollToSection('contact'), icon: <Mail size={18} /> },
+        ]}
+        action={{ label: 'Đăng nhập', to: '/login', icon: <LogIn size={16} /> }}
+      />
       {/* Header */}
       <header className="landing-header">
         <div className="landing-header__brand">
@@ -309,6 +325,7 @@ export const Landing: React.FC = () => {
               <span className="contact-tag">Tư vấn triển khai</span>
               <span className="contact-tag">Bảo mật doanh nghiệp</span>
             </div>
+            <ContactEmailForm />
           </div>
           <div className="contact-actions">
             <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
@@ -1330,19 +1347,7 @@ export const Landing: React.FC = () => {
           }
 
           .landing-nav {
-            width: 100%;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: var(--space-xs);
-          }
-
-          .landing-nav__link {
-            justify-content: center;
-            text-align: center;
-            font-size: 0.85rem;
-            padding: 8px 10px;
-            background: var(--bg-surface);
-            border-color: var(--border);
+            display: none;
           }
 
           .landing-actions {
@@ -1358,8 +1363,13 @@ export const Landing: React.FC = () => {
             font-size: 2rem;
           }
 
+          .hero-subtitle {
+            font-size: 1rem;
+          }
+
           .hero-stage__content {
-            padding: var(--space-lg) 0;
+            padding: 0;
+            max-width: 100%;
           }
 
           .hero {
@@ -1371,11 +1381,19 @@ export const Landing: React.FC = () => {
           }
 
           .hero-stage {
-            aspect-ratio: 16 / 9;
+            aspect-ratio: auto;
+            min-height: 70vh;
+            padding: var(--space-lg) var(--space-md);
           }
 
           .hero-actions {
             flex-direction: column;
+            width: 100%;
+          }
+
+          .hero-cta {
+            width: 100%;
+            justify-content: center;
           }
 
           .benefits-rail {

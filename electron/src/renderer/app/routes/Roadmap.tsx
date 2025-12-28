@@ -1,5 +1,7 @@
-import { ArrowLeft, ExternalLink, Github } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Github, Info, Map, BadgeDollarSign, Mail, LogIn } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import FloatingNavbar from '../../components/ui/floating-navbar'
+import ContactEmailForm from '../../components/ui/contact-email-form'
 
 const Roadmap = () => {
   const scrollToSection = (sectionId: string) => {
@@ -10,6 +12,15 @@ const Roadmap = () => {
 
   return (
     <div className="roadmap-page public-page">
+      <FloatingNavbar
+        navItems={[
+          { name: 'About', to: '/about', icon: <Info size={18} /> },
+          { name: 'Lộ trình', to: '/roadmap', icon: <Map size={18} /> },
+          { name: 'Pricing', to: '/pricing', icon: <BadgeDollarSign size={18} /> },
+          { name: 'Contact', onClick: () => scrollToSection('contact'), icon: <Mail size={18} /> },
+        ]}
+        action={{ label: 'Đăng nhập', to: '/login', icon: <LogIn size={16} /> }}
+      />
       <header className="landing-header">
         <div className="landing-header__brand">
           <div className="logo">
@@ -100,6 +111,7 @@ const Roadmap = () => {
               <span className="contact-tag">Tư vấn triển khai</span>
               <span className="contact-tag">Bảo mật doanh nghiệp</span>
             </div>
+            <ContactEmailForm />
           </div>
           <div className="contact-actions">
             <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
