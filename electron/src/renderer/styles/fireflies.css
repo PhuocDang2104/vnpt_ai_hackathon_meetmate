@@ -8,11 +8,12 @@
   display: grid;
   grid-template-columns: 280px 1fr 380px;
   gap: 0;
-  height: calc(100vh - 140px);
+  align-items: stretch;
+  height: auto;
   background: var(--bg-primary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fireflies-loading {
@@ -29,7 +30,7 @@
 .fireflies-left-panel {
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-default);
-  overflow-y: auto;
+  overflow: visible;
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
@@ -744,8 +745,7 @@
 /* Center Content */
 .fireflies-center-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: var(--space-lg);
   word-wrap: break-word;
   word-break: break-word;
@@ -1123,9 +1123,10 @@
 /* ==================== Right Panel - Transcript ==================== */
 .fireflies-right-panel {
   background: var(--bg-primary);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .fireflies-right-header {
@@ -1134,9 +1135,6 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--card-shadow-soft);
   background: var(--card-bg);
-  position: sticky;
-  top: var(--space-md);
-  z-index: 10;
   margin: var(--space-md);
 }
 
@@ -1154,6 +1152,8 @@
 .fireflies-transcript-list {
   flex: 1;
   padding: var(--space-sm);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .fireflies-transcript-item {
