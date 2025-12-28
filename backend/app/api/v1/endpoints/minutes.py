@@ -229,6 +229,7 @@ async def distribute_minutes(
                 meeting_time=start_time.strftime('%H:%M'),
                 meeting_location=meeting.location or 'Online',
                 executive_summary=minutes.executive_summary or 'Chưa có tóm tắt.',
+                minutes_content=minutes.minutes_html or minutes.minutes_markdown or minutes.minutes_text
             )
         else:
             # Demo mode - just log
