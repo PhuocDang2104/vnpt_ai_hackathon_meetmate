@@ -273,8 +273,12 @@ async def upload_meeting_video(
     """
     Upload a video recording for a meeting.
     
-    Accepts video files (MP4, MOV, AVI, WebM, MKV) up to 500MB.
+    Accepts video files (MP4, MOV, AVI, WebM, MKV).
+    Max file size: Configurable via MAX_VIDEO_FILE_SIZE_MB (default: 100MB for Supabase free tier).
     Uploads to Supabase S3 storage (or local fallback) and updates meeting.recording_url.
+    
+    Note: Supabase Storage free tier typically has a 50-100MB limit per file.
+    For larger files, consider upgrading your Supabase plan or compressing videos.
     """
     from uuid import UUID as UUIDType
     
@@ -299,6 +303,44 @@ async def upload_meeting_video(
         logger = __import__('logging').getLogger(__name__)
         logger.error(f"Unexpected error uploading video: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.delete('/{meeting_id}/video')
+async def delete_meeting_video(
+    meeting_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete video recording for a meeting.
+    
+    Removes the video file from storage and clears the recording_url from the meeting.
+    """
+    from app.services import video_service
+    
+    # Check meeting exists
+    meeting = meeting_service.get_meeting(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Check if meeting has recording_url
+    if not meeting.recording_url:
+        raise HTTPException(status_code=404, detail="Meeting does not have a video recording")
+    
+    try:
+        success = await video_service.delete_meeting_video(db, meeting_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete video")
+        
+        return {
+            "status": "success",
+            "message": "Video deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger = __import__('logging').getLogger(__name__)
+        logger.error(f"Failed to delete video: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete video: {str(e)}")
 
 
 @router.post('/{meeting_id}/trigger-inference')

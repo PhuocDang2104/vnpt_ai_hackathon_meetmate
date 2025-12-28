@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     supabase_s3_bucket: str = ''
     supabase_s3_access_key: str = ''
     supabase_s3_secret_key: str = ''
+    
+    # Video upload settings
+    max_video_file_size_mb: int = 100  # Maximum video file size in MB (default 100MB for Supabase free tier)
+    
+    # Diarization API (Hugging Face Space)
+    diarization_api_url: str = ''  # e.g. https://anhoaithai345-meetmate.hf.space/api/diarize
 
     model_config = SettingsConfigDict(
         env_file=find_env_file(),

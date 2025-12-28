@@ -300,6 +300,72 @@ Trả về đúng JSON, không kèm text khác:
             summary = response.strip()
         return {"summary": summary, "key_points": key_points}
     
+    async def generate_minutes_json(self, transcript: str) -> Dict[str, Any]:
+        """Generate comprehensive minutes in strict JSON format"""
+        prompt = f"""Phân tích nội dung cuộc họp (transcript) bên dưới và trích xuất thông tin để tạo biên bản họp.
+        
+        Transcript:
+        {transcript[:15000]}
+
+        Yêu cầu Output (JSON Strict Mode):
+        Hãy trả về MỘT JSON Object duy nhất với cấu trúc sau (không kèm markdown block ```json ... ```):
+        {{
+            "executive_summary": "Tóm tắt quản trị ngắn gọn (2-3 đoạn), tổng quan về cuộc họp.",
+            "key_points": [
+                "Điểm chính 1",
+                "Điểm chính 2"
+            ],
+            "action_items": [
+                {{
+                    "description": "Mô tả hành động cụ thể",
+                    "owner": "Tên người được giao (nếu có)",
+                    "deadline": "YYYY-MM-DD (nếu có), hoặc null",
+                    "priority": "high/medium/low"
+                }}
+            ],
+            "decisions": [
+                {{
+                    "description": "Nội dung quyết định",
+                    "rationale": "Lý do hoặc bối cảnh ra quyết định",
+                    "confirmed_by": "Người chốt (nếu có)"
+                }}
+            ],
+            "risks": [
+                {{
+                    "description": "Mô tả rủi ro hoặc vấn đề tồn đọng",
+                    "severity": "critical/high/medium/low",
+                    "mitigation": "Hướng giải quyết (nếu có)"
+                }}
+            ]
+        }}
+        """
+        
+        response = await self.chat.chat(prompt)
+        
+        # Robust JSON extraction
+        try:
+            # Try parsing directly
+            return json.loads(response)
+        except json.JSONDecodeError:
+            import re
+            # Try to find JSON block match
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except:
+                    pass
+            
+            # Fallback empty structure
+            print(f"[Gemini] Failed to parse JSON minutes from: {response[:100]}...")
+            return {
+                "executive_summary": response[:500], # Fallback to raw text as summary
+                "key_points": [],
+                "action_items": [],
+                "decisions": [],
+                "risks": []
+            }
+    
     async def generate_summary(self, transcript: str) -> str:
         """Generate meeting summary"""
         prompt = f"""Tạo tóm tắt cuộc họp dựa trên transcript sau, không bịa thông tin.

@@ -16,8 +16,10 @@ from app.services.storage_client import (
     generate_presigned_get_url,
 )
 from app.services import meeting_service
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 # Allowed video formats
 ALLOWED_VIDEO_TYPES = {
@@ -28,8 +30,8 @@ ALLOWED_VIDEO_TYPES = {
     'video/x-matroska',  # MKV
 }
 
-# Max file size: 500MB
-MAX_FILE_SIZE = 500 * 1024 * 1024
+# Max file size: configurable via settings (default 100MB for Supabase free tier)
+MAX_FILE_SIZE = settings.max_video_file_size_mb * 1024 * 1024
 
 
 async def upload_meeting_video(
@@ -65,6 +67,21 @@ async def upload_meeting_video(
             detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_VIDEO_TYPES)}"
         )
     
+    # Get file size first (if available from headers)
+    file_size = 0
+    content_length = file.headers.get("content-length")
+    if content_length:
+        try:
+            file_size = int(content_length)
+            # Validate file size early (before reading)
+            if file_size > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
+                )
+        except (ValueError, TypeError):
+            pass
+    
     # Read file content
     try:
         content = await file.read()
@@ -73,11 +90,11 @@ async def upload_meeting_video(
         logger.error(f"Failed to read file: {e}")
         raise HTTPException(status_code=400, detail="Failed to read file")
     
-    # Validate file size
+    # Validate file size after reading
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"File size exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
+            detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size ({MAX_FILE_SIZE / (1024*1024):.0f}MB)"
         )
     
     if file_size == 0:
@@ -114,6 +131,18 @@ async def upload_meeting_video(
             logger.warning("Storage not configured, falling back to local")
     except Exception as e:
         logger.error(f"Storage upload failed: {e}", exc_info=True)
+        error_msg = str(e)
+        # Provide helpful error message for size limits
+        if "EntityTooLarge" in error_msg or "too large" in error_msg.lower():
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Video file is too large for storage. "
+                    f"File size: {file_size / (1024*1024):.2f}MB. "
+                    f"Supabase Storage may have file size limits (typically 50-100MB for free tier). "
+                    f"Please compress the video or use a smaller file."
+                )
+            )
         raise HTTPException(status_code=500, detail=f"Failed to upload video: {str(e)}")
     
     # Fallback to local storage if S3 not configured or failed
@@ -182,7 +211,12 @@ async def get_video_url(db: Session, meeting_id: str) -> Optional[str]:
 
 async def delete_meeting_video(db: Session, meeting_id: str) -> bool:
     """
-    Delete video recording for a meeting.
+    Delete video recording for a meeting and all related metadata.
+    
+    This includes:
+    - Video file (local or from storage)
+    - Transcript chunks (created from video processing)
+    - Meeting minutes (generated from video transcript)
     
     Args:
         db: Database session
@@ -191,22 +225,74 @@ async def delete_meeting_video(db: Session, meeting_id: str) -> bool:
     Returns:
         True if deleted successfully, False otherwise
     """
+    from sqlalchemy import text
+    
     meeting = meeting_service.get_meeting(db, meeting_id)
     if not meeting or not meeting.recording_url:
         return False
     
-    # TODO: Delete from storage if storage_key is stored
-    # For now, just clear the recording_url
+    recording_url = meeting.recording_url
     
     try:
+        # 1. Delete video file from storage or local filesystem
+        try:
+            # If local file path (/files/...), delete local file
+            if recording_url.startswith("/files/"):
+                from pathlib import Path
+                local_path = Path(__file__).parent.parent.parent / recording_url.lstrip("/")
+                if local_path.exists():
+                    local_path.unlink()
+                    logger.info(f"Deleted local video file: {local_path}")
+            
+            # Note: If recording_url is a presigned URL, we cannot delete the actual file
+            # from Supabase Storage because we don't have the storage_key stored.
+            # The file will remain in storage but become inaccessible after URL expiration.
+            # To properly delete from storage, we would need to store storage_key in the database.
+            
+        except Exception as e:
+            logger.warning(f"Failed to delete video file (continuing to clear metadata): {e}", exc_info=True)
+        
+        # 2. Delete transcript chunks (created from video processing)
+        try:
+            result = db.execute(
+                text("DELETE FROM transcript_chunk WHERE meeting_id = :meeting_id"),
+                {'meeting_id': meeting_id}
+            )
+            deleted_chunks = result.rowcount
+            logger.info(f"Deleted {deleted_chunks} transcript chunks for meeting {meeting_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete transcript chunks: {e}", exc_info=True)
+        
+        # 3. Delete meeting minutes (generated from video transcript)
+        try:
+            result = db.execute(
+                text("DELETE FROM meeting_minutes WHERE meeting_id = :meeting_id"),
+                {'meeting_id': meeting_id}
+            )
+            deleted_minutes = result.rowcount
+            logger.info(f"Deleted {deleted_minutes} meeting minutes for meeting {meeting_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete meeting minutes: {e}", exc_info=True)
+        
+        # 4. Clear recording_url from database
         from app.schemas.meeting import MeetingUpdate
         updated_meeting = meeting_service.update_meeting(
             db,
             meeting_id,
             MeetingUpdate(recording_url=None)
         )
-        return updated_meeting is not None
+        
+        if updated_meeting:
+            # Commit all changes together (transcript chunks, minutes, recording_url)
+            db.commit()
+            logger.info(f"Successfully deleted video and cleared metadata for meeting {meeting_id}")
+            return True
+        else:
+            db.rollback()
+            return False
+            
     except Exception as e:
-        logger.error(f"Failed to delete video: {e}", exc_info=True)
+        db.rollback()
+        logger.error(f"Failed to delete video and metadata: {e}", exc_info=True)
         return False
 

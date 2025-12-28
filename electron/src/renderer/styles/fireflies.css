@@ -306,6 +306,9 @@
 }
 
 .fireflies-video-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--border-default);
 }
@@ -317,6 +320,29 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.fireflies-video-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fireflies-video-delete-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.fireflies-video-delete-btn:active {
+  transform: scale(0.95);
 }
 
 /* Video Player */

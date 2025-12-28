@@ -199,15 +199,15 @@ async def query_rag(
     if request.meeting_id:
         try:
             save_query = text("""
-                INSERT INTO ask_ai_query (id, meeting_id, query_text, answer_text, citation, created_at)
-                VALUES (:id, :meeting_id, :query, :answer, :citation, :created_at)
+                INSERT INTO ask_ai_query (id, meeting_id, query_text, answer_text, citations, created_at)
+                VALUES (:id, :meeting_id, :query, :answer, :citations, :created_at)
             """)
             db.execute(save_query, {
                 'id': query_id,
                 'meeting_id': request.meeting_id,
                 'query': request.query,
                 'answer': answer,
-                'citation': json.dumps([c.model_dump() for c in citations]),
+                'citations': json.dumps([c.model_dump() for c in citations]),
                 'created_at': datetime.utcnow()
             })
             db.commit()
@@ -232,7 +232,7 @@ def get_rag_history(
     """Get RAG query history for a meeting"""
     
     query = text("""
-        SELECT id::text, query_text, answer_text, citation, created_at
+        SELECT id::text, query_text, answer_text, citations, created_at
         FROM ask_ai_query
         WHERE meeting_id = :meeting_id
         ORDER BY created_at DESC

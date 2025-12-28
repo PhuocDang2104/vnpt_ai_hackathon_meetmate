@@ -21,7 +21,7 @@ async def diarize_audio(
     
     Args:
         audio_path: Path to audio file (WAV format)
-        diarization_api_url: URL of diarization API endpoint (default: from env)
+        diarization_api_url: URL of diarization API endpoint (default: from settings)
         min_speakers: Minimum number of speakers
         max_speakers: Maximum number of speakers
         
@@ -31,16 +31,24 @@ async def diarize_audio(
     Raises:
         RuntimeError if API call fails
     """
-    import os
+    from app.core.config import get_settings
     
     audio_path = Path(audio_path)
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
     
-    # Get API URL from environment or parameter
-    api_url = diarization_api_url or os.getenv("DIARIZATION_API_URL")
+    # Get API URL from parameter, settings, or environment
+    settings = get_settings()
+    api_url = diarization_api_url or settings.diarization_api_url
     if not api_url:
-        raise RuntimeError("DIARIZATION_API_URL not configured")
+        import os
+        api_url = os.getenv("DIARIZATION_API_URL")
+    if not api_url:
+        raise RuntimeError(
+            "Diarization API URL not configured. "
+            "Set DIARIZATION_API_URL environment variable or diarization_api_url in settings. "
+            "Example: https://anhoaithai345-meetmate.hf.space/api/diarize"
+        )
     
     # Read audio file as bytes
     try:

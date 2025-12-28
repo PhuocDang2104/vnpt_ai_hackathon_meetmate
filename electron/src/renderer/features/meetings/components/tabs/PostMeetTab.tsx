@@ -22,6 +22,8 @@ import {
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
+import { transcriptsApi } from '../../../../lib/api/transcripts';
+import { meetingsApi } from '../../../../lib/api/meetings';
 
 interface PostMeetTabV2Props {
   meeting: MeetingWithParticipants;
@@ -32,6 +34,7 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [enableDiarization, setEnableDiarization] = useState(true);
 
   useEffect(() => {
     loadMinutes();
@@ -52,6 +55,26 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      // 1. Check/Generate Transcript
+      try {
+        const transcriptList = await transcriptsApi.list(meeting.id);
+        if (!transcriptList.chunks || transcriptList.chunks.length === 0) {
+          console.log('No transcripts found. Triggering inference...');
+          const inferenceResult = await meetingsApi.triggerInference(meeting.id, enableDiarization);
+          if (!inferenceResult.transcript_count) {
+            console.warn('Inference finished but no transcripts created?');
+          }
+        }
+      } catch (infErr: any) {
+        console.error('Auto-transcript generation failed:', infErr);
+        // Continue anyway? Or ask? For now, we continue but warn
+        if (!confirm('Không tìm thấy transcript và không thể tự động tạo. Bạn có muốn tiếp tục tạo biên bản không?')) {
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      // 2. Generate Minutes
       const generated = await minutesApi.generate({
         meeting_id: meeting.id,
         include_transcript: true,
@@ -117,7 +140,7 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
               }} />
             </>
           )}
-          
+
           <button
             className="btn btn--primary"
             onClick={handleGenerate}
@@ -132,7 +155,22 @@ export const PostMeetTabV2 = ({ meeting }: PostMeetTabV2Props) => {
 
       {/* Content */}
       {!minutes ? (
-        <EmptyState onGenerate={handleGenerate} isGenerating={isGenerating} />
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableDiarization}
+                onChange={(e) => setEnableDiarization(e.target.checked)}
+                className="form-checkbox h-4 w-4 text-blue-600 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Kích hoạt nhận dạng người nói (Diarization)
+              </span>
+            </label>
+          </div>
+          <EmptyState onGenerate={handleGenerate} isGenerating={isGenerating} />
+        </>
       ) : (
         <div className="notion-editor__content">
           {/* Executive Summary */}
@@ -445,7 +483,7 @@ const ActionItemsBlockV2 = ({ meetingId }: ActionItemsBlockV2Props) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listActions({ meeting_id: meetingId });
+      const data = await itemsApi.listActions(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load actions failed:', err);
@@ -628,7 +666,7 @@ const DecisionsBlockV2 = ({ meetingId }: { meetingId: string }) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listDecisions({ meeting_id: meetingId });
+      const data = await itemsApi.listDecisions(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load decisions failed:', err);
@@ -695,7 +733,7 @@ const RisksBlockV2 = ({ meetingId }: { meetingId: string }) => {
   const loadItems = async () => {
     setIsLoading(true);
     try {
-      const data = await itemsApi.listRisks({ meeting_id: meetingId });
+      const data = await itemsApi.listRisks(meetingId);
       setItems(data.items || []);
     } catch (err) {
       console.error('Load risks failed:', err);

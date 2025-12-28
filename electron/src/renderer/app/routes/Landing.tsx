@@ -3,16 +3,17 @@
  */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Calendar, 
-  MessageSquare, 
-  FileText, 
+import {
+  Calendar,
+  MessageSquare,
+  FileText,
   CheckSquare,
   ArrowRight,
   Github,
   ExternalLink,
 } from 'lucide-react';
 import BackgroundRippleEffect from '../../components/ui/background-ripple-effect';
+import { MarketingPopup } from '../../components/MarketingPopup';
 
 export const Landing: React.FC = () => {
   useEffect(() => {
@@ -53,7 +54,8 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="landing-page public-page">
+    <div className="landing-page">
+      <MarketingPopup />
       {/* Header */}
       <header className="landing-header">
         <div className="landing-header__brand">
@@ -85,7 +87,7 @@ export const Landing: React.FC = () => {
               Cuộc họp hiệu quả hơn với <span className="gradient-text">AI Assistant</span>
             </h1>
             <p className="hero-subtitle">
-              MeetMate giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động. 
+              MeetMate giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động.
               Tiết kiệm thời gian, không bỏ lỡ action items quan trọng.
             </p>
             <div className="hero-actions">

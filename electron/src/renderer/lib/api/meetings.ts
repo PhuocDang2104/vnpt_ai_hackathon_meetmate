@@ -109,8 +109,15 @@ export const meetingsApi = {
   /**
    * Trigger inference (transcription + diarization) from video
    */
-  triggerInference: async (meetingId: string): Promise<{ job_id: string; message: string }> => {
-    return api.post<{ job_id: string; message: string }>(`${ENDPOINT}/${meetingId}/trigger-inference`, {});
+  triggerInference: async (meetingId: string): Promise<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }> => {
+    return api.post<{ status: string; message: string; transcript_count?: number; minutes_id?: string; pdf_url?: string }>(`${ENDPOINT}/${meetingId}/trigger-inference`, {});
+  },
+
+  /**
+   * Delete video recording for a meeting
+   */
+  deleteVideo: async (meetingId: string): Promise<{ status: string; message: string }> => {
+    return api.delete<{ status: string; message: string }>(`${ENDPOINT}/${meetingId}/video`);
   },
 };
 
