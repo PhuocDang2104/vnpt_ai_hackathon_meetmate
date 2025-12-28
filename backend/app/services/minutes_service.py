@@ -17,6 +17,20 @@ from app.services import transcript_service, action_item_service
 from app.utils.markdown_utils import render_markdown_to_html
 
 
+def _hydrate_minutes_html(minutes: MeetingMinutesResponse) -> MeetingMinutesResponse:
+    """
+    Ensure minutes_html is populated when minutes_markdown exists.
+    Useful for older records created before markdown->HTML auto render.
+    """
+    if not minutes.minutes_html and minutes.minutes_markdown:
+        try:
+            minutes.minutes_html = render_markdown_to_html(minutes.minutes_markdown)
+        except Exception:
+            # Keep silent to avoid breaking response
+            pass
+    return minutes
+
+
 def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
     """List all minutes versions for a meeting"""
     query = text("""
@@ -35,7 +49,7 @@ def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
     
     minutes_list = []
     for row in rows:
-        minutes_list.append(MeetingMinutesResponse(
+        minutes_list.append(_hydrate_minutes_html(MeetingMinutesResponse(
             id=row[0],
             meeting_id=row[1],
             version=row[2],
@@ -50,7 +64,7 @@ def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
             status=row[11],
             approved_by=row[12],
             approved_at=row[13]
-        ))
+        )))
     
     return MeetingMinutesList(minutes=minutes_list, total=len(minutes_list))
 
@@ -75,7 +89,7 @@ def get_latest_minutes(db: Session, meeting_id: str) -> Optional[MeetingMinutesR
     if not row:
         return None
     
-    return MeetingMinutesResponse(
+    return _hydrate_minutes_html(MeetingMinutesResponse(
         id=row[0],
         meeting_id=row[1],
         version=row[2],
@@ -90,7 +104,7 @@ def get_latest_minutes(db: Session, meeting_id: str) -> Optional[MeetingMinutesR
         status=row[11],
         approved_by=row[12],
         approved_at=row[13]
-    )
+    ))
 
 
 def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesResponse:
