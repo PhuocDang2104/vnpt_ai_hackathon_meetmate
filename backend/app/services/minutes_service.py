@@ -14,6 +14,7 @@ from app.schemas.minutes import (
     GenerateMinutesRequest
 )
 from app.services import transcript_service, action_item_service
+from app.utils.markdown_utils import render_markdown_to_html
 
 
 def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
@@ -96,6 +97,9 @@ def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesRes
     """Create new meeting minutes"""
     minutes_id = str(uuid4())
     now = datetime.utcnow()
+    rendered_html = None
+    if data.minutes_markdown and not data.minutes_html:
+        rendered_html = render_markdown_to_html(data.minutes_markdown)
     
     # Get next version number
     version_query = text("""
@@ -123,7 +127,7 @@ def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesRes
         'meeting_id': data.meeting_id,
         'version': version,
         'minutes_text': data.minutes_text,
-        'minutes_html': data.minutes_html,
+        'minutes_html': data.minutes_html or rendered_html,
         'minutes_markdown': data.minutes_markdown,
         'executive_summary': data.executive_summary,
         'status': data.status,
@@ -136,7 +140,7 @@ def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesRes
         meeting_id=data.meeting_id,
         version=version,
         minutes_text=data.minutes_text,
-        minutes_html=data.minutes_html,
+        minutes_html=data.minutes_html or rendered_html,
         minutes_markdown=data.minutes_markdown,
         executive_summary=data.executive_summary,
         status=data.status,
@@ -153,6 +157,9 @@ def update_minutes(
     """Update meeting minutes"""
     updates = ["edited_at = :edited_at"]
     params = {'minutes_id': minutes_id, 'edited_at': datetime.utcnow()}
+    rendered_html = None
+    if data.minutes_markdown is not None:
+        rendered_html = render_markdown_to_html(data.minutes_markdown)
     
     if edited_by:
         updates.append("edited_by = :edited_by")
@@ -164,6 +171,9 @@ def update_minutes(
     if data.minutes_html is not None:
         updates.append("minutes_html = :minutes_html")
         params['minutes_html'] = data.minutes_html
+    elif rendered_html is not None:
+        updates.append("minutes_html = :minutes_html")
+        params['minutes_html'] = rendered_html
     if data.minutes_markdown is not None:
         updates.append("minutes_markdown = :minutes_markdown")
         params['minutes_markdown'] = data.minutes_markdown
@@ -363,11 +373,15 @@ async def generate_minutes_with_ai(
         )
     
     # Create minutes record
+    minutes_html_value = minutes_content if request.format == 'html' else None
+    if request.format == 'markdown':
+        minutes_html_value = render_markdown_to_html(minutes_content)
+
     minutes_data = MeetingMinutesCreate(
         meeting_id=meeting_id,
         minutes_text=minutes_content if request.format == 'text' else None,
         minutes_markdown=minutes_content if request.format == 'markdown' else None,
-        minutes_html=minutes_content if request.format == 'html' else None,
+        minutes_html=minutes_html_value,
         executive_summary=summary_result.get('summary', ''),
         status='draft'
     )

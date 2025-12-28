@@ -9,6 +9,7 @@ from email.header import Header
 from email.utils import formataddr
 from typing import Optional, List
 from app.core.config import get_settings
+from app.utils.markdown_utils import render_markdown_to_html
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -128,12 +129,11 @@ Vui long khong tra loi email nay.
 
     minutes_html_section = ""
     if minutes_content:
-        # Simple markdown to html conversion if needed, or just wrap in div
-        # Using white-space: pre-wrap to preserve formatting if it's text/markdown
+        rendered_minutes = render_markdown_to_html(minutes_content)
         minutes_html_section = f"""
             <div class="summary" style="margin-top: 20px; border-left-color: #f59e0b;">
                 <h3 style="color: #f59e0b;">Chi tiết biên bản</h3>
-                <div style="white-space: pre-wrap; font-family: monospace, sans-serif; font-size: 13px;">{minutes_content}</div>
+                <div class="minutes-body" style="font-size: 14px; color: #1f2937; line-height: 1.6; word-break: break-word;">{rendered_minutes}</div>
             </div>
         """
 
@@ -152,6 +152,11 @@ Vui long khong tra loi email nay.
         .meta-item {{ display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666; }}
         .summary {{ background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #5b5fc7; }}
         .summary h3 {{ margin-top: 0; color: #5b5fc7; }}
+        .summary ul {{ padding-left: 18px; margin: 8px 0; }}
+        .summary ol {{ padding-left: 18px; margin: 8px 0; }}
+        .summary table {{ border-collapse: collapse; width: 100%; margin-top: 10px; }}
+        .summary th, .summary td {{ border: 1px solid #e5e7eb; padding: 8px; text-align: left; }}
+        .summary blockquote {{ margin: 10px 0; padding-left: 12px; border-left: 3px solid #e5e7eb; color: #4b5563; }}
         .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #999; }}
     </style>
 </head>
