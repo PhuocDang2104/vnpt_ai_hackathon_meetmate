@@ -242,6 +242,68 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+      {/* Benefits Section */}
+      <section className="benefits">
+        <div className="benefits-rail">
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">24/7</div>
+            <p className="benefit-desc">
+              Sẵn sàng tham gia mọi cuộc họp, từ call đột xuất tới phiên họp ủy ban định kỳ
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">90%</div>
+            <p className="benefit-desc">
+              Khối lượng ghi chép và soạn biên bản thủ công có thể được tự động hóa
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">2×</div>
+            <p className="benefit-desc">
+              Tốc độ chốt quyết định và giao việc sau họp được đẩy nhanh gấp đôi nhờ RAG và AI Agents
+            </p>
+          </div>
+          <div className="benefit-item reveal-on-scroll">
+            <div className="benefit-value">0 thông tin bị bỏ lỡ</div>
+            <p className="benefit-desc">
+              Mỗi quyết định đều được ghi lại, gắn người chịu trách nhiệm và dễ dàng truy vết khi cần
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Comparison Section */}
+      <section className="comparison">
+        <div className="comparison__header reveal-on-scroll">
+          <h2>Trước và sau khi có MeetMate</h2>
+        </div>
+        <div className="comparison-shell">
+          <div className="comparison-panel comparison-panel--without reveal-on-scroll">
+            <h3 className="comparison-title">Không dùng MeetMate</h3>
+            <ul className="comparison-list comparison-list--without">
+              <li>Tồn đọng biên bản và các đầu việc follow-up sau họp.</li>
+              <li>Quyết định quan trọng chỉ nằm trong trí nhớ từng người.</li>
+              <li>Ghi chép, tổng hợp thủ công, tốn nhiều giờ làm việc giá trị thấp.</li>
+              <li>Khó truy vết: “Cuộc họp nào đã chốt điều này? Ai chịu trách nhiệm?”</li>
+              <li>Áp lực lên thư ký, PM, RM; rủi ro miss việc, miss deadline.</li>
+            </ul>
+          </div>
+          <div className="comparison-divider">
+            <span>VS</span>
+          </div>
+          <div className="comparison-panel comparison-panel--with reveal-on-scroll">
+            <h3 className="comparison-title">Khi có MeetMate</h3>
+            <ul className="comparison-list comparison-list--with">
+              <li>Nền tảng AI khép kín Pre – In – Post cho mọi cuộc họp.</li>
+              <li>Biên bản, quyết định và hành động được tự động hóa, chuẩn hóa.</li>
+              <li>Nhiều thời gian hơn cho phân tích, phục vụ khách hàng và ra quyết định.</li>
+              <li>Lịch sử họp và quyết định minh bạch, truy vết được cho audit và quản trị rủi ro.</li>
+              <li>Quy trình follow-up, giao việc sau họp vận hành mượt mà, không bỏ sót.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* Roadmap Section */}
       <section className="landing-roadmap" id="roadmap">
         <div className="landing-roadmap__header reveal-on-scroll">
@@ -340,68 +402,6 @@ export const Landing: React.FC = () => {
               </div>
             </div>
           </article>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="benefits">
-        <div className="benefits-rail">
-          <div className="benefit-item reveal-on-scroll">
-            <div className="benefit-value">24/7</div>
-            <p className="benefit-desc">
-              Sẵn sàng tham gia mọi cuộc họp, từ call đột xuất tới phiên họp ủy ban định kỳ
-            </p>
-          </div>
-          <div className="benefit-item reveal-on-scroll">
-            <div className="benefit-value">90%</div>
-            <p className="benefit-desc">
-              Khối lượng ghi chép và soạn biên bản thủ công có thể được tự động hóa
-            </p>
-          </div>
-          <div className="benefit-item reveal-on-scroll">
-            <div className="benefit-value">2×</div>
-            <p className="benefit-desc">
-              Tốc độ chốt quyết định và giao việc sau họp được đẩy nhanh gấp đôi nhờ RAG và AI Agents
-            </p>
-          </div>
-          <div className="benefit-item reveal-on-scroll">
-            <div className="benefit-value">0 thông tin bị bỏ lỡ</div>
-            <p className="benefit-desc">
-              Mỗi quyết định đều được ghi lại, gắn người chịu trách nhiệm và dễ dàng truy vết khi cần
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Comparison Section */}
-      <section className="comparison">
-        <div className="comparison__header reveal-on-scroll">
-          <h2>Trước và sau khi có MeetMate</h2>
-        </div>
-        <div className="comparison-shell">
-          <div className="comparison-panel comparison-panel--without reveal-on-scroll">
-            <h3 className="comparison-title">Không dùng MeetMate</h3>
-            <ul className="comparison-list comparison-list--without">
-              <li>Tồn đọng biên bản và các đầu việc follow-up sau họp.</li>
-              <li>Quyết định quan trọng chỉ nằm trong trí nhớ từng người.</li>
-              <li>Ghi chép, tổng hợp thủ công, tốn nhiều giờ làm việc giá trị thấp.</li>
-              <li>Khó truy vết: “Cuộc họp nào đã chốt điều này? Ai chịu trách nhiệm?”</li>
-              <li>Áp lực lên thư ký, PM, RM; rủi ro miss việc, miss deadline.</li>
-            </ul>
-          </div>
-          <div className="comparison-divider">
-            <span>VS</span>
-          </div>
-          <div className="comparison-panel comparison-panel--with reveal-on-scroll">
-            <h3 className="comparison-title">Khi có MeetMate</h3>
-            <ul className="comparison-list comparison-list--with">
-              <li>Nền tảng AI khép kín Pre – In – Post cho mọi cuộc họp.</li>
-              <li>Biên bản, quyết định và hành động được tự động hóa, chuẩn hóa.</li>
-              <li>Nhiều thời gian hơn cho phân tích, phục vụ khách hàng và ra quyết định.</li>
-              <li>Lịch sử họp và quyết định minh bạch, truy vết được cho audit và quản trị rủi ro.</li>
-              <li>Quy trình follow-up, giao việc sau họp vận hành mượt mà, không bỏ sót.</li>
-            </ul>
-          </div>
         </div>
       </section>
 
