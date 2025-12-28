@@ -2,8 +2,10 @@
  * Post-Meeting Tab - Fireflies.ai Style
  * 3-column layout: Filters | AI Summary | Transcript
  */
-import { useEffect, useState } from 'react';
+// Force rebuild: Fix syntax error verification
+import React, { useState, useEffect, useRef } from 'react';
 import {
+  FileText,
   ChevronDown,
   ChevronRight,
   Calendar,
@@ -247,11 +249,23 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         onSelectTemplate={setSelectedTemplateId}
         defaultTemplate={defaultTemplate}
         templatesLoading={templatesLoading}
-        onEmailClick={() => setIsEmailModalOpen(true)}
+        openEmailModal={() => setIsEmailModalOpen(true)}
       />
 
       {/* Right - Transcript */}
       <RightPanel transcripts={transcripts} filters={filters} />
+
+      {/* Email Modal */}
+      {minutes && (
+        <MinutesEmailModal
+          isOpen={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
+          meetingId={meeting.id}
+          minutesId={minutes.id}
+          meetingTitle={meeting.title}
+          participants={meeting.participants}
+        />
+      )}
     </div>
   );
 };
@@ -403,7 +417,7 @@ interface CenterPanelProps {
   onSelectTemplate: (templateId: string | null) => void;
   defaultTemplate: MinutesTemplate | null;
   templatesLoading: boolean;
-  onEmailClick: () => void;
+  openEmailModal: () => void;
 }
 
 const CenterPanel = ({
@@ -425,8 +439,9 @@ const CenterPanel = ({
   onSelectTemplate,
   defaultTemplate,
   templatesLoading,
-  onEmailClick,
+  openEmailModal,
 }: CenterPanelProps) => {
+  console.log('CenterPanel Rendered - Verifying fix');
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -589,7 +604,7 @@ const CenterPanel = ({
               <button
                 className="fireflies-icon-btn"
                 title="Email & PDF"
-                onClick={onEmailClick}
+                onClick={openEmailModal}
               >
                 <Mail size={16} />
               </button>
@@ -843,17 +858,6 @@ const CenterPanel = ({
         )}
       </div>
 
-      {/* Email Modal */}
-      {minutes && (
-        <MinutesEmailModal
-          isOpen={isEmailModalOpen}
-          onClose={() => setIsEmailModalOpen(false)}
-          meetingId={meeting.id}
-          minutesId={minutes.id}
-          meetingTitle={meeting.title}
-          participants={meeting.participants}
-        />
-      )}
     </div>
   );
 };
