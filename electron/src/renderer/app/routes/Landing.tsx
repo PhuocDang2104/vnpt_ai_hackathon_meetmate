@@ -9,6 +9,8 @@ import {
   FileText, 
   CheckSquare,
   ArrowRight,
+  Github,
+  ExternalLink,
 } from 'lucide-react';
 import BackgroundRippleEffect from '../../components/ui/background-ripple-effect';
 
@@ -44,18 +46,34 @@ export const Landing: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <div className="landing-page">
+    <div className="landing-page public-page">
       {/* Header */}
       <header className="landing-header">
-        <div className="logo">
-          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
-          <span>MeetMate</span>
+        <div className="landing-header__brand">
+          <div className="logo">
+            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
+            <span>MeetMate</span>
+          </div>
+          <nav className="landing-nav">
+            <Link to="/about" className="landing-nav__link">About</Link>
+            <Link to="/roadmap" className="landing-nav__link">Lộ trình</Link>
+            <Link to="/pricing" className="landing-nav__link">Pricing</Link>
+            <button type="button" className="landing-nav__link" onClick={() => scrollToSection('contact')}>
+              Contact
+            </button>
+          </nav>
         </div>
-        <nav className="landing-nav">
+        <div className="landing-actions">
           <Link to="/login" className="btn btn-ghost">Đăng nhập</Link>
           <Link to="/register" className="btn btn-primary">Đăng ký</Link>
-        </nav>
+        </div>
       </header>
 
       {/* Hero Section */}
@@ -112,7 +130,7 @@ export const Landing: React.FC = () => {
                 </ul>
               </div>
               <div className="feature-card__media">
-                <img src="/meetmate_ai.png" alt="Pre-meeting overview" />
+                <img src="/landing/pre.png" alt="Pre-meeting overview" />
               </div>
             </div>
           </div>
@@ -142,7 +160,7 @@ export const Landing: React.FC = () => {
                 </ul>
               </div>
               <div className="feature-card__media">
-                <img src="/meetmate_ai.png" alt="In-meeting assistant" />
+                <img src="/landing/in.png" alt="In-meeting assistant" />
               </div>
             </div>
           </div>
@@ -171,7 +189,7 @@ export const Landing: React.FC = () => {
                 </ul>
               </div>
               <div className="feature-card__media">
-                <img src="/meetmate_ai.png" alt="Post-meeting summary" />
+                <img src="/landing/post.png" alt="Post-meeting summary" />
               </div>
             </div>
           </div>
@@ -199,7 +217,7 @@ export const Landing: React.FC = () => {
                 </ul>
               </div>
               <div className="feature-card__media">
-                <img src="/meetmate_ai.png" alt="RAG Q&A" />
+                <img src="/landing/rag.png" alt="RAG Q&A" />
               </div>
             </div>
           </div>
@@ -278,12 +296,41 @@ export const Landing: React.FC = () => {
         </Link>
       </section>
 
+      {/* Contact Section */}
+      <section className="contact" id="contact">
+        <div className="contact-card reveal-on-scroll">
+          <div className="contact-content">
+            <h2>Liên hệ</h2>
+            <p>Nhận demo, báo giá hoặc tư vấn triển khai cho doanh nghiệp.</p>
+            <div className="contact-tags">
+              <span className="contact-tag">Demo nhanh</span>
+              <span className="contact-tag">Tư vấn triển khai</span>
+              <span className="contact-tag">Bảo mật doanh nghiệp</span>
+            </div>
+          </div>
+          <div className="contact-actions">
+            <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
+            <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="landing-footer reveal-on-scroll">
         <div className="footer-brand">
           <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
           <span>MeetMate</span>
         </div>
+        <a
+          className="landing-footer__link"
+          href="https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Github size={18} />
+          GitHub
+          <ExternalLink size={14} />
+        </a>
         <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
       </footer>
 
@@ -302,6 +349,15 @@ export const Landing: React.FC = () => {
           padding: var(--space-sm) var(--space-xl);
           max-width: 1200px;
           margin: 0 auto;
+          gap: var(--space-lg);
+        }
+
+        .landing-header__brand {
+          display: flex;
+          align-items: center;
+          gap: var(--space-md);
+          flex: 1;
+          min-width: 0;
         }
 
         .logo {
@@ -328,6 +384,43 @@ export const Landing: React.FC = () => {
 
         .landing-nav {
           display: flex;
+          align-items: center;
+          gap: var(--space-sm);
+          flex-wrap: wrap;
+        }
+
+        .landing-nav__link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          font-size: 0.95rem;
+          font-weight: 500;
+          color: var(--text-secondary);
+          background: transparent;
+          border: 1px solid transparent;
+          border-radius: 999px;
+          cursor: pointer;
+          text-decoration: none;
+          font-family: inherit;
+          transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .landing-nav__link:hover {
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border-color: rgba(247, 167, 69, 0.4);
+          transform: translateY(-1px);
+        }
+
+        .landing-nav__link:focus-visible {
+          outline: 2px solid rgba(247, 167, 69, 0.45);
+          outline-offset: 2px;
+        }
+
+        .landing-actions {
+          display: flex;
+          align-items: center;
           gap: var(--space-sm);
         }
 
@@ -726,6 +819,68 @@ export const Landing: React.FC = () => {
           }
         }
 
+        /* Contact */
+        .contact {
+          padding: var(--space-2xl) var(--space-xl);
+          background: var(--bg-base);
+        }
+
+        .contact-card {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: var(--space-xl);
+          border-radius: 24px;
+          border: 1px solid var(--border);
+          background: linear-gradient(135deg, rgba(247, 167, 69, 0.16), rgba(255, 255, 255, 0.95));
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--space-lg);
+        }
+
+        .contact-content {
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-sm);
+          flex: 1;
+        }
+
+        .contact-content h2 {
+          font-family: var(--font-heading);
+          font-size: 2rem;
+          margin: 0;
+        }
+
+        .contact-content p {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 1rem;
+          line-height: 1.6;
+        }
+
+        .contact-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--space-sm);
+        }
+
+        .contact-tag {
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(247, 167, 69, 0.15);
+          border: 1px solid rgba(247, 167, 69, 0.4);
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--accent);
+        }
+
+        .contact-actions {
+          display: flex;
+          gap: var(--space-sm);
+          flex-wrap: wrap;
+        }
+
         .reveal-on-scroll {
           opacity: 0;
           transform: translateY(18px) scale(0.98);
@@ -936,6 +1091,10 @@ export const Landing: React.FC = () => {
           text-align: center;
           padding: var(--space-xl);
           border-top: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: var(--space-xs);
         }
 
         .footer-brand {
@@ -945,12 +1104,26 @@ export const Landing: React.FC = () => {
           font-family: var(--font-heading);
           font-weight: 600;
           color: var(--accent);
-          margin-bottom: var(--space-sm);
+        }
+
+        .landing-footer__link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          text-decoration: none;
+          transition: color 0.2s ease;
+        }
+
+        .landing-footer__link:hover {
+          color: var(--accent);
         }
 
         .landing-footer p {
           font-size: 0.875rem;
           color: var(--text-secondary);
+          margin: 0;
         }
 
         /* Buttons */
@@ -1109,6 +1282,22 @@ export const Landing: React.FC = () => {
         }
 
         @media (max-width: 900px) {
+          .landing-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: var(--space-md);
+          }
+
+          .landing-header__brand {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .landing-actions {
+            width: 100%;
+            justify-content: flex-end;
+          }
+
           .feature-card__expanded {
             grid-template-columns: 1fr;
           }
@@ -1120,11 +1309,47 @@ export const Landing: React.FC = () => {
           .comparison-divider {
             display: none;
           }
+
+          .contact-card {
+            flex-direction: column;
+            align-items: flex-start;
+          }
         }
 
         @media (max-width: 640px) {
           .landing-header {
             padding: var(--space-md);
+          }
+
+          .landing-header__brand {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--space-sm);
+          }
+
+          .landing-nav {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--space-xs);
+          }
+
+          .landing-nav__link {
+            justify-content: center;
+            text-align: center;
+            font-size: 0.85rem;
+            padding: 8px 10px;
+            background: var(--bg-surface);
+            border-color: var(--border);
+          }
+
+          .landing-actions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .landing-actions .btn {
+            width: 100%;
           }
 
           .hero-title {
@@ -1157,6 +1382,16 @@ export const Landing: React.FC = () => {
 
           .comparison {
             padding: var(--space-xl) var(--space-md);
+          }
+
+          .contact-actions {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .contact-actions .btn {
+            width: 100%;
           }
         }
 

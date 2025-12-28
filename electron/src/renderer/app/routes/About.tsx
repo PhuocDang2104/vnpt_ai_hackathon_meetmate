@@ -21,42 +21,70 @@ import {
 import { Link } from 'react-router-dom'
 
 const About = () => {
-  return (
-    <div className="about-page">
-      {/* Hero Section */}
-      <section className="about-hero">
-        <Link to="/" className="about-back">
-          <ArrowLeft size={20} />
-          Quay lại trang chủ
-        </Link>
-        
-        <div className="about-hero__content">
-          <div className="about-hero__badge">
-            <Sparkles size={16} />
-            VNPT AI Hackathon 2025
-          </div>
-          <h1 className="about-hero__title">
-            <span className="about-hero__logo">Meet</span>
-            <span className="about-hero__logo about-hero__logo--accent">Mate</span>
-          </h1>
-          <p className="about-hero__tagline">
-            AI-Powered Meeting Assistant for Enterprise PMO
-          </p>
-          <p className="about-hero__description">
-            Giải pháp trợ lý cuộc họp thông minh, tự động hóa quy trình họp từ chuẩn bị, 
-            ghi chép real-time đến tạo biên bản và theo dõi công việc.
-          </p>
-        </div>
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId)
+    if (!section) return
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
-        {/* Placeholder for hero image */}
-        <div className="about-hero__image-placeholder">
-          <div className="about-hero__image-text">
-            <Zap size={48} />
-            <span>Hero Image / Demo Screenshot</span>
-            <small>Cập nhật sau</small>
+  return (
+    <div className="about-page public-page">
+      <header className="landing-header">
+        <div className="landing-header__brand">
+          <div className="logo">
+            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
+            <span>MeetMate</span>
           </div>
+          <nav className="landing-nav">
+            <Link to="/about" className="landing-nav__link">About</Link>
+            <Link to="/roadmap" className="landing-nav__link">Lộ trình</Link>
+            <Link to="/pricing" className="landing-nav__link">Pricing</Link>
+            <button type="button" className="landing-nav__link" onClick={() => scrollToSection('contact')}>
+              Contact
+            </button>
+          </nav>
         </div>
-      </section>
+        <div className="landing-actions">
+          <Link to="/login" className="btn btn-ghost">Đăng nhập</Link>
+          <Link to="/register" className="btn btn-primary">Đăng ký</Link>
+        </div>
+      </header>
+
+      <div className="about-container">
+        {/* Hero Section */}
+        <section className="about-hero">
+          <Link to="/" className="about-back">
+            <ArrowLeft size={20} />
+            Quay lại trang chủ
+          </Link>
+          
+          <div className="about-hero__content">
+            <div className="about-hero__badge">
+              <Sparkles size={16} />
+              VNPT AI Hackathon 2025
+            </div>
+            <h1 className="about-hero__title">
+              <span className="about-hero__logo">Meet</span>
+              <span className="about-hero__logo about-hero__logo--accent">Mate</span>
+            </h1>
+            <p className="about-hero__tagline">
+              AI-Powered Meeting Assistant for Enterprise PMO
+            </p>
+            <p className="about-hero__description">
+              Giải pháp trợ lý cuộc họp thông minh, tự động hóa quy trình họp từ chuẩn bị, 
+              ghi chép real-time đến tạo biên bản và theo dõi công việc.
+            </p>
+          </div>
+
+          {/* Placeholder for hero image */}
+          <div className="about-hero__image-placeholder">
+            <div className="about-hero__image-text">
+              <Zap size={48} />
+              <span>Hero Image / Demo Screenshot</span>
+              <small>Cập nhật sau</small>
+            </div>
+          </div>
+        </section>
 
       {/* Problem & Solution */}
       <section className="about-section">
@@ -325,31 +353,42 @@ const About = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="about-footer">
-        <div className="about-footer__content">
-          <div className="about-footer__brand">
-            <h3>MeetMate</h3>
-            <p>AI-Powered Meeting Assistant</p>
+      </div>
+
+      <section className="contact" id="contact">
+        <div className="contact-card">
+          <div className="contact-content">
+            <h2>Liên hệ</h2>
+            <p>Nhận demo, báo giá hoặc tư vấn triển khai cho doanh nghiệp.</p>
+            <div className="contact-tags">
+              <span className="contact-tag">Demo nhanh</span>
+              <span className="contact-tag">Tư vấn triển khai</span>
+              <span className="contact-tag">Bảo mật doanh nghiệp</span>
+            </div>
           </div>
-          
-          <div className="about-footer__links">
-            <a href="https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate" target="_blank" rel="noopener noreferrer">
-              <Github size={20} />
-              GitHub
-              <ExternalLink size={14} />
-            </a>
-          </div>
-          
-          <div className="about-footer__badge">
-            <Shield size={16} />
-            VNPT AI Hackathon 2025
+          <div className="contact-actions">
+            <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
+            <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
           </div>
         </div>
-        
-        <div className="about-footer__copyright">
-          © 2025 MeetMate Team. Built with ❤️ for VNPT AI Hackathon.
+      </section>
+
+      <footer className="landing-footer">
+        <div className="footer-brand">
+          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
+          <span>MeetMate</span>
         </div>
+        <a
+          className="landing-footer__link"
+          href="https://github.com/PhuocDang2104/vnpt_ai_hackathon_meetmate"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Github size={18} />
+          GitHub
+          <ExternalLink size={14} />
+        </a>
+        <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
       </footer>
     </div>
   )
