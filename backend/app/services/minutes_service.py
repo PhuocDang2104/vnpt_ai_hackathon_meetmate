@@ -147,6 +147,21 @@ def get_minutes_by_id(db: Session, minutes_id: str) -> Optional[MeetingMinutesRe
     ))
 
 
+def render_minutes_html_content(minutes: MeetingMinutesResponse) -> str:
+    """
+    Render minutes into HTML for export/viewing, preferring stored HTML,
+    otherwise converting markdown, otherwise wrapping plain text.
+    """
+    if minutes.minutes_html:
+        return minutes.minutes_html
+    if minutes.minutes_markdown:
+        return render_markdown_to_html(minutes.minutes_markdown)
+    if minutes.minutes_text:
+        from html import escape
+        return f"<pre style=\"white-space: pre-wrap; font-family: sans-serif;\">{escape(minutes.minutes_text)}</pre>"
+    return "<p>Chưa có nội dung biên bản.</p>"
+
+
 def create_minutes(db: Session, data: MeetingMinutesCreate) -> MeetingMinutesResponse:
     """Create new meeting minutes"""
     minutes_id = str(uuid4())

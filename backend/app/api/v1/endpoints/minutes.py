@@ -2,6 +2,7 @@
 Meeting Minutes API Endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -141,6 +142,20 @@ def approve_minutes(
     return minutes
 
 
+@router.get('/render/{minutes_id}', response_class=HTMLResponse)
+def render_minutes_html(
+    minutes_id: str,
+    db: Session = Depends(get_db)
+):
+    """Render minutes content as HTML (markdown-aware) for export/view."""
+    minutes = minutes_service.get_minutes_by_id(db, minutes_id)
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+
+    html = minutes_service.render_minutes_html_content(minutes)
+    return HTMLResponse(content=html, status_code=200)
+
+
 # ============================================
 # AI-Powered Generation
 # ============================================
@@ -262,4 +277,3 @@ async def distribute_minutes(
         'email_enabled': is_email_enabled(),
         'demo_mode': email_result.get('demo_mode', False)
     }
-
