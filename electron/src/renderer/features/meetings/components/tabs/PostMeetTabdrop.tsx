@@ -126,6 +126,14 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
     }
   };
 
+  const handleAddToJira = () => {
+    if (!minutes) {
+      alert('Vui lòng tạo biên bản trước khi thêm vào Jira.');
+      return;
+    }
+    alert('Đã gửi yêu cầu thêm vào Jira (demo).');
+  };
+
   const handleCopySummary = () => {
     const content = minutes?.minutes_markdown || minutes?.executive_summary || '';
     navigator.clipboard.writeText(content);
@@ -325,6 +333,9 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
             )}
             <button className="btn btn--accent btn--sm" onClick={handleGenerateMinutes} disabled={isGenerating || isLoading}>
               {minutes ? 'Tạo lại' : 'AI tạo biên bản'}
+            </button>
+            <button className="btn btn--secondary btn--sm" onClick={handleAddToJira} disabled={isLoading || isGenerating}>
+              Thêm vào Jira
             </button>
             {minutes && !isEditing && (
               <>
@@ -1230,7 +1241,18 @@ MeetMate AI Assistant`;
 
       {showEmailModal && (
         <div className="modal-overlay" onClick={() => !isDistributing && setShowEmailModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
+          <div
+            className="modal"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '720px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            }}
+          >
             <div className="modal__header">
               <h2 className="modal__title">Gửi biên bản qua Email</h2>
               <button
