@@ -7,7 +7,7 @@ from typing import Optional, List
 
 from app.db.session import get_db
 from app.schemas.transcript import (
-    TranscriptChunkCreate, TranscriptChunkUpdate,
+    TranscriptChunkCreate, TranscriptChunkUpdate, TranscriptChunkBatchInput,
     TranscriptChunkResponse, TranscriptChunkList,
     LiveRecapSnapshot, LiveRecapRequest
 )
@@ -55,11 +55,26 @@ def create_transcript_chunk(
 @router.post('/{meeting_id}/chunks/batch', response_model=TranscriptChunkList)
 def create_batch_chunks(
     meeting_id: str,
-    chunks: List[TranscriptChunkCreate],
+    chunks: List[TranscriptChunkBatchInput],
     db: Session = Depends(get_db)
 ):
     """Create multiple transcript chunks at once"""
-    return transcript_service.create_batch_transcript_chunks(db, meeting_id, chunks)
+    # Convert batch input to full TranscriptChunkCreate with meeting_id
+    full_chunks = [
+        TranscriptChunkCreate(
+            meeting_id=meeting_id,
+            chunk_index=c.chunk_index,
+            start_time=c.start_time,
+            end_time=c.end_time,
+            speaker=c.speaker,
+            text=c.text,
+            confidence=c.confidence,
+            language=c.language,
+            speaker_user_id=c.speaker_user_id,
+        )
+        for c in chunks
+    ]
+    return transcript_service.create_batch_transcript_chunks(db, meeting_id, full_chunks)
 
 
 @router.put('/chunks/{chunk_id}', response_model=TranscriptChunkResponse)

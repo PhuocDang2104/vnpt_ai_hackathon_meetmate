@@ -223,6 +223,32 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     }
   };
 
+  // Hidden feature: Add transcripts manually for demo
+  const handleAddTranscripts = async (newTranscripts: { speaker: string; start_time: number; text: string }[]) => {
+    try {
+      // Import transcript API
+      const { transcriptsApi } = await import('../../../../lib/api/transcripts');
+
+      // Create transcript chunks with proper format
+      const chunks = newTranscripts.map((t, index) => ({
+        chunk_index: index,
+        speaker: t.speaker,
+        start_time: t.start_time,
+        end_time: t.start_time + 5,
+        text: t.text,
+      }));
+
+      // Use batch ingest for efficiency
+      await transcriptsApi.ingestBatch(meeting.id, chunks);
+
+      // Reload transcripts
+      await loadAllData();
+    } catch (err) {
+      console.error('Add transcript failed:', err);
+      alert('Không thể thêm transcript. Vui lòng thử lại.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="fireflies-layout">
@@ -268,7 +294,12 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       />
 
       {/* Right - Transcript */}
-      <RightPanel transcripts={transcripts} filters={filters} />
+      <RightPanel
+        transcripts={transcripts}
+        filters={filters}
+        meetingId={meeting.id}
+        onAddTranscripts={handleAddTranscripts}
+      />
     </div>
   );
 };
@@ -655,10 +686,14 @@ const CenterPanel = ({
 interface RightPanelProps {
   transcripts: TranscriptChunk[];
   filters: FilterState;
+  meetingId: string;
+  onAddTranscripts?: (transcripts: { speaker: string; start_time: number; text: string }[]) => void;
 }
 
-const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
+const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts }: RightPanelProps) => {
   const [searchInTranscript, setSearchInTranscript] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [bulkInput, setBulkInput] = useState('');
 
   const filteredTranscripts = transcripts.filter((t) => {
     // Apply search filter
@@ -685,11 +720,57 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Parse bulk input format: "Speaker: Text" on each line
+  const handleBulkAdd = async () => {
+    if (!bulkInput.trim()) return;
+
+    const lines = bulkInput.split('\n').filter(line => line.trim());
+    const newTranscripts: { speaker: string; start_time: number; text: string }[] = [];
+    let currentTime = 0;
+
+    for (const line of lines) {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const speaker = line.substring(0, colonIndex).trim();
+        const text = line.substring(colonIndex + 1).trim();
+        if (speaker && text) {
+          newTranscripts.push({
+            speaker,
+            start_time: currentTime,
+            text,
+          });
+          // Estimate time based on text length (~150 words per minute)
+          const wordCount = text.split(' ').length;
+          currentTime += Math.max(5, Math.round(wordCount / 2.5));
+        }
+      }
+    }
+
+    if (newTranscripts.length > 0 && onAddTranscripts) {
+      onAddTranscripts(newTranscripts);
+      setBulkInput('');
+      setShowAddModal(false);
+      alert(`Đã thêm ${newTranscripts.length} transcript entries.`);
+    }
+  };
+
+  // Hidden trigger: Shift + Click on title
+  const handleTitleClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      setShowAddModal(true);
+    }
+  };
+
   return (
     <div className="fireflies-right-panel">
       {/* Header */}
       <div className="fireflies-right-header">
-        <h3 className="fireflies-right-title">
+        <h3
+          className="fireflies-right-title"
+          onClick={handleTitleClick}
+          style={{ cursor: 'pointer' }}
+          title="Shift+Click để thêm transcript thủ công"
+        >
           <span>📝</span>
           Transcript
         </h3>
@@ -737,6 +818,74 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
           })
         )}
       </div>
+
+      {/* Hidden Add Transcript Modal */}
+      {showAddModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-primary)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              width: '600px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '18px' }}>🎭 Demo Mode - Thêm Transcript Thủ Công</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Nhập transcript theo format: <code>Tên người: Nội dung nói</code> (mỗi dòng một phát ngôn)
+            </p>
+            <textarea
+              value={bulkInput}
+              onChange={(e) => setBulkInput(e.target.value)}
+              placeholder={`Quân: Ok, mình khai mạc phiên họp Hội đồng quản trị về dự án ORION giai đoạn 1 nhé.\nĐạt: Em chuyển sang phần ngân sách để Hội đồng quản trị nắm bức tranh tổng quan nhé.\nPhước: Có 2 rủi ro mức độ đỏ cần điều kiện bắt buộc.`}
+              style={{
+                width: '100%',
+                height: '300px',
+                padding: '12px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                resize: 'vertical',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+                background: 'var(--bg-secondary)',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn--ghost"
+                onClick={() => setShowAddModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={handleBulkAdd}
+                disabled={!bulkInput.trim()}
+              >
+                Thêm Transcript
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
