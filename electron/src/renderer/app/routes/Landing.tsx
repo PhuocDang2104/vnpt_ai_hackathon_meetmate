@@ -75,10 +75,10 @@ export const Landing: React.FC = () => {
       {/* Header */}
       <header className="landing-header">
         <div className="landing-header__brand">
-          <div className="logo">
+          <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
             <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
             <span>MeetMate</span>
-          </div>
+          </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
             <Link to="/roadmap" className="landing-nav__link">Lộ trình</Link>
@@ -242,6 +242,107 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+      {/* Roadmap Section */}
+      <section className="landing-roadmap" id="roadmap">
+        <div className="landing-roadmap__header reveal-on-scroll">
+          <h2>Lộ trình MeetMate</h2>
+          <p>4 phiên bản phát triển cho enterprise, mở rộng dần về scale, compliance và hệ sinh thái.</p>
+        </div>
+        <div className="landing-roadmap__grid">
+          <article className="landing-roadmap__column landing-roadmap__column--v1 reveal-on-scroll">
+            <div className="landing-roadmap__kicker">Enterprise lớn BFSI</div>
+            <div className="landing-roadmap__card">
+              <div className="landing-roadmap__card-top">
+                <span className="landing-roadmap__pill">Ver 1</span>
+                <h3>MeetMate 1.0</h3>
+              </div>
+              <ul className="landing-roadmap__list">
+                <li><strong>Auto-capture & quản lý meeting:</strong> bot auto-join (Teams/GoMeet/…), sync Outlook, gán theo dự án.</li>
+                <li><strong>Transcript + diarization:</strong> speaker đúng, ngắt câu/định dạng đọc được.</li>
+                <li><strong>Minutes chuẩn BFSI:</strong> summary/decision/action (owner, due date), highlight 5–10 điểm quan trọng.</li>
+                <li><strong>Export & phân phối:</strong> DOCX/PDF, share link phân quyền, version draft/final tối thiểu.</li>
+                <li><strong>Ứng dụng + extension:</strong> trải nghiệm mượt, tuỳ biến workflow nhanh.</li>
+                <li><strong>Triển khai & bảo mật:</strong> VPC/on-prem, RBAC cơ bản, mã hoá + access log.</li>
+              </ul>
+            </div>
+          </article>
+          <article className="landing-roadmap__column landing-roadmap__column--v2 reveal-on-scroll">
+            <div className="landing-roadmap__kicker">Enterprise đa lĩnh vực</div>
+            <div className="landing-roadmap__card">
+              <div className="landing-roadmap__card-top">
+                <span className="landing-roadmap__pill">Ver 2</span>
+                <h3>MeetMate 2.0</h3>
+              </div>
+              <ul className="landing-roadmap__list">
+                <li><strong>Admin platform:</strong> multi-workspace/branch, RBAC vai trò, policy theo đơn vị.</li>
+                <li><strong>Approval workflow:</strong> drafter → reviewer → approver, track changes + versioning.</li>
+                <li><strong>Minutes theo ngành/role:</strong> template library + taxonomy/thuật ngữ theo domain.</li>
+                <li><strong>Quality tuning + review:</strong> confidence/flag kiểm tra decision/action.</li>
+                <li><strong>Model mode + slide-aware:</strong> Fast/Strong và OCR/IDP theo slide/metrics/title.</li>
+                <li><strong>Voice identity (opt-in):</strong> gắn speaker tốt hơn; eKYC giọng nói nên là add-on Ver3 "Identity Verification".</li>
+              </ul>
+            </div>
+          </article>
+          <article className="landing-roadmap__column landing-roadmap__column--v3 reveal-on-scroll">
+            <div className="landing-roadmap__kicker">Packs (Enterprise + SME)</div>
+            <div className="landing-roadmap__card">
+              <div className="landing-roadmap__card-top">
+                <span className="landing-roadmap__pill">Ver 3</span>
+                <h3>MeetMate 3.0</h3>
+              </div>
+              <div className="landing-roadmap__packs">
+                <div className="landing-roadmap__pack">
+                  <div className="landing-roadmap__pack-title">Enterprise Pack</div>
+                  <ul className="landing-roadmap__list">
+                    <li><strong>Knowledge Base + Agentic RAG:</strong> theo dự án/ngành (trước & sau họp).</li>
+                    <li><strong>Citation/traceability:</strong> minutes & trả lời có dẫn nguồn transcript/timestamp.</li>
+                    <li><strong>eDiscovery nâng cao:</strong> search tiêu chí, export bundle phục vụ audit/điều tra.</li>
+                    <li><strong>Action governance:</strong> nhắc hạn/escalation theo policy; báo cáo blockers.</li>
+                    <li><strong>Cross-meeting insights:</strong> mâu thuẫn quyết định, trùng đầu việc, chủ đề lặp.</li>
+                  </ul>
+                </div>
+                <div className="landing-roadmap__pack landing-roadmap__pack--muted">
+                  <div className="landing-roadmap__pack-title">SME Pack</div>
+                  <ul className="landing-roadmap__list">
+                    <li><strong>Self-serve + auto-share:</strong> bật là dùng, tự gửi minutes vào Slack/Teams.</li>
+                    <li><strong>Task sync cơ bản:</strong> 1-click đẩy action sang tool phổ biến.</li>
+                    <li><strong>Cost controls + quota:</strong> usage/minutes/storage/retention theo gói.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article className="landing-roadmap__column landing-roadmap__column--v4 reveal-on-scroll">
+            <div className="landing-roadmap__kicker">Lite + Ecosystem</div>
+            <div className="landing-roadmap__card">
+              <div className="landing-roadmap__card-top">
+                <span className="landing-roadmap__pill">Ver 4</span>
+                <h3>MeetMate Ecosystem</h3>
+              </div>
+              <div className="landing-roadmap__split">
+                <div className="landing-roadmap__pack">
+                  <div className="landing-roadmap__pack-title">Lite</div>
+                  <ul className="landing-roadmap__list">
+                    <li><strong>Core loop tối giản:</strong> meeting → summary → action items (ổn định, nhanh).</li>
+                    <li><strong>Search & share:</strong> tìm theo meeting/minutes + link/export.</li>
+                    <li><strong>Mobile-friendly minutes:</strong> đọc nhanh, tick action, UX nhẹ.</li>
+                  </ul>
+                </div>
+                <div className="landing-roadmap__pack landing-roadmap__pack--muted">
+                  <div className="landing-roadmap__pack-title">Ecosystem</div>
+                  <ul className="landing-roadmap__list">
+                    <li><strong>Integrations rộng:</strong> CRM/ticketing/DMS/chat-collab/calendar đa hệ.</li>
+                    <li><strong>Marketplace/Partner:</strong> cài integration theo ngành/công ty, quản trị permission scopes.</li>
+                    <li><strong>Multi-language/multi-region:</strong> mở rộng thị trường & vận hành tập đoàn.</li>
+                    <li><strong>Workflow triggers:</strong> minutes finalized → create/update ticket/CRM, decision → notify + log.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       {/* Benefits Section */}
       <section className="benefits">
         <div className="benefits-rail">
@@ -325,11 +426,13 @@ export const Landing: React.FC = () => {
               <span className="contact-tag">Tư vấn triển khai</span>
               <span className="contact-tag">Bảo mật doanh nghiệp</span>
             </div>
-            <ContactEmailForm />
           </div>
-          <div className="contact-actions">
-            <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
-            <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+          <div className="contact-panel">
+            <ContactEmailForm />
+            <div className="contact-actions">
+              <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
+              <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+            </div>
           </div>
         </div>
       </section>
@@ -387,6 +490,7 @@ export const Landing: React.FC = () => {
           font-size: 1.5rem;
           font-weight: 700;
           color: var(--accent);
+          text-decoration: none;
         }
 
         .landing-logo__icon {
@@ -852,9 +956,9 @@ export const Landing: React.FC = () => {
           border: 1px solid var(--border);
           background: linear-gradient(135deg, rgba(247, 167, 69, 0.16), rgba(255, 255, 255, 0.95));
           box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+          display: grid;
+          grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+          align-items: stretch;
           gap: var(--space-lg);
         }
 
@@ -894,10 +998,30 @@ export const Landing: React.FC = () => {
           color: var(--accent);
         }
 
-        .contact-actions {
+        .contact-panel {
           display: flex;
+          flex-direction: column;
+          gap: var(--space-md);
+          padding: var(--space-lg);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(247, 167, 69, 0.35);
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .contact-panel .contact-form {
+          margin-top: 0;
+        }
+
+        .contact-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: var(--space-sm);
-          flex-wrap: wrap;
+        }
+
+        .contact-actions .btn {
+          width: 100%;
+          justify-content: center;
         }
 
         .reveal-on-scroll {
@@ -1330,8 +1454,7 @@ export const Landing: React.FC = () => {
           }
 
           .contact-card {
-            flex-direction: column;
-            align-items: flex-start;
+            grid-template-columns: 1fr;
           }
         }
 
@@ -1351,12 +1474,7 @@ export const Landing: React.FC = () => {
           }
 
           .landing-actions {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .landing-actions .btn {
-            width: 100%;
+            display: none;
           }
 
           .hero-title {
@@ -1406,7 +1524,7 @@ export const Landing: React.FC = () => {
 
           .contact-actions {
             width: 100%;
-            flex-direction: column;
+            grid-template-columns: 1fr;
             align-items: stretch;
           }
 

@@ -1,5 +1,4 @@
 import { 
-  ArrowLeft, 
   Brain, 
   Users, 
   FileText, 
@@ -46,10 +45,10 @@ const About = () => {
       />
       <header className="landing-header">
         <div className="landing-header__brand">
-          <div className="logo">
+          <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
             <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
             <span>MeetMate</span>
-          </div>
+          </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
             <Link to="/roadmap" className="landing-nav__link">Lộ trình</Link>
@@ -68,11 +67,6 @@ const About = () => {
       <div className="about-container">
         {/* Hero Section */}
         <section className="about-hero">
-          <Link to="/" className="about-back">
-            <ArrowLeft size={20} />
-            Quay lại trang chủ
-          </Link>
-          
           <div className="about-hero__content">
             <div className="about-hero__badge">
               <Sparkles size={16} />
@@ -380,11 +374,13 @@ const About = () => {
               <span className="contact-tag">Tư vấn triển khai</span>
               <span className="contact-tag">Bảo mật doanh nghiệp</span>
             </div>
-            <ContactEmailForm />
           </div>
-          <div className="contact-actions">
-            <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
-            <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+          <div className="contact-panel">
+            <ContactEmailForm />
+            <div className="contact-actions">
+              <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
+              <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+            </div>
           </div>
         </div>
       </section>

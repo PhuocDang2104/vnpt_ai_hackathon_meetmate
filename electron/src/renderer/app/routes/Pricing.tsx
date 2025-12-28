@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Github, Info, Map, BadgeDollarSign, Mail, LogIn } from 'lucide-react'
+import { ExternalLink, Github, Info, Map, BadgeDollarSign, Mail, LogIn } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import FloatingNavbar from '../../components/ui/floating-navbar'
 import ContactEmailForm from '../../components/ui/contact-email-form'
@@ -23,10 +23,10 @@ const Pricing = () => {
       />
       <header className="landing-header">
         <div className="landing-header__brand">
-          <div className="logo">
+          <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
             <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
             <span>MeetMate</span>
-          </div>
+          </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
             <Link to="/roadmap" className="landing-nav__link">Lộ trình</Link>
@@ -43,11 +43,6 @@ const Pricing = () => {
       </header>
 
       <header className="pricing-hero">
-        <Link to="/" className="pricing-back">
-          <ArrowLeft size={18} />
-          Quay lại trang chủ
-        </Link>
-        <div className="pricing-hero__badge">MeetMate Pricing</div>
         <h1 className="pricing-hero__title">Bảng giá linh hoạt</h1>
         <p className="pricing-hero__subtitle">
           Chọn gói phù hợp, dễ mở rộng khi nhu cầu tăng.
@@ -120,11 +115,13 @@ const Pricing = () => {
               <span className="contact-tag">Tư vấn triển khai</span>
               <span className="contact-tag">Bảo mật doanh nghiệp</span>
             </div>
-            <ContactEmailForm />
           </div>
-          <div className="contact-actions">
-            <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
-            <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+          <div className="contact-panel">
+            <ContactEmailForm />
+            <div className="contact-actions">
+              <Link to="/register" className="btn btn-primary btn-lg">Nhận demo</Link>
+              <Link to="/about" className="btn btn-outline btn-lg">Về chúng tôi</Link>
+            </div>
           </div>
         </div>
       </section>
