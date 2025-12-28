@@ -36,22 +36,10 @@ const Sidebar = () => {
     { path: '/app/projects', labelKey: 'nav.projects', icon: <FolderOpen size={20} /> },
   ]
 
-  const toolsNavItems: NavItem[] = [
-    { path: '/app/knowledge', labelKey: 'nav.knowledge', icon: <BookOpen size={20} /> },
-    { 
-      path: '/app/tasks', 
-      labelKey: 'nav.tasks', 
-      icon: <CheckSquare size={20} />,
-      badge: overdueCount > 0 ? overdueCount : undefined
-    },
-  ]
+  const toolsNavItems: NavItem[] = []
 
   const settingsNavItems: NavItem[] = [
     { path: '/app/settings', labelKey: 'nav.settings', icon: <Settings size={20} /> },
-    ...(isAdmin ? [
-      { path: '/app/admin', labelKey: 'nav.adminConsole', icon: <Users size={20} /> },
-      { path: '/app/templates', labelKey: 'nav.templates', icon: <FileText size={20} /> },
-    ] : []),
   ]
 
   const handleLogout = async () => {
@@ -76,14 +64,13 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="sidebar__nav">
-        {/* Main Section */}
+        {/* Main Navigation */}
         <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">{t('common.all')}</div>
           <ul className="sidebar__nav-list">
             {mainNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
-                <NavLink 
-                  to={item.path} 
+                <NavLink
+                  to={item.path}
                   className={({ isActive }) => {
                     const isMeetingsRoute = item.path === '/app/meetings'
                     const isMergedActive = isMeetingsRoute && (location.pathname.startsWith('/app/meetings') || location.pathname.startsWith('/app/calendar'))
@@ -100,18 +87,11 @@ const Sidebar = () => {
                 </NavLink>
               </li>
             ))}
-          </ul>
-        </div>
-
-        {/* Tools Section */}
-        <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">{t('ai.assistant')}</div>
-          <ul className="sidebar__nav-list">
             {toolsNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
-                <NavLink 
-                  to={item.path} 
-                  className={({ isActive }) => 
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
                     `sidebar__nav-link ${isActive ? 'active' : ''}`
                   }
                 >
@@ -123,18 +103,11 @@ const Sidebar = () => {
                 </NavLink>
               </li>
             ))}
-          </ul>
-        </div>
-
-        {/* Settings Section */}
-        <div className="sidebar__nav-section">
-          <div className="sidebar__nav-title">{t('settings.title')}</div>
-          <ul className="sidebar__nav-list">
             {settingsNavItems.map((item) => (
               <li key={item.path} className="sidebar__nav-item">
-                <NavLink 
-                  to={item.path} 
-                  className={({ isActive }) => 
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
                     `sidebar__nav-link ${isActive ? 'active' : ''}`
                   }
                 >
@@ -157,8 +130,8 @@ const Sidebar = () => {
             <div className="sidebar__user-name">{displayUser.display_name || displayUser.displayName}</div>
             <div className="sidebar__user-role">{displayUser.role || 'User'}</div>
           </div>
-          <button 
-            className="sidebar__logout-btn" 
+          <button
+            className="sidebar__logout-btn"
             onClick={handleLogout}
             title={t('nav.logout')}
           >

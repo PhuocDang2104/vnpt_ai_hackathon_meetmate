@@ -10,8 +10,10 @@ import { useChatContext } from '../../../contexts/ChatContext'
 import projectsApi from '../../../lib/api/projects'
 import meetingsApi from '../../../lib/api/meetings'
 import { knowledgeApi, type KnowledgeDocument } from '../../../lib/api/knowledge'
-import { FolderOpen, Users, FileText, Calendar } from 'lucide-react'
+import { FolderOpen, Users, FileText, Calendar, Loader2, CheckCircle, X, Trash2, ExternalLink } from 'lucide-react'
 import { adminListUsers } from '../../../lib/api/admin'
+import { UploadDocumentModal, type UploadToastState } from '../../../components/UploadDocumentModal'
+import { API_URL } from '../../../config/env'
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>()
@@ -42,8 +44,7 @@ const ProjectDetail = () => {
   const [meetingSaving, setMeetingSaving] = useState(false)
   const [memberSaving, setMemberSaving] = useState(false)
   const [showDocModal, setShowDocModal] = useState(false)
-  const [uploadingDoc, setUploadingDoc] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadToast, setUploadToast] = useState<UploadToastState | null>(null)
   const [showAttachModal, setShowAttachModal] = useState(false)
   const [searchDoc, setSearchDoc] = useState('')
   const [attaching, setAttaching] = useState(false)
@@ -287,9 +288,9 @@ const ProjectDetail = () => {
                 {memberSaving ? 'Đang thêm...' : 'Thêm'}
               </button>
             </div>
+          </div>
         </div>
-      </div>
-    )}
+      )}
       {/* Modal: Add Meeting */}
       {showMeetingModal && (
         <div className="modal-overlay" onClick={() => setShowMeetingModal(false)}>
@@ -376,66 +377,19 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* Modal: Upload Doc */}
-      {showDocModal && (
-        <div className="modal-overlay" onClick={() => setShowDocModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 520 }}>
-            <div className="modal__header">
-              <h3 className="modal__title">Tải tài liệu lên</h3>
-            </div>
-            <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Chọn file</label>
-                <input
-                  className="form-input"
-                  type="file"
-                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Tiêu đề</label>
-                <input
-                  className="form-input"
-                  placeholder="Tiêu đề"
-                  value={selectedFile ? selectedFile.name : ''}
-                  readOnly
-                />
-              </div>
-            </div>
-            <div className="modal__footer">
-              <button className="btn btn--ghost" onClick={() => setShowDocModal(false)}>Hủy</button>
-              <button
-                className="btn btn--primary"
-                disabled={!selectedFile || uploadingDoc}
-                onClick={async () => {
-                  if (!selectedFile) return
-                  setUploadingDoc(true)
-                  try {
-                    await knowledgeApi.upload({
-                      title: selectedFile.name.replace(/\.[^/.]+$/, ''),
-                      document_type: 'document',
-                      source: 'Uploaded',
-                      file_type: selectedFile.name.split('.').pop() || 'pdf',
-                      project_id: projectId,
-                    } as any, selectedFile)
-                    const d = await projectsApi.listDocuments(projectId!)
-                    setDocs(d.documents || [])
-                    setShowDocModal(false)
-                    setSelectedFile(null)
-                  } catch (err) {
-                    console.error('Upload doc failed', err)
-                    alert('Upload thất bại.')
-                  } finally {
-                    setUploadingDoc(false)
-                  }
-                }}
-              >
-                {uploadingDoc ? 'Đang upload...' : 'Tải lên'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal: Upload Doc - Using shared component */}
+      <UploadDocumentModal
+        isOpen={showDocModal}
+        onClose={() => setShowDocModal(false)}
+        onSuccess={async () => {
+          setShowDocModal(false)
+          // Refresh docs list
+          const d = await projectsApi.listDocuments(projectId!)
+          setDocs(d.documents || [])
+        }}
+        onUploadProgress={(state) => setUploadToast(state)}
+        projectId={projectId}
+      />
 
       {/* Modal: Attach existing doc */}
       {showAttachModal && (
@@ -684,6 +638,41 @@ const ProjectDetail = () => {
           )}
         </div>
       </div>
+
+      {/* Upload Toast Notification */}
+      {uploadToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            padding: '12px 14px',
+            background: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            borderRadius: '12px',
+            boxShadow: '0 12px 35px rgba(0,0,0,0.28)',
+            border: '1px solid var(--border-strong)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            minWidth: 260,
+            zIndex: 9999,
+          }}
+        >
+          {uploadToast.status === 'pending' && <Loader2 size={18} className="animate-spin" />}
+          {uploadToast.status === 'success' && <CheckCircle size={18} color="var(--success)" />}
+          {uploadToast.status === 'error' && <X size={18} color="var(--danger)" />}
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>{uploadToast.message}</div>
+          {uploadToast.status !== 'pending' && (
+            <button
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+              onClick={() => setUploadToast(null)}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

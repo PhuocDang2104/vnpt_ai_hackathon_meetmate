@@ -83,7 +83,7 @@ const Dashboard = () => {
                         <span>{meeting.participants} người</span>
                       </div>
                     </div>
-                    <Link to={`/app/meetings/${meeting.id}/pre`} className="home-meeting-link">
+                    <Link to={`/app/meetings/${meeting.id}/detail`} className="home-meeting-link">
                       Xem
                     </Link>
                   </li>
