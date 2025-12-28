@@ -27,7 +27,6 @@ from app.api.v1.endpoints import (
     minutes,
     minutes_template,
     tools,
-    marketing,
 )
 from app.api.v1.websocket import in_meeting_ws
 
@@ -80,18 +79,12 @@ app.include_router(participants.router, prefix=f"{settings.api_v1_prefix}/partic
 app.include_router(minutes.router, prefix=f"{settings.api_v1_prefix}/minutes", tags=['minutes'])
 app.include_router(minutes_template.router, prefix=f"{settings.api_v1_prefix}/minutes-templates", tags=['minutes-templates'])
 app.include_router(tools.router, prefix=f"{settings.api_v1_prefix}/tools", tags=['tools'])
-app.include_router(marketing.router, prefix=f"{settings.api_v1_prefix}/marketing", tags=['marketing'])
 app.include_router(in_meeting_ws.router, prefix=f"{settings.api_v1_prefix}/ws", tags=['ws'])
 
 # Serve uploaded files (local)
 upload_path = (Path(__file__).parent.parent / "uploaded_files").resolve()
 upload_path.mkdir(parents=True, exist_ok=True)
 app.mount("/files", StaticFiles(directory=str(upload_path)), name="files")
-
-# Serve static assets (e.g. email images)
-static_path = (Path(__file__).parent / "static").resolve()
-static_path.mkdir(parents=True, exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 
 @app.get('/')

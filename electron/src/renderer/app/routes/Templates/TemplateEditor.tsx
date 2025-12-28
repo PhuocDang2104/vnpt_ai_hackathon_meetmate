@@ -56,7 +56,6 @@ const TemplateEditor = ({ template, onClose, onSuccess }: TemplateEditorProps) =
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [meetingTypeInput, setMeetingTypeInput] = useState('')
-  const [mode, setMode] = useState<'visual' | 'json'>('visual')
 
   useEffect(() => {
     if (template) {
@@ -277,201 +276,32 @@ const TemplateEditor = ({ template, onClose, onSuccess }: TemplateEditorProps) =
             </label>
           </div>
 
-          {/* Content Mode Toggle */}
-          <div style={{ borderBottom: '1px solid var(--border)', marginBottom: 16, display: 'flex', gap: 16 }}>
-            <button
+          {/* Structure JSON Editor */}
+          <div className="form-group">
+            <label className="form-label">
+              Structure (JSON) <span style={{ color: 'var(--danger)' }}>*</span>
+            </label>
+            <textarea
+              className="form-textarea"
+              rows={15}
               style={{
-                padding: '8px 4px',
-                borderBottom: mode === 'visual' ? '2px solid var(--accent)' : '2px solid transparent',
-                fontWeight: mode === 'visual' ? 600 : 500,
-                color: mode === 'visual' ? 'var(--accent)' : 'var(--text-muted)',
-                background: 'none',
-                borderTop: 'none',
-                borderLeft: 'none',
-                borderRight: 'none',
-                cursor: 'pointer',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                ...(jsonError ? { borderColor: 'var(--danger)' } : {}),
               }}
-              onClick={() => setMode('visual')}
-            >
-              Xem trước (Visual)
-            </button>
-            <button
-              style={{
-                padding: '8px 4px',
-                borderBottom: mode === 'json' ? '2px solid var(--accent)' : '2px solid transparent',
-                fontWeight: mode === 'json' ? 600 : 500,
-                color: mode === 'json' ? 'var(--accent)' : 'var(--text-muted)',
-                background: 'none',
-                borderTop: 'none',
-                borderLeft: 'none',
-                borderRight: 'none',
-                cursor: 'pointer',
-              }}
-              onClick={() => setMode('json')}
-            >
-              Cấu hình (JSON)
-            </button>
+              value={structureJson}
+              onChange={(e) => handleStructureChange(e.target.value)}
+              placeholder='{"sections": [...]}'
+            />
+            {jsonError && (
+              <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: 4 }}>⚠️ {jsonError}</div>
+            )}
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
+              Structure JSON định nghĩa các sections và fields của template. Xem example trong migration file để
+              tham khảo.
+            </div>
           </div>
-
-          {/* VISUAL MODE */}
-          {mode === 'visual' && (
-            <div
-              style={{
-                background: 'var(--bg-surface)',
-                borderRadius: 'var(--radius-md)',
-                padding: 24,
-                border: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ marginBottom: 24 }}>
-                <h4
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    marginBottom: 4,
-                    color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-heading)',
-                  }}
-                >
-                  {form.name || 'Tên Template'}
-                </h4>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>
-                  {form.description || 'Chưa có mô tả'}
-                </p>
-              </div>
-
-              <div>
-                <h5
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: 'var(--text-muted)',
-                    marginBottom: 16,
-                  }}
-                >
-                  CÁC PHẦN TRONG TEMPLATE:
-                </h5>
-
-                {(() => {
-                  try {
-                    const struct = JSON.parse(structureJson)
-                    if (!struct.sections || !Array.isArray(struct.sections)) return <p>Invalid Structure</p>
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                        {struct.sections
-                          .sort((a: any, b: any) => a.order - b.order)
-                          .map((section: any) => (
-                            <div
-                              key={section.id}
-                              style={{
-                                background: 'white',
-                                padding: 16,
-                                borderRadius: 'var(--radius-sm)',
-                                boxShadow: 'var(--card-shadow-soft)',
-                                borderLeft: '3px solid var(--accent)',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: '14px',
-                                  fontWeight: 600,
-                                  marginBottom: 12,
-                                  color: 'var(--text-primary)',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                }}
-                              >
-                                {section.title}
-                                {section.required && (
-                                  <span
-                                    style={{
-                                      fontSize: '10px',
-                                      color: 'var(--error)',
-                                      background: 'var(--error-subtle)',
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                    }}
-                                  >
-                                    Required
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ display: 'grid', gap: 12 }}>
-                                {section.fields?.map((field: any) => (
-                                  <div key={field.id}>
-                                    <label
-                                      style={{
-                                        display: 'block',
-                                        fontSize: '12px',
-                                        fontWeight: 500,
-                                        marginBottom: 4,
-                                        color: 'var(--text-secondary)',
-                                      }}
-                                    >
-                                      {field.label}{' '}
-                                      {field.required && <span style={{ color: 'var(--error)' }}>*</span>}
-                                    </label>
-                                    <div
-                                      style={{
-                                        height: field.type === 'textarea' ? '60px' : '32px',
-                                        background: 'var(--bg-surface)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 4,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '0 8px',
-                                        fontSize: '12px',
-                                        color: 'var(--text-muted)',
-                                        fontStyle: 'italic',
-                                      }}
-                                    >
-                                      Input type: {field.type}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )
-                  } catch (e) {
-                    return <div style={{ color: 'var(--error)' }}>Cannot render preview: Invalid JSON</div>
-                  }
-                })()}
-              </div>
-            </div>
-          )}
-
-          {/* JSON MODE */}
-          {mode === 'json' && (
-            <div className="form-group">
-              <label className="form-label">
-                Structure (JSON) <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <textarea
-                className="form-textarea"
-                rows={15}
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                  ...(jsonError ? { borderColor: 'var(--danger)' } : {}),
-                }}
-                value={structureJson}
-                onChange={(e) => handleStructureChange(e.target.value)}
-                placeholder='{"sections": [...]}'
-              />
-              {jsonError && (
-                <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: 4 }}>⚠️ {jsonError}</div>
-              )}
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
-                Structure JSON định nghĩa các sections và fields của template. Xem example trong migration file để
-                tham khảo.
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="modal__footer">
