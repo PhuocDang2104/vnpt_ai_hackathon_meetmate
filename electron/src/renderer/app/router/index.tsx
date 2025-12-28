@@ -14,6 +14,8 @@ import KnowledgeHub from '../routes/KnowledgeHub'
 import Tasks from '../routes/Tasks'
 import Settings from '../routes/Settings'
 import About from '../routes/About'
+import Roadmap from '../routes/Roadmap'
+import Pricing from '../routes/Pricing'
 import MeetingLayout from '../layout/MeetingLayout'
 import { MeetingDetail } from '../../features/meetings/components/MeetingDetail'
 import { Login, Register } from '../routes/Auth'
@@ -28,6 +30,8 @@ const router = createHashRouter([
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   { path: '/about', element: <About /> },
+  { path: '/roadmap/*', element: <Roadmap /> },
+  { path: '/pricing/*', element: <Pricing /> },
   
   // App routes (with shell) - Protected
   {

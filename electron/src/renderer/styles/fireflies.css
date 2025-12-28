@@ -310,7 +310,11 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-default);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow-soft);
+  background: var(--card-bg);
+  margin: var(--space-md) var(--space-lg);
 }
 
 .fireflies-video-title {
@@ -491,8 +495,11 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow-soft);
+  background: var(--card-bg);
+  margin: var(--space-md) var(--space-lg);
 }
 
 .fireflies-center-title {
@@ -1123,11 +1130,14 @@
 
 .fireflies-right-header {
   padding: var(--space-md);
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow-soft);
+  background: var(--card-bg);
   position: sticky;
-  top: 0;
+  top: var(--space-md);
   z-index: 10;
+  margin: var(--space-md);
 }
 
 .fireflies-right-title {
