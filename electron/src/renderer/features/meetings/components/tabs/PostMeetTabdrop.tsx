@@ -175,9 +175,14 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   };
 
   const renderMarkdownToHtml = (markdown: string) => {
-    const raw = marked.parse(markdown || '', { gfm: true, breaks: true });
-    const sanitized = DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
-    return addChapterAnchors(sanitized);
+    try {
+      const raw = marked.parse(markdown || '', { gfm: true, breaks: true, headerIds: false, mangle: false }) as string;
+      const sanitized = DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
+      return addChapterAnchors(sanitized);
+    } catch (err) {
+      console.error('Markdown render failed', err);
+      return markdown;
+    }
   };
 
   const handleExport = () => {
