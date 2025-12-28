@@ -88,6 +88,11 @@ upload_path = (Path(__file__).parent.parent / "uploaded_files").resolve()
 upload_path.mkdir(parents=True, exist_ok=True)
 app.mount("/files", StaticFiles(directory=str(upload_path)), name="files")
 
+# Serve static assets (e.g. email images)
+static_path = (Path(__file__).parent / "static").resolve()
+static_path.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
 
 @app.get('/')
 def root():

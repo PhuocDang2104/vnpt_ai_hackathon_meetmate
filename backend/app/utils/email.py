@@ -19,76 +19,19 @@ def _is_valid_email(email: str) -> bool:
 
 
 def _build_welcome_email_html() -> str:
-    # Keep inline CSS simple (better compatibility across email clients)
-    return """
-    <div style="position: relative; width: 100%; height: 0; padding-top: 100.0000%;
- padding-bottom: 0; box-shadow: 0 2px 8px 0 rgba(63,69,81,0.16); margin-top: 1.6em; margin-bottom: 0.9em; overflow: hidden;
- border-radius: 8px; will-change: transform;">
-  <iframe loading="lazy" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; border: none; padding: 0;margin: 0;"
-    src="https://www.canva.com/design/DAG8ofsui9Q/QCQuWNfXhicYEA2NNMz6jA/view?embed" allowfullscreen="allowfullscreen" allow="fullscreen">
-  </iframe>
-</div>
-<a href="https:&#x2F;&#x2F;www.canva.com&#x2F;design&#x2F;DAG8ofsui9Q&#x2F;QCQuWNfXhicYEA2NNMz6jA&#x2F;view?utm_content=DAG8ofsui9Q&amp;utm_campaign=designshare&amp;utm_medium=embeds&amp;utm_source=link" target="_blank" rel="noopener">Software &amp; SaaS B2B Email in Dark Blue Black and White Purple Modern &amp; Futuristic Style</a> của Quan Hoang
-    """
-#     return """\
-# <!DOCTYPE html>
-# <html lang="vi">
-# <head>
-#   <meta charset="utf-8" />
-#   <meta name="viewport" content="width=device-width,initial-scale=1" />
-#   <title>Welcome to MeetMate</title>
-# </head>
-# <body style="margin:0;padding:0;background:#ffffff;color:#1f2937;">
-#   <div style="max-width:600px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;line-height:1.6;">
-#     <div style="padding:16px 18px;border:1px solid #e5e7eb;border-radius:12px;">
-#       <h2 style="margin:0 0 10px 0;font-size:20px;">Cảm ơn bạn đã quan tâm đến MeetMate</h2>
-#       <p style="margin:0 0 14px 0;">
-#         Xin chào,<br/>
-#         Cảm ơn bạn đã đăng ký nhận thông tin từ <strong>MeetMate</strong> — trợ lý AI hỗ trợ chuẩn hóa quy trình họp và chuyển kết quả cuộc họp thành hành động có trách nhiệm.
-#       </p>
-
-#       <h3 style="margin:18px 0 8px 0;font-size:16px;">MeetMate giúp bạn làm gì?</h3>
-#       <ul style="margin:0 0 14px 18px;padding:0;">
-#         <li style="margin:0 0 8px 0;"><strong>Pre-meeting:</strong> chuẩn bị agenda, tài liệu, nhắc lịch theo ngữ cảnh.</li>
-#         <li style="margin:0 0 8px 0;"><strong>In-meeting:</strong> ghi nhận nội dung theo thời gian thực, phân tách người nói.</li>
-#         <li style="margin:0 0 8px 0;"><strong>Post-meeting:</strong> tạo minutes có cấu trúc, trích xuất <em>Action Items</em>/<em>Decisions</em>, gửi và đồng bộ sang công cụ quản trị.</li>
-#       </ul>
-
-#       <h3 style="margin:18px 0 8px 0;font-size:16px;">Tài liệu & liên kết</h3>
-#       <ul style="margin:0 0 16px 18px;padding:0;">
-#         <li style="margin:0 0 8px 0;">
-#           Giới thiệu sản phẩm: <a href="https://vnpt-ai-hackathon-meetmate.vercel.app/about" style="color:#2563eb;text-decoration:none;">/about</a>
-#         </li>
-#         <li style="margin:0 0 8px 0;">
-#           Demo (sắp ra mắt): <a href="https://vnpt-ai-hackathon-meetmate.vercel.app" style="color:#2563eb;text-decoration:none;">/demo</a>
-#         </li>
-#       </ul>
-
-#       <div style="text-align:center;margin:22px 0 8px 0;">
-#         <a href="https://vnpt-ai-hackathon-meetmate.vercel.app/"
-#            style="display:inline-block;background:#f59e0b;color:#ffffff;text-decoration:none;
-#                   padding:12px 18px;border-radius:10px;font-weight:700;">
-#           Truy cập website
-#         </a>
-#       </div>
-
-#       <p style="margin:16px 0 0 0;">
-#         Nếu anh/chị muốn tụi em demo theo quy trình thực tế của đội mình (agenda, tài liệu, action-items), hãy reply email này và cho biết ngữ cảnh sử dụng.
-#       </p>
-
-#       <p style="margin:16px 0 0 0;">
-#         Trân trọng,<br/>
-#         <strong>MeetMate Team</strong>
-#       </p>
-#     </div>
-
-#     <p style="margin:14px 0 0 0;font-size:12px;color:#6b7280;text-align:center;">
-#       Email này được gửi tự động từ MeetMate.
-#     </p>
-#   </div>
-# </body>
-# </html>
-# """
+    try:
+        from pathlib import Path
+        template_path = Path(__file__).parent.parent / "templates" / "welcome_email.html"
+        return template_path.read_text(encoding="utf-8")
+    except Exception as e:
+        logger.error(f"Failed to load email template: {e}")
+        # Fallback to simple HTML if template fails
+        return """
+        <html><body>
+            <h2>Welcome to MeetMate</h2>
+            <p>Admin has updated the template but it failed to load. Please contact support.</p>
+        </body></html>
+        """
 
 
 def _build_welcome_email_text() -> str:
