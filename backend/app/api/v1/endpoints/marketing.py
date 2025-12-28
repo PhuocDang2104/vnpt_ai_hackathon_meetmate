@@ -3,12 +3,12 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.marketing import MarketingLead
-from app.schemas.marketing import MarketingLeadCreate, MarketingLead
+from app.schemas.marketing import MarketingLeadCreate, MarketingLead as MarketingLeadSchema
 from pathlib import Path
 
 router = APIRouter()
 
-@router.post("/join", response_model=MarketingLead)
+@router.post("/join", response_model=MarketingLeadSchema)
 def join_mailing_list(lead: MarketingLeadCreate, db: Session = Depends(get_db)):
     """
     Join the mailing list.
