@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from app.api.v1.deps import get_db
+from app.db.session import get_db
 from app.models.marketing import MarketingLead
 from app.schemas.marketing import MarketingLeadCreate, MarketingLead
 from pathlib import Path
