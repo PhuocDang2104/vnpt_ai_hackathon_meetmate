@@ -22,7 +22,13 @@ def _hydrate_minutes_html(minutes: MeetingMinutesResponse) -> MeetingMinutesResp
     Ensure minutes_html is populated when minutes_markdown exists.
     Useful for older records created before markdown->HTML auto render.
     """
-    if not minutes.minutes_html and minutes.minutes_markdown:
+    def _looks_like_markdown(text: Optional[str]) -> bool:
+        if not text:
+            return True
+        # heuristic: no html tags and has markdown syntax
+        return ("<" not in text and ">" not in text) or ("| ---" in text) or ("**" in text) or ("##" in text)
+
+    if minutes.minutes_markdown and (not minutes.minutes_html or _looks_like_markdown(minutes.minutes_html)):
         try:
             minutes.minutes_html = render_markdown_to_html(minutes.minutes_markdown)
         except Exception:
@@ -89,6 +95,40 @@ def get_latest_minutes(db: Session, meeting_id: str) -> Optional[MeetingMinutesR
     if not row:
         return None
     
+    return _hydrate_minutes_html(MeetingMinutesResponse(
+        id=row[0],
+        meeting_id=row[1],
+        version=row[2],
+        minutes_text=row[3],
+        minutes_html=row[4],
+        minutes_markdown=row[5],
+        minutes_doc_url=row[6],
+        executive_summary=row[7],
+        generated_at=row[8],
+        edited_by=row[9],
+        edited_at=row[10],
+        status=row[11],
+        approved_by=row[12],
+        approved_at=row[13]
+    ))
+
+
+def get_minutes_by_id(db: Session, minutes_id: str) -> Optional[MeetingMinutesResponse]:
+    """Get minutes by ID (hydrated with rendered HTML if only markdown exists)."""
+    query = text("""
+        SELECT 
+            id::text, meeting_id::text, version, minutes_text,
+            minutes_html, minutes_markdown, minutes_doc_url,
+            executive_summary, generated_at, edited_by::text,
+            edited_at, status, approved_by::text, approved_at
+        FROM meeting_minutes
+        WHERE id = :minutes_id
+        LIMIT 1
+    """)
+    row = db.execute(query, {'minutes_id': minutes_id}).fetchone()
+    if not row:
+        return None
+
     return _hydrate_minutes_html(MeetingMinutesResponse(
         id=row[0],
         meeting_id=row[1],
