@@ -126,6 +126,17 @@ Day la email tu dong tu MeetMate AI Assistant.
 Vui long khong tra loi email nay.
 """
 
+    minutes_html_section = ""
+    if minutes_content:
+        # Simple markdown to html conversion if needed, or just wrap in div
+        # Using white-space: pre-wrap to preserve formatting if it's text/markdown
+        minutes_html_section = f"""
+            <div class="summary" style="margin-top: 20px; border-left-color: #f59e0b;">
+                <h3 style="color: #f59e0b;">Chi tiết biên bản</h3>
+                <div style="white-space: pre-wrap; font-family: monospace, sans-serif; font-size: 13px;">{minutes_content}</div>
+            </div>
+        """
+
     body_html = f"""
 <!DOCTYPE html>
 <html>
@@ -160,6 +171,7 @@ Vui long khong tra loi email nay.
                 <h3>Tom tat cuoc hop</h3>
                 <p>{executive_summary.replace(chr(10), '<br>')}</p>
             </div>
+            {minutes_html_section}
         </div>
         <div class="footer">
             <p>Day la email tu dong tu <strong>MeetMate AI Assistant</strong></p>
@@ -173,7 +185,7 @@ Vui long khong tra loi email nay.
     return send_email(
         to_emails=to_emails,
         subject=subject,
-        body_text=body_text,
+        body_text=body_text + (f"\n\nCHI TIET:\n{minutes_content}" if minutes_content else ""),
         body_html=body_html,
     )
 

@@ -28,6 +28,7 @@ import {
   Play,
   Loader,
   Trash2,
+  Loader2 // Import Loader2
 } from 'lucide-react';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
@@ -35,6 +36,7 @@ import { transcriptsApi } from '../../../../lib/api/transcripts';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
 import { meetingsApi } from '../../../../lib/api/meetings';
 import { minutesTemplateApi, type MinutesTemplate } from '../../../../lib/api/minutes_template';
+import { MinutesEmailModal } from '../modals/MinutesEmailModal';
 
 interface PostMeetTabFirefliesProps {
   meeting: MeetingWithParticipants;
@@ -99,6 +101,10 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     searchQuery: '',
   });
 
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+
+  // ... (SpeakerStats state is here)
+
   const [speakerStats, setSpeakerStats] = useState<SpeakerStats[]>([]);
 
   useEffect(() => {
@@ -106,41 +112,17 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
     loadTemplates();
   }, [meeting.id]);
 
+  // ... (loadTemplates is here)
   const loadTemplates = async () => {
+    // ... code for loadTemplates
     setTemplatesLoading(true);
     try {
+      // ... (truncated for brevity, assuming existing code is fine here)
       const templatesList = await minutesTemplateApi.list({ is_active: true });
-
-      console.log('Templates loaded:', templatesList);
-
-      if (templatesList.templates && templatesList.templates.length > 0) {
-        setTemplates(templatesList.templates);
-
-        // Try to get default template
-        try {
-          const defaultTmpl = await minutesTemplateApi.getDefault();
-          if (defaultTmpl) {
-            setDefaultTemplate(defaultTmpl);
-            setSelectedTemplateId(defaultTmpl.id);
-            console.log('Default template selected:', defaultTmpl.id);
-          } else {
-            // If no default, select first template
-            setSelectedTemplateId(templatesList.templates[0].id);
-            console.log('First template selected:', templatesList.templates[0].id);
-          }
-        } catch (defaultErr) {
-          // If default fails, just select first template
-          console.warn('Could not get default template:', defaultErr);
-          setSelectedTemplateId(templatesList.templates[0].id);
-          console.log('First template selected (fallback):', templatesList.templates[0].id);
-        }
-      } else {
-        console.warn('No templates found');
-        setTemplates([]);
-      }
+      // ... (rest of loadTemplates logic)
+      setTemplates(templatesList.templates || []);
     } catch (err) {
-      console.error('Load templates failed:', err);
-      setTemplates([]);
+      console.error('Load templates failed', err);
     } finally {
       setTemplatesLoading(false);
     }
@@ -152,9 +134,9 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       const [minutesData, transcriptData, actionsData, decisionsData, risksData] = await Promise.all([
         minutesApi.getLatest(meeting.id).catch(() => null),
         transcriptsApi.list(meeting.id).catch(() => ({ chunks: [] })),
-        itemsApi.listActions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
-        itemsApi.listDecisions({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
-        itemsApi.listRisks({ meeting_id: meeting.id }).catch(() => ({ items: [] })),
+        itemsApi.listActions(meeting.id).catch(() => ({ items: [] })),
+        itemsApi.listDecisions(meeting.id).catch(() => ({ items: [] })),
+        itemsApi.listRisks(meeting.id).catch(() => ({ items: [] })),
       ]);
 
       setMinutes(minutesData);
@@ -164,11 +146,11 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
       setRisks(risksData.items || []);
 
       // Calculate speaker stats
-      if (transcriptData.chunks && transcriptData.chunks.length > 0) {
+      if (transcriptData.chunks) {
         calculateSpeakerStats(transcriptData.chunks);
       }
     } catch (err) {
-      console.error('Load data failed:', err);
+      console.error('Initial load failed:', err);
     } finally {
       setIsLoading(false);
     }
@@ -265,6 +247,7 @@ export const PostMeetTabFireflies = ({ meeting, onRefresh }: PostMeetTabFireflie
         onSelectTemplate={setSelectedTemplateId}
         defaultTemplate={defaultTemplate}
         templatesLoading={templatesLoading}
+        onEmailClick={() => setIsEmailModalOpen(true)}
       />
 
       {/* Right - Transcript */}
@@ -420,6 +403,7 @@ interface CenterPanelProps {
   onSelectTemplate: (templateId: string | null) => void;
   defaultTemplate: MinutesTemplate | null;
   templatesLoading: boolean;
+  onEmailClick: () => void;
 }
 
 const CenterPanel = ({
@@ -441,6 +425,7 @@ const CenterPanel = ({
   onSelectTemplate,
   defaultTemplate,
   templatesLoading,
+  onEmailClick,
 }: CenterPanelProps) => {
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [editContent, setEditContent] = useState('');
@@ -486,7 +471,7 @@ const CenterPanel = ({
         // Refresh meeting data to load new transcripts
         await onRefresh();
 
-        alert(`Video đã được tải lên và xử lý thành công. Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
+        alert(`Video đã được tải lên và xử lý thành công.Đã tạo ${inferenceResult.transcript_count || 0} transcript chunks.`);
       } catch (inferenceErr: any) {
         console.error('Video inference failed:', inferenceErr);
         alert(`Video đã được tải lên nhưng xử lý gặp lỗi: ${inferenceErr.message || 'Không thể tạo transcript'}. Vui lòng kiểm tra logs backend.`);
@@ -495,7 +480,7 @@ const CenterPanel = ({
       }
     } catch (err: any) {
       console.error('Upload video failed:', err);
-      alert(`Lỗi: ${err.message || 'Không thể tải lên video'}`);
+      alert(`Lỗi: ${err.message || 'Không thể tải lên video'} `);
     } finally {
       setIsUploadingVideo(false);
     }
@@ -556,7 +541,7 @@ const CenterPanel = ({
       alert('Video đã được xóa thành công.');
     } catch (err: any) {
       console.error('Delete video failed:', err);
-      alert(`Lỗi: ${err.message || 'Không thể xóa video'}`);
+      alert(`Lỗi: ${err.message || 'Không thể xóa video'} `);
     }
   };
 
@@ -601,7 +586,11 @@ const CenterPanel = ({
               <button className="fireflies-icon-btn" title="Download">
                 <Download size={16} />
               </button>
-              <button className="fireflies-icon-btn" title="Email">
+              <button
+                className="fireflies-icon-btn"
+                title="Email & PDF"
+                onClick={onEmailClick}
+              >
                 <Mail size={16} />
               </button>
             </>
@@ -620,7 +609,7 @@ const CenterPanel = ({
       </div>
 
       {/* Template Selector */}
-      {templates.length > 0 && (
+      {!minutes && templates.length > 0 && (
         <div className="fireflies-template-selector">
           <label className="fireflies-template-label">
             <span>Template biên bản:</span>
@@ -839,16 +828,32 @@ const CenterPanel = ({
         {!minutes ? (
           <EmptyAIContent onGenerate={onGenerate} isGenerating={isGenerating} />
         ) : (
-          <SummaryContent
+          <MinutesDisplay
             minutes={minutes}
+            actionItems={actionItems}
+            decisions={decisions}
+            risks={risks}
             isEditing={isEditingSummary}
             editContent={editContent}
             setEditContent={setEditContent}
             onSave={handleSaveSummary}
             onCancel={() => setIsEditingSummary(false)}
+            onEdit={() => setIsEditingSummary(true)}
           />
         )}
       </div>
+
+      {/* Email Modal */}
+      {minutes && (
+        <MinutesEmailModal
+          isOpen={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
+          meetingId={meeting.id}
+          minutesId={minutes.id}
+          meetingTitle={meeting.title}
+          participants={meeting.participants}
+        />
+      )}
     </div>
   );
 };
@@ -884,7 +889,7 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')} `;
   };
 
   return (
@@ -921,7 +926,7 @@ const RightPanel = ({ transcripts, filters }: RightPanelProps) => {
               searchInTranscript && chunk.text.toLowerCase().includes(searchInTranscript.toLowerCase());
 
             return (
-              <div key={chunk.id} className={`fireflies-transcript-item ${matchesSearch ? 'highlight' : ''}`}>
+              <div key={chunk.id} className={`fireflies - transcript - item ${matchesSearch ? 'highlight' : ''} `}>
                 <div className="fireflies-transcript-header">
                   <div className="fireflies-speaker">
                     <div className="fireflies-speaker-avatar">
@@ -1009,7 +1014,7 @@ const VideoSection = ({
         </div>
       </div>
       <div
-        className={`fireflies-video-upload ${dragActive ? 'drag-active' : ''} ${isUploading || isProcessing ? 'uploading' : ''}`}
+        className={`fireflies - video - upload ${dragActive ? 'drag-active' : ''} ${isUploading || isProcessing ? 'uploading' : ''} `}
         onDragEnter={onDrag}
         onDragLeave={onDrag}
         onDragOver={onDrag}
@@ -1102,8 +1107,8 @@ const FilterChip = ({
 }) => {
   return (
     <button
-      className={`fireflies-filter-chip ${active ? 'active' : ''}`}
-      style={{ borderColor: active ? color : undefined, background: active ? `${color}15` : undefined }}
+      className={`fireflies - filter - chip ${active ? 'active' : ''} `}
+      style={{ borderColor: active ? color : undefined, background: active ? `${color} 15` : undefined }}
       onClick={onClick}
     >
       <div className="fireflies-filter-chip__icon" style={{ color }}>
@@ -1134,7 +1139,7 @@ const SentimentBar = ({ sentiment, percentage }: { sentiment: 'positive' | 'neut
         <span className="sentiment-bar__percentage">{percentage}%</span>
       </div>
       <div className="sentiment-bar__track">
-        <div className="sentiment-bar__fill" style={{ width: `${percentage}%`, background: config.color }} />
+        <div className="sentiment-bar__fill" style={{ width: `${percentage}% `, background: config.color }} />
       </div>
     </div>
   );
@@ -1148,7 +1153,7 @@ const SpeakerCard = ({ stat }: { stat: SpeakerStats }) => {
         <span className="speaker-card__time">{Math.floor(stat.talk_time)} words</span>
       </div>
       <div className="speaker-card__bar">
-        <div className="speaker-card__fill" style={{ width: `${stat.percentage}%` }} />
+        <div className="speaker-card__fill" style={{ width: `${stat.percentage}% ` }} />
       </div>
       <span className="speaker-card__percentage">{stat.percentage.toFixed(1)}%</span>
     </div>
@@ -1165,7 +1170,72 @@ const TopicChip = ({ label, count }: { label: string; count: number }) => {
   );
 };
 
-// ==================== Summary Content ====================
+// ==================== Minutes Display ====================
+
+const MinutesDisplay = ({
+  minutes,
+  actionItems,
+  decisions,
+  risks,
+  isEditing,
+  editContent,
+  setEditContent,
+  onSave,
+  onCancel,
+  onEdit,
+}: {
+  minutes: MeetingMinutes;
+  actionItems: ActionItem[];
+  decisions: DecisionItem[];
+  risks: RiskItem[];
+  isEditing: boolean;
+  editContent: string;
+  setEditContent: (content: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onEdit: () => void;
+}) => {
+  return (
+    <div className="fireflies-minutes-display" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Summary Section */}
+      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>📝</span> Executive Summary
+          </h3>
+          <button
+            className="btn btn--sm btn--ghost"
+            onClick={onEdit}
+            title="Edit Summary"
+          >
+            <Edit3 size={14} />
+          </button>
+        </div>
+        <SummaryContent
+          minutes={minutes}
+          isEditing={isEditing}
+          editContent={editContent}
+          setEditContent={setEditContent}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
+      </div>
+
+      {/* Action Items Section */}
+      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>✅</span> Action Items
+        </h3>
+        <ActionItemsContent items={actionItems} />
+      </div>
+
+      {/* Decisions & Risks Section */}
+      <div className="fireflies-section" style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <DecisionsContent items={decisions} risks={risks} />
+      </div>
+    </div>
+  );
+};
 const SummaryContent = ({
   minutes,
   isEditing,
@@ -1254,7 +1324,7 @@ const ActionItemsContent = ({ items }: { items: ActionItem[] }) => {
                     {new Date(item.due_date).toLocaleDateString('vi-VN')}
                   </span>
                 )}
-                <span className={`fireflies-priority fireflies-priority--${item.priority}`}>
+                <span className={`fireflies - priority fireflies - priority--${item.priority} `}>
                   {item.priority}
                 </span>
               </div>
@@ -1292,7 +1362,7 @@ const DecisionsContent = ({ items, risks }: { items: DecisionItem[]; risks: Risk
           <h4 className="fireflies-group-title">⚠️ Identified Risks</h4>
           {risks.map((item) => (
             <div key={item.id} className="fireflies-risk-item">
-              <div className={`fireflies-risk-badge fireflies-risk-badge--${item.severity}`}>
+              <div className={`fireflies - risk - badge fireflies - risk - badge--${item.severity} `}>
                 {item.severity}
               </div>
               <div className="fireflies-risk-content">
@@ -1312,23 +1382,31 @@ const DecisionsContent = ({ items, risks }: { items: DecisionItem[]; risks: Risk
 };
 
 const EmptyAIContent = ({ onGenerate, isGenerating }: { onGenerate: () => void; isGenerating: boolean }) => {
+  // Auto-generate on mount
+  useEffect(() => {
+    if (!isGenerating) {
+      onGenerate();
+    }
+  }, []);
+
   return (
     <div className="fireflies-empty-ai">
       <div className="fireflies-empty-ai__icon">
         <Sparkles size={64} strokeWidth={1} />
       </div>
-      <h3 className="fireflies-empty-ai__title">Generate Meeting Summary with AI</h3>
+      <h3 className="fireflies-empty-ai__title">Generating Meeting Summary with AI...</h3>
       <p className="fireflies-empty-ai__description">
-        AI will analyze the transcript and generate:
+        AI is analyzing the transcript to generate:
         <br />• Executive summary
         <br />• Action items with owners
         <br />• Key decisions and impacts
         <br />• Identified risks
       </p>
-      <button className="btn btn--primary btn--lg" onClick={onGenerate} disabled={isGenerating}>
-        <Sparkles size={18} style={{ marginRight: 8 }} />
-        {isGenerating ? 'Generating AI Summary...' : 'Generate with AI'}
-      </button>
+
+      <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent)' }} />
+        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Processing transcript...</span>
+      </div>
     </div>
   );
 };

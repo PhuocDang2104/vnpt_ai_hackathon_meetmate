@@ -10,9 +10,11 @@ export interface ActionItem {
   meeting_id: string;
   owner_user_id?: string;
   owner_name?: string;
+  title?: string; // Added field
   meeting_title?: string;
   description: string;
   deadline?: string;
+  due_date?: string; // Added alias
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'proposed' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   source_text?: string;
@@ -24,6 +26,7 @@ export interface ActionItem {
 
 export interface ActionItemCreate {
   meeting_id: string;
+  title?: string;
   description: string;
   owner_user_id?: string;
   deadline?: string;
@@ -33,6 +36,7 @@ export interface ActionItemCreate {
 }
 
 export interface ActionItemUpdate {
+  title?: string;
   description?: string;
   owner_user_id?: string;
   deadline?: string;
@@ -58,8 +62,10 @@ export interface ActionItemList {
 export interface DecisionItem {
   id: string;
   meeting_id: string;
+  title?: string; // Added field
   description: string;
   rationale?: string;
+  impact?: string; // Added field
   confirmed_by?: string;
   confirmed_at?: string;
   source_text?: string;
@@ -76,6 +82,7 @@ export interface DecisionItemList {
 export interface RiskItem {
   id: string;
   meeting_id: string;
+  title?: string; // Added field
   description: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   mitigation?: string;
@@ -100,7 +107,7 @@ export const itemsApi = {
     if (filters?.priority) params.append('priority', filters.priority);
     if (filters?.owner_user_id) params.append('owner_user_id', filters.owner_user_id);
     if (filters?.overdue_only) params.append('overdue_only', 'true');
-    
+
     const query = params.toString();
     return api.get<ActionItemList>(`${ENDPOINT}/actions${query ? `?${query}` : ''}`);
   },
