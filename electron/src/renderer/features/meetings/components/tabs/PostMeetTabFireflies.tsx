@@ -602,7 +602,7 @@ const CenterPanel = ({
     <!-- Header -->
     <div class="header">
       <div class="header-top">
-        <div class="logo">📋 MeetMate</div>
+        <div class="logo">MeetMate</div>
         <div class="doc-type">BIÊN BẢN CUỘC HỌP</div>
       </div>
       <div class="meeting-title">${meeting.title}</div>
@@ -610,16 +610,16 @@ const CenterPanel = ({
     
     <!-- Meeting Info -->
     <table class="info-table">
-      <tr><td>📅 Ngày họp</td><td>${formatDate(meeting.start_time)}</td></tr>
-      <tr><td>⏰ Thời gian</td><td>${formatTime(meeting.start_time)}${meeting.end_time ? ' - ' + formatTime(meeting.end_time) : ''}</td></tr>
-      ${meeting.meeting_type ? '<tr><td>📁 Loại cuộc họp</td><td>' + meeting.meeting_type + '</td></tr>' : ''}
-      ${meeting.participants?.length ? '<tr><td>👥 Người tham gia</td><td>' + meeting.participants.map(p => p.display_name || p.email).join(', ') + '</td></tr>' : ''}
+      <tr><td>Ngày họp</td><td>${formatDate(meeting.start_time)}</td></tr>
+      <tr><td>Thời gian</td><td>${formatTime(meeting.start_time)}${meeting.end_time ? ' - ' + formatTime(meeting.end_time) : ''}</td></tr>
+      ${meeting.meeting_type ? '<tr><td>Loại cuộc họp</td><td>' + meeting.meeting_type + '</td></tr>' : ''}
+      ${meeting.participants?.length ? '<tr><td>Người tham gia</td><td>' + meeting.participants.map(p => p.display_name || p.email).join(', ') + '</td></tr>' : ''}
     </table>
     
     <!-- Executive Summary -->
     <div class="section">
       <div class="section-header">
-        <span class="section-icon">📝</span>
+        <span class="section-icon"></span>
         <span class="section-title">Tóm tắt điều hành</span>
       </div>
       <div class="summary-box">
@@ -631,7 +631,7 @@ const CenterPanel = ({
     <!-- Key Points -->
     <div class="section">
       <div class="section-header">
-        <span class="section-icon">💡</span>
+        <span class="section-icon"></span>
         <span class="section-title">Những điểm chính</span>
         <span class="section-count">${keyPoints.length}</span>
       </div>
@@ -644,7 +644,7 @@ const CenterPanel = ({
     <!-- Action Items -->
     <div class="section">
       <div class="section-header">
-        <span class="section-icon">✅</span>
+        <span class="section-icon"></span>
         <span class="section-title">Công việc cần thực hiện</span>
         <span class="section-count">${actionItems.length}</span>
       </div>
@@ -653,9 +653,9 @@ const CenterPanel = ({
           <div class="item-desc">${a.description}</div>
           <div class="item-meta">
             <span>👤 ${a.owner || 'Chưa phân công'}</span>
-            ${a.deadline ? `<span>📅 ${a.deadline}</span>` : ''}
+            ${a.deadline ? `<span>${a.deadline}</span>` : ''}
             ${a.priority ? `<span class="badge ${a.priority}">${a.priority.toUpperCase()}</span>` : ''}
-            ${a.created_by ? `<span>📌 Yêu cầu bởi: ${a.created_by}</span>` : ''}
+            ${a.created_by ? `<span>Yêu cầu bởi: ${a.created_by}</span>` : ''}
           </div>
         </div>
       `).join('')}
@@ -673,7 +673,7 @@ const CenterPanel = ({
         <div class="item-card decision">
           <div class="item-desc">${d.description}</div>
           <div class="item-meta">
-            ${d.rationale ? `<span>💬 ${d.rationale}</span>` : ''}
+            ${d.rationale ? `<span>${d.rationale}</span>` : ''}
             ${d.decided_by || d.confirmed_by ? `<span>👤 Quyết định bởi: ${d.decided_by || d.confirmed_by}</span>` : ''}
           </div>
         </div>
@@ -684,7 +684,7 @@ const CenterPanel = ({
     <!-- Risks -->
     <div class="section">
       <div class="section-header">
-        <span class="section-icon">⚠️</span>
+        <span class="section-icon"></span>
         <span class="section-title">Rủi ro & Vấn đề</span>
         <span class="section-count">${risks.length}</span>
       </div>
@@ -693,8 +693,8 @@ const CenterPanel = ({
           <div class="item-desc">${r.description}</div>
           <div class="item-meta">
             <span class="badge ${r.severity}">${(r.severity || 'medium').toUpperCase()}</span>
-            ${r.mitigation ? `<span>🛡️ ${r.mitigation}</span>` : ''}
-            ${r.raised_by ? `<span>👤 Nêu bởi: ${r.raised_by}</span>` : ''}
+            ${r.mitigation ? `<span>${r.mitigation}</span>` : ''}
+            ${r.raised_by ? `<span>Nêu bởi: ${r.raised_by}</span>` : ''}
           </div>
         </div>
       `).join('')}
@@ -999,8 +999,8 @@ const CenterPanel = ({
               </div>
               <div style={{ padding: '16px', maxHeight: '160px', overflowY: 'auto' }}>
                 <div style={{ background: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <h4 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '15px' }}>📝 {meeting.title}</h4>
-                  <p style={{ fontSize: '11px', color: '#666', margin: '0 0 10px' }}>📅 {meeting.start_time ? new Date(meeting.start_time).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                  <h4 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '15px' }}>{meeting.title}</h4>
+                  <p style={{ fontSize: '11px', color: '#666', margin: '0 0 10px' }}>{meeting.start_time ? new Date(meeting.start_time).toLocaleDateString('vi-VN') : 'N/A'}</p>
                   <div style={{ fontSize: '12px', color: '#333', lineHeight: 1.5 }}>
                     <strong>Tóm tắt:</strong> {(minutes?.executive_summary || 'Chưa có').slice(0, 200)}{(minutes?.executive_summary?.length || 0) > 200 ? '...' : ''}
                   </div>
@@ -1113,7 +1113,7 @@ const RightPanel = ({ transcripts, filters, meetingId, onAddTranscripts, onDelet
           style={{ cursor: 'pointer' }}
           title="Shift+Click để thêm transcript thủ công"
         >
-          <span>📝</span>
+          <span></span>
           Transcript
         </h3>
 

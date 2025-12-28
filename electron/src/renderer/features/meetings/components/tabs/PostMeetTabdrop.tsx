@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { MeetingWithParticipants } from '../../../../shared/dto/meeting';
 import { minutesApi, type MeetingMinutes } from '../../../../lib/api/minutes';
 import { itemsApi, type ActionItem, type DecisionItem, type RiskItem } from '../../../../lib/api/items';
 import { transcriptsApi } from '../../../../lib/api/transcripts';
 import { meetingsApi } from '../../../../lib/api/meetings';
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  headerIds: false,
+});
 
 interface PostMeetTabProps {
   meeting: MeetingWithParticipants;
@@ -166,6 +174,12 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
     }
   };
 
+  const renderMarkdownToHtml = (markdown: string) => {
+    const raw = marked.parse(markdown || '', { gfm: true, breaks: true });
+    const sanitized = DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
+    return addChapterAnchors(sanitized);
+  };
+
   const handleExport = () => {
     if (!minutes) {
       alert('Vui lòng tạo biên bản trước khi export');
@@ -217,7 +231,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
         </div>
         <div class="section">
           <h2>NỘI DUNG CUỘC HỌP</h2>
-          <div class="content">${minutes.minutes_markdown || minutes.executive_summary || 'Không có nội dung'}</div>
+          <div class="content">${renderMarkdownToHtml(minutes.minutes_markdown || minutes.executive_summary || 'Không có nội dung')}</div>
         </div>
         <div class="footer">
           <p>Biên bản được tạo bởi MeetMate AI</p>
@@ -372,7 +386,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
               <div
                 className="minutes-content markdown-body"
                 dangerouslySetInnerHTML={{
-                  __html: formatMarkdownWithChapters(
+                  __html: renderMarkdownToHtml(
                     maskSensitiveContent(minutes.minutes_markdown || minutes.executive_summary || '')
                   ),
                 }}
@@ -399,16 +413,10 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
   );
 };
 
-const formatMarkdownWithChapters = (markdown: string): string => {
-  return markdown
-    .replace(/^## (.*$)/gim, '<h2 data-chapter="$1">$1</h2>')
-    .replace(/^### (.*$)/gim, '<h3 data-chapter="$1">$1</h3>')
-    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-    .replace(/^- (.*$)/gim, '<li>$1</li>')
-    .replace(/^(\d+)\. (.*$)/gim, '<li>$2</li>')
-    .replace(/\n/g, '<br>');
+const addChapterAnchors = (html: string): string => {
+  return html
+    .replace(/<h2>(.*?)<\/h2>/gim, '<h2 data-chapter="$1">$1</h2>')
+    .replace(/<h3>(.*?)<\/h3>/gim, '<h3 data-chapter="$1">$1</h3>');
 };
 
 // ------------------ Stats Section ------------------

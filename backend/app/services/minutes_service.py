@@ -25,12 +25,6 @@ def _hydrate_minutes_html(minutes: MeetingMinutesResponse) -> MeetingMinutesResp
     Ensure minutes_html is populated when minutes_markdown exists.
     Useful for older records created before markdown->HTML auto render.
     """
-    def _looks_like_markdown(text: Optional[str]) -> bool:
-        if not text:
-            return True
-        # heuristic: no html tags and has markdown syntax
-        return ("<" not in text and ">" not in text) or ("| ---" in text) or ("**" in text) or ("##" in text)
-
     if minutes.minutes_markdown and (not minutes.minutes_html or _looks_like_markdown(minutes.minutes_html)):
         try:
             minutes.minutes_html = render_markdown_to_html(minutes.minutes_markdown)
@@ -38,6 +32,14 @@ def _hydrate_minutes_html(minutes: MeetingMinutesResponse) -> MeetingMinutesResp
             # Keep silent to avoid breaking response
             pass
     return minutes
+
+
+def _looks_like_markdown(text: Optional[str]) -> bool:
+    if not text:
+        return True
+    # heuristic: common markdown markers
+    return ("| ---" in text) or ("**" in text) or ("##" in text) or ("- " in text and "<" not in text)
+
 
 
 def list_minutes(db: Session, meeting_id: str) -> MeetingMinutesList:
@@ -155,10 +157,13 @@ def render_minutes_html_content(minutes: MeetingMinutesResponse) -> str:
     Render minutes into HTML for export/viewing, preferring stored HTML,
     otherwise converting markdown, otherwise wrapping plain text.
     """
-    if minutes.minutes_html:
+    if minutes.minutes_html and not _looks_like_markdown(minutes.minutes_html):
         return minutes.minutes_html
-    if minutes.minutes_markdown:
-        return render_markdown_to_html(minutes.minutes_markdown)
+
+    # Prefer markdown if available
+    source_md = minutes.minutes_markdown or (minutes.minutes_html if _looks_like_markdown(minutes.minutes_html) else None)
+    if source_md:
+        return render_markdown_to_html(source_md)
     if minutes.minutes_text:
         from html import escape
         return f"<pre style=\"white-space: pre-wrap; font-family: sans-serif;\">{escape(minutes.minutes_text)}</pre>"
