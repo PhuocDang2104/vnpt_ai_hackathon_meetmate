@@ -2,8 +2,10 @@ import logging
 import re
 import smtplib
 import ssl
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Optional
 
 from app.core.config import get_settings
@@ -20,7 +22,6 @@ def _is_valid_email(email: str) -> bool:
 
 def _build_welcome_email_html() -> str:
     try:
-        from pathlib import Path
         template_path = Path(__file__).parent.parent / "templates" / "welcome_email.html"
         return template_path.read_text(encoding="utf-8")
     except Exception as e:
@@ -53,26 +54,103 @@ def _build_welcome_email_text() -> str:
     )
 
 
-def send_welcome_email(to_email: str, *, subject: Optional[str] = None) -> bool:
-    """
-    Send a welcome email to a subscriber.
+def _pitch_template_context() -> dict:
+    """Default placeholders for the pitch minutes HTML."""
+    return {
+        "meeting_ref": "DEMO-2024-09",
+        "minutes_url": "https://vnpt-ai-hackathon-meetmate.vercel.app/demo-minutes",
+        "recording_url": "https://vnpt-ai-hackathon-meetmate.vercel.app/demo-recording",
+        "delivery_seconds": "42",
+        "meeting_title": "MeetMate Demo cùng VNPT",
+        "meeting_datetime": "09/2024",
+        "meeting_location": "Online",
+        "participants_count": "5",
+        "organizer_name": "MeetMate Team",
+        "objective": "Trình diễn luồng Pre/In/Post-meeting, khả năng ghi nhận real-time và xuất minutes chuẩn doanh nghiệp.",
+        "key_points_html": "<ul style='padding-left:18px;margin:0;'><li>AI ghi âm, tách người nói và highlight Action/Decision/Risk.</li><li>Minutes chuẩn hóa, có người phụ trách và deadline.</li><li>Sẵn sàng tích hợp SmartVoice và GoMeet.</li></ul>",
+        "highlight_refs": "00:05:12, 00:12:40",
+        "decisions_rows_html": """
+        <tr>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">Chuẩn hóa minutes theo mẫu VNPT</td>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">MeetMate</td>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">Tuần này</td>
+        </tr>
+        <tr>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">Kết nối SmartVoice/GoMeet</td>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">Tech team</td>
+          <td class="small text" style="padding:10px 12px; border-top:1px solid #EEF0F3;">Đang tiến hành</td>
+        </tr>
+        """,
+        "followups_html": "<ul style='padding-left:18px;margin:0;'><li>Chốt API SmartVoice & GoMeet.</li><li>Test minutes trên dữ liệu nội bộ VNPT.</li><li>Chuẩn bị demo end-to-end với phòng ban.</li></ul>",
+        "pending_count": "3",
+        "next_review_date": "Tuần tới",
+        "attachments_note": "Link minutes, transcript, demo deck và prompt tham khảo.",
+        "attachments_rows_html": """
+        <tr>
+          <td class="text small" style="padding:10px 12px; border-bottom:1px solid #EEF0F3;">Minutes</td>
+          <td class="text small" style="padding:10px 12px; border-bottom:1px solid #EEF0F3;"><a href="https://vnpt-ai-hackathon-meetmate.vercel.app/demo-minutes">Mở file</a></td>
+        </tr>
+        <tr>
+          <td class="text small" style="padding:10px 12px; border-bottom:1px solid #EEF0F3;">Transcript</td>
+          <td class="text small" style="padding:10px 12px; border-bottom:1px solid #EEF0F3;"><a href="https://vnpt-ai-hackathon-meetmate.vercel.app/demo-transcript">Mở file</a></td>
+        </tr>
+        <tr>
+          <td class="text small" style="padding:10px 12px;">Deck</td>
+          <td class="text small" style="padding:10px 12px;"><a href="https://vnpt-ai-hackathon-meetmate.vercel.app/demo-deck">Xem deck</a></td>
+        </tr>
+        """,
+        "project_name": "MeetMate Demo",
+        "kb_updated_at": "Hôm qua",
+        "transcript_url": "https://vnpt-ai-hackathon-meetmate.vercel.app/demo-transcript",
+        "year": str(datetime.utcnow().year),
+    }
 
-    Returns:
-        True if sent successfully, False otherwise.
 
-    Notes:
-        - Uses SMTP settings from `get_settings()`.
-        - Designed to run in a background task (but safe to call synchronously).
-    """
+def _build_pitch_minutes_email_html() -> str:
+    try:
+        template_path = Path(__file__).parent.parent / "templates" / "pitch_minutes_email.html"
+        html = template_path.read_text(encoding="utf-8")
+        ctx = _pitch_template_context()
+        for key, val in ctx.items():
+            html = html.replace(f"{{{{{key}}}}}", val)
+        return html
+    except Exception as e:
+        logger.error(f"Failed to load pitch minutes template: {e}")
+        return """
+        <html><body>
+            <h2>Biên bản pitching MeetMate</h2>
+            <p>Chúng tôi gặp lỗi khi tải template HTML. Vui lòng xem phiên bản text đính kèm.</p>
+        </body></html>
+        """
+
+
+def _build_pitch_minutes_email_text() -> str:
+    ctx = _pitch_template_context()
+    return (
+        "Chào bạn,\n\n"
+        "Đây là biên bản tóm tắt buổi demo MeetMate.\n\n"
+        f"Biên bản đầy đủ: {ctx['minutes_url']}\n"
+        f"Recording: {ctx['recording_url']}\n"
+        f"Mục tiêu: {ctx['objective']}\n"
+        "Quyết định chính:\n"
+        "- Chuẩn hóa minutes theo mẫu VNPT (MeetMate, tuần này)\n"
+        "- Kết nối SmartVoice/GoMeet (Tech team, đang tiến hành)\n"
+        "Follow-ups: Chốt API, test dữ liệu VNPT, chuẩn bị demo end-to-end.\n\n"
+        "Nếu bạn muốn nhận file minutes chi tiết hoặc book buổi demo theo quy trình của đội mình, hãy reply email này.\n\n"
+        "Trân trọng,\n"
+        "MeetMate Team\n"
+    )
+
+
+def _send_email(*, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    """Shared email sender using SMTP settings."""
     if not settings.email_enabled:
-        logger.info("Email sending is disabled. Skipping welcome email.")
+        logger.info("Email sending is disabled. Skipping email [%s].", subject)
         return False
 
     if not _is_valid_email(to_email):
-        logger.warning("Invalid email address: %r. Skipping welcome email.", to_email)
+        logger.warning("Invalid email address: %r. Skipping email [%s].", to_email, subject)
         return False
-
-    subj = subject or "Chào mừng bạn đến với MeetMate"
 
     from_addr = settings.smtp_user
     from_name = getattr(settings, "email_from_name", None) or "MeetMate"
@@ -81,12 +159,12 @@ def send_welcome_email(to_email: str, *, subject: Optional[str] = None) -> bool:
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{from_name} <{from_addr}>"
     msg["To"] = to_email
-    msg["Subject"] = subj
+    msg["Subject"] = subject
     if reply_to:
         msg["Reply-To"] = reply_to
 
-    text_part = MIMEText(_build_welcome_email_text(), "plain", "utf-8")
-    html_part = MIMEText(_build_welcome_email_html(), "html", "utf-8")
+    text_part = MIMEText(text_body, "plain", "utf-8")
+    html_part = MIMEText(html_body, "html", "utf-8")
     msg.attach(text_part)
     msg.attach(html_part)
 
@@ -105,9 +183,41 @@ def send_welcome_email(to_email: str, *, subject: Optional[str] = None) -> bool:
             server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
 
-        logger.info("Welcome email sent to %s", to_email)
+        logger.info("Email [%s] sent to %s", subject, to_email)
         return True
 
     except Exception:
-        logger.exception("Failed to send welcome email to %s", to_email)
+        logger.exception("Failed to send email [%s] to %s", subject, to_email)
         return False
+
+
+def send_welcome_email(to_email: str, *, subject: Optional[str] = None) -> bool:
+    """
+    Send a welcome email to a subscriber.
+
+    Returns:
+        True if sent successfully, False otherwise.
+    """
+    subj = subject or "Chào mừng bạn đến với MeetMate"
+    return _send_email(
+        to_email=to_email,
+        subject=subj,
+        text_body=_build_welcome_email_text(),
+        html_body=_build_welcome_email_html(),
+    )
+
+
+def send_pitch_minutes_email(to_email: str, *, subject: Optional[str] = None) -> bool:
+    """
+    Send the pitch minutes email to a subscriber.
+
+    Returns:
+        True if sent successfully, False otherwise.
+    """
+    subj = subject or "Biên bản pitching MeetMate - VNPT AI Hackathon"
+    return _send_email(
+        to_email=to_email,
+        subject=subj,
+        text_body=_build_pitch_minutes_email_text(),
+        html_body=_build_pitch_minutes_email_html(),
+    )
