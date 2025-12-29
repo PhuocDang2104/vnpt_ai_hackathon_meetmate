@@ -108,7 +108,9 @@ def _pitch_template_context() -> dict:
 
 def _build_pitch_minutes_email_html() -> str:
     try:
-        template_path = Path(__file__).parent.parent / "templates" / "pitch_minutes_email.html"
+        # Prefer Canva template if present
+        canva_template = Path(__file__).parent / "pitching mail" / "email.html"
+        template_path = canva_template if canva_template.exists() else Path(__file__).parent.parent / "templates" / "pitch_minutes_email.html"
         html = template_path.read_text(encoding="utf-8")
         ctx = _pitch_template_context()
         for key, val in ctx.items():
