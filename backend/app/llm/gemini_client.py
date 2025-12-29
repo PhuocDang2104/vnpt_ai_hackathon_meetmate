@@ -37,9 +37,10 @@ def is_gemini_available() -> bool:
 class GeminiChat:
     """Chat wrapper using Groq chat completions."""
     
-    def __init__(self, system_prompt: Optional[str] = None):
+    def __init__(self, system_prompt: Optional[str] = None, mock_response: Optional[str] = None):
         self.client = get_gemini_client()
         self.system_prompt = system_prompt or self._default_system_prompt()
+        self.mock_response = mock_response or "AI dang o che do mock, chua cau hinh GROQ_API_KEY."
         self.history: List[Dict[str, str]] = []
     
     def _default_system_prompt(self) -> str:
@@ -98,7 +99,7 @@ Nguyên tắc:
         return text.strip()
     
     def _mock_response(self, message: str) -> str:
-        return "AI đang ở chế độ mock, chưa cấu hình GROQ_API_KEY."
+        return self.mock_response
 
 
 class MeetingAIAssistant:
