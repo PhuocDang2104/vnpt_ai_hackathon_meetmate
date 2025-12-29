@@ -1,16 +1,22 @@
 /**
  * Home - Minimal overview focused on what's important
  */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Calendar, CheckSquare, Clock, Lightbulb, Sparkles, User } from 'lucide-react'
 import { actionItems, isOverdue } from '../../store/mockData'
 import { useUpcomingMeetings, type NormalizedMeeting } from '../../services/meeting'
+import aiApi from '../../lib/api/ai'
 
 const formatShortDate = (date: Date) =>
   date.toLocaleDateString('vi-VN', { day: '2-digit', month: 'short' })
 
 const Dashboard = () => {
   const { data: upcomingMeetings, isLoading: loadingMeetings } = useUpcomingMeetings(3)
+  const [askValue, setAskValue] = useState('')
+  const [askResponse, setAskResponse] = useState<string | null>(null)
+  const [askError, setAskError] = useState<string | null>(null)
+  const [askLoading, setAskLoading] = useState(false)
   const myTasks = actionItems
     .filter(item => item.status !== 'completed' && item.status !== 'cancelled')
     .sort((a, b) => a.deadline.getTime() - b.deadline.getTime())
@@ -31,6 +37,25 @@ const Dashboard = () => {
     },
   ]
 
+  const handleAskSubmit = async () => {
+    const trimmed = askValue.trim()
+    if (!trimmed || askLoading) return
+
+    setAskLoading(true)
+    setAskResponse(null)
+    setAskError(null)
+
+    try {
+      const response = await aiApi.homeAsk(trimmed)
+      setAskResponse(response.message)
+      setAskValue('')
+    } catch {
+      setAskError('Không thể kết nối Groq lúc này. Vui lòng thử lại sau.')
+    } finally {
+      setAskLoading(false)
+    }
+  }
+
   return (
     <div className="home-page">
       <div className="home-header">
@@ -40,13 +65,42 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="home-ask">
-        <Sparkles size={18} className="home-ask__icon" />
-        <input
-          className="home-ask__input"
-          placeholder="Hôm nay bạn thế nào? Chia sẻ hay muốn hỏi gì không?"
-        />
-        <button className="home-ask__btn">Gửi</button>
+      <div className="home-ask-stack">
+        <div className="home-ask">
+          <Sparkles size={18} className="home-ask__icon" />
+          <input
+            className="home-ask__input"
+            placeholder="Hôm nay bạn thế nào? Chia sẻ hay muốn hỏi gì không?"
+            value={askValue}
+            onChange={event => setAskValue(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleAskSubmit()
+              }
+            }}
+            aria-label="Hỏi nhanh MeetMate"
+            disabled={askLoading}
+          />
+          <button
+            className="home-ask__btn"
+            type="button"
+            onClick={handleAskSubmit}
+            disabled={askLoading || !askValue.trim()}
+          >
+            {askLoading ? 'Đang gửi...' : 'Gửi'}
+          </button>
+        </div>
+        {(askResponse || askError) && (
+          <div
+            className={`home-ask-response ${askError ? 'home-ask-response--error' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="home-ask-response__label">MeetMate AI</div>
+            <div className="home-ask-response__text">{askError ?? askResponse}</div>
+          </div>
+        )}
       </div>
 
       <div className="home-grid">

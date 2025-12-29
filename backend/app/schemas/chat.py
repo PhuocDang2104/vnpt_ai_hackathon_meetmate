@@ -16,6 +16,10 @@ class ChatRequest(BaseModel):
     include_context: bool = True
 
 
+class HomeAskRequest(BaseModel):
+    message: str
+
+
 class ChatResponse(BaseModel):
     id: str
     message: str

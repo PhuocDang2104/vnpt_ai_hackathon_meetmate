@@ -56,6 +56,12 @@ export const aiApi = {
     });
   },
 
+  homeAsk: async (message: string): Promise<{ message: string; confidence?: number }> => {
+    return api.post('/chat/home', {
+      message,
+    });
+  },
+
   // Summary
   generateSummary: async (meetingId: string, transcript: string): Promise<{ summary: string }> => {
     return api.post('/chat/generate/summary', {
