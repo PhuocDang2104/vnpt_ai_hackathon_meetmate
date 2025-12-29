@@ -3,7 +3,17 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Calendar, CheckSquare, Clock, Lightbulb, Sparkles, User } from 'lucide-react'
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  Calendar,
+  CheckSquare,
+  Clock,
+  Lightbulb,
+  Sparkles,
+  User,
+} from 'lucide-react'
 import { actionItems, isOverdue } from '../../store/mockData'
 import { useUpcomingMeetings, type NormalizedMeeting } from '../../services/meeting'
 import aiApi from '../../lib/api/ai'
@@ -34,6 +44,41 @@ const Dashboard = () => {
     {
       title: 'Rà soát action items quá hạn',
       description: 'Ưu tiên những việc có rủi ro trễ deadline.',
+    },
+  ]
+
+  const kpis = [
+    {
+      value: '25 giờ/ngày',
+      label: 'Thời gian tiết kiệm',
+      note: '100 cuộc họp × 15 phút',
+      variant: 'impact',
+      trend: 'up',
+      delta: '+18% tuần này',
+    },
+    {
+      value: '<10 phút',
+      label: 'Phát hành minutes',
+      note: 'Chuẩn hóa sau họp',
+      variant: 'speed',
+      trend: 'down',
+      delta: 'Giảm 35% thời gian',
+    },
+    {
+      value: '2-3s',
+      label: 'Độ trễ recap live',
+      note: 'Realtime mượt mà',
+      variant: 'latency',
+      trend: 'down',
+      delta: 'Giảm 12% độ trễ',
+    },
+    {
+      value: '92%',
+      label: 'Action đúng hạn',
+      note: 'Owner + deadline rõ',
+      variant: 'quality',
+      trend: 'up',
+      delta: '+9% tỉ lệ đúng hạn',
     },
   ]
 
@@ -101,6 +146,20 @@ const Dashboard = () => {
             <div className="home-ask-response__text">{askError ?? askResponse}</div>
           </div>
         )}
+      </div>
+
+      <div className="home-kpi-grid">
+        {kpis.map(kpi => (
+          <div key={kpi.label} className={`home-kpi-card home-kpi-card--${kpi.variant}`}>
+            <div className={`home-kpi-trend home-kpi-trend--${kpi.trend}`}>
+              {kpi.trend === 'down' ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
+              <span>{kpi.delta}</span>
+            </div>
+            <div className="home-kpi-card__label">{kpi.label}</div>
+            <div className="home-kpi-card__value">{kpi.value}</div>
+            <div className="home-kpi-card__note">{kpi.note}</div>
+          </div>
+        ))}
       </div>
 
       <div className="home-grid">
