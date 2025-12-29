@@ -3,10 +3,11 @@ import re
 import smtplib
 import ssl
 from datetime import datetime
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from app.core.config import get_settings
 
@@ -170,6 +171,67 @@ def _send_email(*, to_email: str, subject: str, text_body: str, html_body: str) 
     msg.attach(text_part)
     msg.attach(html_part)
 
+    return _smtp_send_message(msg, subject=subject, to_email=to_email)
+
+
+def _smtp_send_message(msg, *, subject: str, to_email: str) -> bool:
+    """Send a prepared email message via SMTP."""
+    timeout = getattr(settings, "smtp_timeout_sec", 15)
+    use_starttls = getattr(settings, "smtp_starttls", True)
+
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout) as server:
+            server.ehlo()
+
+            if use_starttls:
+                context = ssl.create_default_context()
+                server.starttls(context=context)
+                server.ehlo()
+
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.send_message(msg)
+
+        logger.info("Email [%s] sent to %s", subject, to_email)
+        return True
+
+    except Exception:
+        logger.exception("Failed to send email [%s] to %s", subject, to_email)
+        return False
+
+
+def _load_pitch_images() -> List[Tuple[str, bytes, str]]:
+    """Load images from the Canva export folder for inline embedding.
+
+    Returns list of (cid, content, subtype).
+    """
+    images_dir = Path(__file__).parent / "pitching mail" / "images"
+    if not images_dir.exists():
+        return []
+
+    assets = []
+    for path in images_dir.glob("*"):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower().lstrip(".")
+        if suffix not in {"png", "jpg", "jpeg", "gif"}:
+            continue
+        try:
+            data = path.read_bytes()
+            cid = path.name  # use filename as cid
+            assets.append((cid, data, suffix))
+        except Exception as e:
+            logger.warning("Skip inline image %s: %s", path, e)
+    return assets
+
+
+def _inject_inline_cids(html: str, assets: List[Tuple[str, bytes, str]]) -> str:
+    """Replace image src references to use cid."""
+    if not assets:
+        return html
+    for cid, _, _ in assets:
+        html = html.replace(f"images/{cid}", f"cid:{cid}")
+    return html
+
     timeout = getattr(settings, "smtp_timeout_sec", 15)
     use_starttls = getattr(settings, "smtp_starttls", True)
 
@@ -217,9 +279,44 @@ def send_pitch_minutes_email(to_email: str, *, subject: Optional[str] = None) ->
         True if sent successfully, False otherwise.
     """
     subj = subject or "Biên bản pitching MeetMate - VNPT AI Hackathon"
-    return _send_email(
-        to_email=to_email,
-        subject=subj,
-        text_body=_build_pitch_minutes_email_text(),
-        html_body=_build_pitch_minutes_email_html(),
-    )
+    if not settings.email_enabled:
+        logger.info("Email sending is disabled. Skipping email [%s].", subj)
+        return False
+
+    if not _is_valid_email(to_email):
+        logger.warning("Invalid email address: %r. Skipping email [%s].", to_email, subj)
+        return False
+
+    html_body = _build_pitch_minutes_email_html()
+    text_body = _build_pitch_minutes_email_text()
+
+    # Prepare message with inline images for Canva template
+    msg_root = MIMEMultipart("related")
+    msg_root["Subject"] = subj
+    from_addr = settings.smtp_user
+    from_name = getattr(settings, "email_from_name", None) or "MeetMate"
+    reply_to = getattr(settings, "email_reply_to", None)
+    msg_root["From"] = f"{from_name} <{from_addr}>"
+    msg_root["To"] = to_email
+    if reply_to:
+        msg_root["Reply-To"] = reply_to
+
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, "plain", "utf-8"))
+
+    # Inline images
+    assets = _load_pitch_images()
+    html_with_cid = _inject_inline_cids(html_body, assets)
+    alt_part.attach(MIMEText(html_with_cid, "html", "utf-8"))
+    msg_root.attach(alt_part)
+
+    for cid, content, subtype in assets:
+        try:
+            img = MIMEImage(content, _subtype=subtype)
+            img.add_header("Content-ID", f"<{cid}>")
+            img.add_header("Content-Disposition", "inline", filename=cid)
+            msg_root.attach(img)
+        except Exception as e:
+            logger.warning("Failed to attach inline image %s: %s", cid, e)
+
+    return _smtp_send_message(msg_root, subject=subj, to_email=to_email)
