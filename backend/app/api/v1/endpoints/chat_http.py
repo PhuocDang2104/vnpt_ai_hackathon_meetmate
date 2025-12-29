@@ -177,6 +177,13 @@ Quy tac bat buoc:
 </context>
 """
 
+HOME_ASK_MOCK_RESPONSE = (
+    "MeetMate la tro ly hop thong minh cho AI-First Workplace tai LPBank. "
+    "Ung dung ho tro truoc, trong va sau cuoc hop: tu dong agenda, recap, "
+    "bien ban, action items va theo doi cong viec. "
+    "Nen tang gom desktop app + Teams add-in, ket hop RAG, LLM va tool-calling."
+)
+
 
 # Store chat sessions in memory (for demo - use Redis in production)
 chat_sessions: dict = {}
@@ -329,7 +336,7 @@ async def home_ask(request: HomeAskRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
-    chat = GeminiChat(system_prompt=HOME_ASK_SYSTEM_PROMPT)
+    chat = GeminiChat(system_prompt=HOME_ASK_SYSTEM_PROMPT, mock_response=HOME_ASK_MOCK_RESPONSE)
     response_text = await chat.chat(message)
 
     return ChatResponse(
