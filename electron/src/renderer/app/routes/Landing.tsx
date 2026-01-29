@@ -1,5 +1,5 @@
 /**
- * Landing Page - Welcome to MeetMate
+ * Landing Page - Welcome to Minute
  */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -76,8 +76,8 @@ export const Landing: React.FC = () => {
       <header className="landing-header">
         <div className="landing-header__brand">
           <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
-            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
-            <span>MeetMate</span>
+            <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon" />
+            <span>Minute</span>
           </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
@@ -103,7 +103,7 @@ export const Landing: React.FC = () => {
               Cuộc họp hiệu quả hơn với <span className="gradient-text">AI Assistant</span>
             </h1>
             <p className="hero-subtitle">
-              MeetMate giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động.
+              Minute giúp bạn chuẩn bị, ghi chép và theo dõi cuộc họp tự động.
               Tiết kiệm thời gian, không bỏ lỡ action items quan trọng.
             </p>
             <div className="hero-actions">
@@ -136,7 +136,7 @@ export const Landing: React.FC = () => {
             <div className="feature-card__expanded">
               <div className="feature-card__details">
                 <p className="feature-card__desc">
-                  MeetMate đồng bộ lịch từ Outlook, Teams, VNPT..., nhận diện chủ đề và đơn vị tham gia,
+                  Minute đồng bộ lịch từ Outlook, Teams, VNPT..., nhận diện chủ đề và đơn vị tham gia,
                   rồi dùng RAG để tra cứu kho tài liệu nội bộ, chọn đúng policy, proposal và biên bản liên
                   quan. Tất cả được đóng gói thành pre-read pack kèm agenda gợi ý.
                 </p>
@@ -165,7 +165,7 @@ export const Landing: React.FC = () => {
             <div className="feature-card__expanded">
               <div className="feature-card__details">
                 <p className="feature-card__desc">
-                  Bot MeetMate tham gia như một thành viên, hiển thị Live Notes – Actions – Ask AI. Hệ
+                  Bot Minute tham gia như một thành viên, hiển thị Live Notes – Actions – Ask AI. Hệ
                   thống ghi theo từng người nói, recap liên tục theo timeline, nhận diện Action/Decision/Risk
                   và gợi ý tạo nhiệm vụ, lịch follow-up, mở tài liệu liên quan. Mọi thao tác đều có một bước
                   xác nhận.
@@ -195,7 +195,7 @@ export const Landing: React.FC = () => {
             <div className="feature-card__expanded">
               <div className="feature-card__details">
                 <p className="feature-card__desc">
-                  Sau khi kết thúc, MeetMate tạo biên bản chuẩn với mục tiêu, nội dung chính, quyết định,
+                  Sau khi kết thúc, Minute tạo biên bản chuẩn với mục tiêu, nội dung chính, quyết định,
                   hành động và rủi ro kèm timecode. Các đầu việc đồng bộ sang Planner/Jira/Work hoặc hệ
                   thống nội bộ, gán đúng owner và deadline.
                 </p>
@@ -275,11 +275,11 @@ export const Landing: React.FC = () => {
       {/* Comparison Section */}
       <section className="comparison">
         <div className="comparison__header reveal-on-scroll">
-          <h2>Trước và sau khi có MeetMate</h2>
+          <h2>Trước và sau khi có Minute</h2>
         </div>
         <div className="comparison-shell">
           <div className="comparison-panel comparison-panel--without reveal-on-scroll">
-            <h3 className="comparison-title">Không dùng MeetMate</h3>
+            <h3 className="comparison-title">Không dùng Minute</h3>
             <ul className="comparison-list comparison-list--without">
               <li>Tồn đọng biên bản và các đầu việc follow-up sau họp.</li>
               <li>Quyết định quan trọng chỉ nằm trong trí nhớ từng người.</li>
@@ -292,7 +292,7 @@ export const Landing: React.FC = () => {
             <span>VS</span>
           </div>
           <div className="comparison-panel comparison-panel--with reveal-on-scroll">
-            <h3 className="comparison-title">Khi có MeetMate</h3>
+            <h3 className="comparison-title">Khi có Minute</h3>
             <ul className="comparison-list comparison-list--with">
               <li>Nền tảng AI khép kín Pre – In – Post cho mọi cuộc họp.</li>
               <li>Biên bản, quyết định và hành động được tự động hóa, chuẩn hóa.</li>
@@ -307,7 +307,7 @@ export const Landing: React.FC = () => {
       {/* Roadmap Section */}
       <section className="landing-roadmap" id="roadmap">
         <div className="landing-roadmap__header reveal-on-scroll">
-          <h2>Lộ trình MeetMate</h2>
+          <h2>Lộ trình Minute</h2>
           <p>4 phiên bản phát triển cho enterprise, mở rộng dần về scale, compliance và hệ sinh thái.</p>
         </div>
         <div className="landing-roadmap__grid">
@@ -316,7 +316,7 @@ export const Landing: React.FC = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 1</span>
-                <h3>MeetMate 1.0</h3>
+                <h3>Minute 1.0</h3>
               </div>
               <ul className="landing-roadmap__list">
                 <li><strong>Auto-capture & quản lý meeting:</strong> bot auto-join (Teams/GoMeet/…), sync Outlook, gán theo dự án.</li>
@@ -333,7 +333,7 @@ export const Landing: React.FC = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 2</span>
-                <h3>MeetMate 2.0</h3>
+                <h3>Minute 2.0</h3>
               </div>
               <ul className="landing-roadmap__list">
                 <li><strong>Admin platform:</strong> multi-workspace/branch, RBAC vai trò, policy theo đơn vị.</li>
@@ -350,7 +350,7 @@ export const Landing: React.FC = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 3</span>
-                <h3>MeetMate 3.0</h3>
+                <h3>Minute 3.0</h3>
               </div>
               <div className="landing-roadmap__packs">
                 <div className="landing-roadmap__pack">
@@ -379,7 +379,7 @@ export const Landing: React.FC = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 4</span>
-                <h3>MeetMate Ecosystem</h3>
+                <h3>Minute Ecosystem</h3>
               </div>
               <div className="landing-roadmap__split">
                 <div className="landing-roadmap__pack">
@@ -408,7 +408,7 @@ export const Landing: React.FC = () => {
       {/* CTA Section */}
       <section className="cta reveal-on-scroll">
         <h2>Sẵn sàng nâng cấp cuộc họp?</h2>
-        <p>Đăng ký ngay để trải nghiệm MeetMate miễn phí</p>
+        <p>Đăng ký ngay để trải nghiệm Minute miễn phí</p>
         <Link to="/login" className="btn btn-primary btn-lg cta-button">
           Bắt đầu
           <ArrowRight size={20} />
@@ -440,8 +440,8 @@ export const Landing: React.FC = () => {
       {/* Footer */}
       <footer className="landing-footer reveal-on-scroll">
         <div className="footer-brand">
-          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
-          <span>MeetMate</span>
+          <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon landing-logo__icon--sm" />
+          <span>Minute</span>
         </div>
         <a
           className="landing-footer__link"
@@ -453,7 +453,7 @@ export const Landing: React.FC = () => {
           GitHub
           <ExternalLink size={14} />
         </a>
-        <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
+        <p>© 2024 Minute - AI Meeting Assistant for Enterprise</p>
       </footer>
 
       <style>{`
