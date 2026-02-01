@@ -89,8 +89,8 @@ const About = () => {
       <header className="landing-header">
         <div className="landing-header__brand">
           <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
-            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
-            <span>MeetMate</span>
+            <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon" />
+            <span>Minute</span>
           </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
@@ -122,7 +122,7 @@ const About = () => {
               Agentic S/CRAG AI Meeting Co-Host for BFSI
             </p>
             <p className="about-hero__description">
-              MeetMate chuẩn hóa vòng đời cuộc họp cho doanh nghiệp BFSI/LPBank: thu thập ngữ cảnh trước họp,
+              Minute chuẩn hóa vòng đời cuộc họp cho doanh nghiệp BFSI/LPBank: thu thập ngữ cảnh trước họp,
               hỗ trợ realtime trong họp, phát hành biên bản và action items sau họp - tất cả có trích dẫn,
               audit và kiểm soát quyền truy cập.
             </p>
@@ -158,7 +158,7 @@ const About = () => {
           <div className="about-hero__visual">
             <img
               src="/meetmate_ai.png"
-              alt="MeetMate product preview"
+              alt="Minute product preview"
               className="about-hero__image"
               loading="lazy"
             />
@@ -234,7 +234,7 @@ const About = () => {
             </div>
 
             <div className="about-card about-card--solution about-card--accent">
-              <h3>Giải pháp MeetMate</h3>
+              <h3>Giải pháp Minute</h3>
               <ul>
                 <li>AI tự động tạo agenda & pre-read theo ngữ cảnh dự án.</li>
                 <li>Live transcript, live recap và ADR (Actions/Decisions/Risks).</li>
@@ -603,7 +603,7 @@ const About = () => {
             <div className="about-card about-card--docs">
               <h3>Architecture & AI</h3>
               <ul>
-                <li><code>docs/MeetMate _ SAAR – Self-aware Adaptive Agentic RAG.md</code></li>
+                <li><code>docs/Minute _ SAAR – Self-aware Adaptive Agentic RAG.md</code></li>
                 <li><code>docs/rag_architecture.md</code></li>
                 <li><code>docs/AI architecture/</code></li>
                 <li><code>docs/in_meeting_flow.md</code></li>
@@ -806,8 +806,8 @@ const About = () => {
 
       <footer className="landing-footer">
         <div className="footer-brand">
-          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
-          <span>MeetMate</span>
+          <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon landing-logo__icon--sm" />
+          <span>Minute</span>
         </div>
         <a
           className="landing-footer__link"
@@ -819,7 +819,7 @@ const About = () => {
           GitHub
           <ExternalLink size={14} />
         </a>
-        <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
+        <p>© 2024 Minute - AI Meeting Assistant for Enterprise</p>
       </footer>
     </div>
   )

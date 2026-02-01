@@ -24,8 +24,8 @@ const Roadmap = () => {
       <header className="landing-header">
         <div className="landing-header__brand">
           <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
-            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
-            <span>MeetMate</span>
+            <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon" />
+            <span>Minute</span>
           </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
@@ -59,7 +59,7 @@ const Roadmap = () => {
 
       <section className="landing-roadmap" id="roadmap">
         <div className="landing-roadmap__header">
-          <h2>Lộ trình MeetMate</h2>
+          <h2>Lộ trình Minute</h2>
           <p>4 phiên bản phát triển cho enterprise, mở rộng dần về scale, compliance và hệ sinh thái.</p>
         </div>
         <div className="landing-roadmap__grid">
@@ -68,7 +68,7 @@ const Roadmap = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 1</span>
-                <h3>MeetMate 1.0</h3>
+                <h3>Minute 1.0</h3>
               </div>
               <ul className="landing-roadmap__list">
                 <li><strong>Auto-capture & quản lý meeting:</strong> bot auto-join (Teams/GoMeet/…), sync Outlook, gán theo dự án.</li>
@@ -85,7 +85,7 @@ const Roadmap = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 2</span>
-                <h3>MeetMate 2.0</h3>
+                <h3>Minute 2.0</h3>
               </div>
               <ul className="landing-roadmap__list">
                 <li><strong>Admin platform:</strong> multi-workspace/branch, RBAC vai trò, policy theo đơn vị.</li>
@@ -102,7 +102,7 @@ const Roadmap = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 3</span>
-                <h3>MeetMate 3.0</h3>
+                <h3>Minute 3.0</h3>
               </div>
               <div className="landing-roadmap__packs">
                 <div className="landing-roadmap__pack">
@@ -131,7 +131,7 @@ const Roadmap = () => {
             <div className="landing-roadmap__card">
               <div className="landing-roadmap__card-top">
                 <span className="landing-roadmap__pill">Ver 4</span>
-                <h3>MeetMate Ecosystem</h3>
+                <h3>Minute Ecosystem</h3>
               </div>
               <div className="landing-roadmap__split">
                 <div className="landing-roadmap__pack">
@@ -180,8 +180,8 @@ const Roadmap = () => {
 
       <footer className="landing-footer">
         <div className="footer-brand">
-          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
-          <span>MeetMate</span>
+          <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon landing-logo__icon--sm" />
+          <span>Minute</span>
         </div>
         <a
           className="landing-footer__link"
@@ -193,7 +193,7 @@ const Roadmap = () => {
           GitHub
           <ExternalLink size={14} />
         </a>
-        <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
+        <p>© 2024 Minute - AI Meeting Assistant for Enterprise</p>
       </footer>
     </div>
   )

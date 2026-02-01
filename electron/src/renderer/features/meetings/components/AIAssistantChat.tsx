@@ -196,7 +196,7 @@ export const AIAssistantChat = ({ meetingId, meetingTitle }: AIAssistantChatProp
                 </div>
                 <div className="ai-chatbox__bubble">
                   <div className="ai-chatbox__role">
-                    {msg.role === 'assistant' ? 'MeetMate AI' : 'Bạn'}
+                    {msg.role === 'assistant' ? 'Minute AI' : 'Bạn'}
                   </div>
                   <div className="ai-chatbox__text">{msg.content}</div>
                   {renderCitations(msg.citations)}

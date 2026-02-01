@@ -100,7 +100,7 @@ const MeetingCapture = () => {
       processorRef.current = null;
     }
     if (ctxRef.current) {
-      ctxRef.current.close().catch(() => {});
+      ctxRef.current.close().catch(() => { });
       ctxRef.current = null;
     }
     if (mediaRef.current) {
@@ -290,7 +290,7 @@ const MeetingCapture = () => {
     <div className="capture-page">
       <div className="page-header">
         <div>
-          <h1 className="page-header__title">MeetMate Capture</h1>
+          <h1 className="page-header__title">Minute Capture</h1>
           <p className="page-header__subtitle">
             Lấy audio từ Chrome Tab (Google Meet / Teams web / Zoom web) và stream tới SmartVoice ingest.
           </p>
@@ -381,14 +381,14 @@ const MeetingCapture = () => {
           </div>
           <ol className="capture-steps">
             <li>Mở tab họp (Google Meet / Teams web / Zoom web) ở Chrome.</li>
-            <li>Mở trang MeetMate Capture ở tab khác (tab này).</li>
+            <li>Mở trang Minute Capture ở tab khác (tab này).</li>
             <li>Bấm Start → chọn &quot;Chrome Tab&quot; trong picker.</li>
             <li>Tick &quot;Share tab audio&quot; trước khi bấm Share.</li>
             <li>Khi muốn dừng, bấm Stop hoặc Stop sharing ở thanh Chrome.</li>
           </ol>
           <div className="capture-note">
             <AlertCircle size={14} />
-            Nếu stream không có audio track, MeetMate sẽ báo: &quot;You didn’t tick Share tab audio. Stop and Start again.&quot;
+            Nếu stream không có audio track, Minute sẽ báo: &quot;You didn’t tick Share tab audio. Stop and Start again.&quot;
           </div>
         </div>
       </div>

@@ -178,8 +178,8 @@ export const vi = {
     generateMinutes: 'Tạo biên bản',
     generateActionItems: 'Tạo công việc',
     sidebar: {
-      toggleOpen: 'Mở MeetMate AI',
-      toggleClose: 'Ẩn MeetMate AI',
+      toggleOpen: 'Mở Minute AI',
+      toggleClose: 'Ẩn Minute AI',
       clear: 'Xóa cuộc trò chuyện',
       emptyTitle: 'Xin chào!',
       emptyHint: 'Bắt đầu bằng một câu hỏi hoặc chọn gợi ý bên dưới.',
@@ -189,7 +189,7 @@ export const vi = {
       suggestionsLabel: 'Gợi ý',
       contexts: {
         general: {
-          title: 'MeetMate AI',
+          title: 'Minute AI',
           subtitle: 'Trợ lý tổng quát cho dự án và cuộc họp',
           placeholder: 'Hỏi về dự án, cuộc họp, tài liệu...',
           prompt: 'Bối cảnh: trợ lý tổng quát. Ưu tiên trả lời ngắn gọn và hành động.',
@@ -286,9 +286,9 @@ export const vi = {
 
   // About
   about: {
-    title: 'Giới thiệu MeetMate',
+    title: 'Giới thiệu Minute',
     subtitle: 'Trợ lý cuộc họp AI thông minh',
-    description: 'MeetMate là giải pháp quản lý cuộc họp toàn diện, tích hợp AI để tự động hóa việc ghi chú, tóm tắt và theo dõi công việc.',
+    description: 'Minute là giải pháp quản lý cuộc họp toàn diện, tích hợp AI để tự động hóa việc ghi chú, tóm tắt và theo dõi công việc.',
     features: 'Tính năng chính',
     team: 'Đội ngũ phát triển',
     techStack: 'Công nghệ sử dụng',

@@ -47,9 +47,9 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
   return (
     <div className="inmeet-tab"> {/* Reuse inmeet-tab styles for consistency */}
       {/* Send Email Action Bar */}
-      <SendEmailActionBar 
-        meeting={meeting} 
-        onSendEmail={() => setShowSendEmailModal(true)} 
+      <SendEmailActionBar
+        meeting={meeting}
+        onSendEmail={() => setShowSendEmailModal(true)}
       />
 
       <div className="inmeet-grid">
@@ -69,9 +69,9 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
 
       {/* Send Email Modal */}
       {showSendEmailModal && (
-        <SendPrepEmailModal 
-          meeting={meeting} 
-          onClose={() => setShowSendEmailModal(false)} 
+        <SendPrepEmailModal
+          meeting={meeting}
+          onClose={() => setShowSendEmailModal(false)}
         />
       )}
     </div>
@@ -81,20 +81,20 @@ export const PreMeetTab = ({ meeting, onRefresh }: PreMeetTabProps) => {
 // ============================================
 // SEND EMAIL ACTION BAR
 // ============================================
-const SendEmailActionBar = ({ 
-  meeting, 
-  onSendEmail 
-}: { 
-  meeting: MeetingWithParticipants; 
+const SendEmailActionBar = ({
+  meeting,
+  onSendEmail
+}: {
+  meeting: MeetingWithParticipants;
   onSendEmail: () => void;
 }) => {
   const participants = meeting.participants || [];
   const startTime = meeting.start_time ? new Date(meeting.start_time) : null;
-  
+
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('vi-VN', { 
+    return date.toLocaleDateString('vi-VN', {
       weekday: 'long',
-      day: '2-digit', 
+      day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
@@ -122,7 +122,7 @@ const SendEmailActionBar = ({
           </span>
         </div>
       </div>
-      <button 
+      <button
         className="btn btn--primary send-email-bar__btn"
         onClick={onSendEmail}
       >
@@ -136,11 +136,11 @@ const SendEmailActionBar = ({
 // ============================================
 // SEND PREPARATION EMAIL MODAL
 // ============================================
-const SendPrepEmailModal = ({ 
-  meeting, 
-  onClose 
-}: { 
-  meeting: MeetingWithParticipants; 
+const SendPrepEmailModal = ({
+  meeting,
+  onClose
+}: {
+  meeting: MeetingWithParticipants;
   onClose: () => void;
 }) => {
   const [isSending, setIsSending] = useState(false);
@@ -278,28 +278,28 @@ const SendPrepEmailModal = ({
               <div className="send-email-options">
                 <h4>Nội dung email</h4>
                 <label className="send-email-checkbox">
-                  <input 
-                    type="checkbox" 
-                    checked={includeAgenda} 
-                    onChange={e => setIncludeAgenda(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={includeAgenda}
+                    onChange={e => setIncludeAgenda(e.target.checked)}
                   />
                   <Calendar size={14} />
                   <span>Bao gồm Chương trình họp (Agenda)</span>
                 </label>
                 <label className="send-email-checkbox">
-                  <input 
-                    type="checkbox" 
-                    checked={includeDocuments} 
-                    onChange={e => setIncludeDocuments(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={includeDocuments}
+                    onChange={e => setIncludeDocuments(e.target.checked)}
                   />
                   <FileText size={14} />
                   <span>Bao gồm Danh sách tài liệu</span>
                 </label>
                 <label className="send-email-checkbox">
-                  <input 
-                    type="checkbox" 
-                    checked={includeReminders} 
-                    onChange={e => setIncludeReminders(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={includeReminders}
+                    onChange={e => setIncludeReminders(e.target.checked)}
                   />
                   <Bell size={14} />
                   <span>Bao gồm Ghi nhớ cá nhân</span>
@@ -328,11 +328,11 @@ const SendPrepEmailModal = ({
                 </div>
                 <div className="send-email-recipients__list">
                   {participants.map((p: any) => (
-                    <label 
-                      key={p.user_id || p.id} 
+                    <label
+                      key={p.user_id || p.id}
                       className={`send-email-recipient ${selectedParticipants.has(p.user_id || p.id) ? 'send-email-recipient--selected' : ''}`}
                     >
-                      <input 
+                      <input
                         type="checkbox"
                         checked={selectedParticipants.has(p.user_id || p.id)}
                         onChange={() => toggleParticipant(p.user_id || p.id)}
@@ -357,7 +357,7 @@ const SendPrepEmailModal = ({
                 <h4>Xem trước nội dung email</h4>
                 <div className="send-email-preview__content">
                   <div className="send-email-preview__subject">
-                    <strong>Chủ đề:</strong> [MeetMate] Thông báo cuộc họp: {meeting.title}
+                    <strong>Chủ đề:</strong> [Minute] Thông báo cuộc họp: {meeting.title}
                   </div>
                   <div className="send-email-preview__body">
                     <p>Kính gửi [Tên thành viên],</p>
@@ -371,7 +371,7 @@ const SendPrepEmailModal = ({
                     {includeAgenda && <p>📋 <em>Chương trình họp được đính kèm</em></p>}
                     {includeDocuments && <p>📄 <em>Tài liệu chuẩn bị được đính kèm</em></p>}
                     {customMessage && <p style={{ fontStyle: 'italic', color: 'var(--accent)' }}>"{customMessage}"</p>}
-                    <p>Trân trọng,<br/>MeetMate AI</p>
+                    <p>Trân trọng,<br />Minute AI</p>
                   </div>
                 </div>
               </div>
@@ -384,8 +384,8 @@ const SendPrepEmailModal = ({
             <button className="btn btn--secondary" onClick={onClose}>
               Hủy
             </button>
-            <button 
-              className="btn btn--primary" 
+            <button
+              className="btn btn--primary"
               onClick={handleSend}
               disabled={selectedParticipants.size === 0 || isSending}
             >
@@ -530,17 +530,17 @@ const AgendaPanel = ({ meeting }: { meeting: MeetingWithParticipants }) => {
           </div>
         </div>
         <div className="transcript-header__right" style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          <button 
-            className="btn btn--ghost btn--sm" 
-            onClick={handleGenerateAgenda} 
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={handleGenerateAgenda}
             disabled={isGenerating}
           >
             {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             AI Tạo
           </button>
           {hasChanges && (
-            <button 
-              className="btn btn--primary btn--sm" 
+            <button
+              className="btn btn--primary btn--sm"
               onClick={handleSaveAgenda}
               disabled={isSaving}
             >
@@ -627,7 +627,7 @@ const AgendaPanel = ({ meeting }: { meeting: MeetingWithParticipants }) => {
                     <span>phút</span>
                   </div>
                 </div>
-                <button 
+                <button
                   className="btn btn--ghost btn--icon btn--sm"
                   onClick={() => handleDeleteItem(index)}
                 >
@@ -663,7 +663,7 @@ interface ReminderItem {
 }
 
 const RemindersPanel = ({ meetingId }: { meetingId: string }) => {
-  const STORAGE_KEY = `meetmate_reminders_${meetingId}`;
+  const STORAGE_KEY = `minute_reminders_${meetingId}`;
   const [activeTab, setActiveTab] = useState<'question' | 'risk' | 'request'>('question');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newContent, setNewContent] = useState('');
@@ -743,8 +743,8 @@ const RemindersPanel = ({ meetingId }: { meetingId: string }) => {
         {showAddForm ? (
           <div className="reminder-add-inline">
             <div className="reminder-add-inline__row">
-              <select 
-                value={newPriority} 
+              <select
+                value={newPriority}
                 onChange={e => setNewPriority(e.target.value as any)}
                 className="reminder-add-inline__select"
               >
@@ -773,8 +773,8 @@ const RemindersPanel = ({ meetingId }: { meetingId: string }) => {
             </div>
           </div>
         ) : (
-          <button 
-            className="btn btn--ghost btn--sm" 
+          <button
+            className="btn btn--ghost btn--sm"
             onClick={() => setShowAddForm(true)}
             style={{ width: '100%', justifyContent: 'center', marginBottom: 'var(--space-sm)' }}
           >
@@ -785,8 +785,8 @@ const RemindersPanel = ({ meetingId }: { meetingId: string }) => {
 
         {currentItems.length > 0 ? (
           currentItems.map(item => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               className={`detected-item detected-item--${activeTab} ${item.completed ? 'detected-item--completed' : ''}`}
             >
               <button className="detected-item__check" onClick={() => handleToggle(item.id)}>
@@ -1077,7 +1077,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     handleFiles(files);
   };
@@ -1164,16 +1164,16 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
           Tài liệu ({documents.length})
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <button 
-            className="btn btn--ghost btn--icon btn--sm" 
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
             style={{ padding: '6px', width: '32px', height: '32px' }}
             onClick={() => setShowUpload(!showUpload)}
             title={showUpload ? 'Đóng' : 'Tải lên tài liệu'}
           >
             {showUpload ? <X size={14} /> : <Upload size={14} />}
           </button>
-          <button 
-            className="btn btn--ghost btn--icon btn--sm" 
+          <button
+            className="btn btn--ghost btn--icon btn--sm"
             style={{ padding: '6px', width: '32px', height: '32px' }}
             onClick={() => setShowSelect(true)}
             title="Chọn tài liệu có sẵn"
@@ -1198,7 +1198,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
 
       {/* Drag & Drop Upload Area */}
       {showUpload && (
-        <div 
+        <div
           className={`doc-dropzone ${isDragging ? 'doc-dropzone--active' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -1243,7 +1243,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
                 <Loader2 size={12} className="animate-spin" />
                 <span>Đang chờ...</span>
               </div>
-              <button 
+              <button
                 className="btn btn--ghost btn--icon btn--sm"
                 onClick={() => removeFile(index)}
               >
@@ -1276,7 +1276,7 @@ const DocumentsPanel = ({ meetingId }: { meetingId: string }) => {
             </div>
           ))
         ) : !showUpload && (
-          <div 
+          <div
             className="empty-state empty-state--clickable"
             onClick={() => setShowUpload(true)}
           >

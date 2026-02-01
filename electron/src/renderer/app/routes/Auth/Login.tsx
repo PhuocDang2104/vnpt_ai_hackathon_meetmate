@@ -48,7 +48,7 @@ export const Login: React.FC = () => {
           <div className="auth-card">
             <div className="auth-header">
               <Link to="/" className="auth-logo-link">
-                <h1 className="auth-logo">MeetMate</h1>
+                <h1 className="auth-logo">Minute</h1>
               </Link>
               <p className="auth-subtitle">AI-Powered Meeting Assistant</p>
             </div>

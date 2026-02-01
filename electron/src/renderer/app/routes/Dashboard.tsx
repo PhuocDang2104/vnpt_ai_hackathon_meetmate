@@ -124,7 +124,7 @@ const Dashboard = () => {
                 handleAskSubmit()
               }
             }}
-            aria-label="Hỏi nhanh MeetMate"
+            aria-label="Hỏi nhanh Minute"
             disabled={askLoading}
           />
           <button
@@ -142,7 +142,7 @@ const Dashboard = () => {
             role="status"
             aria-live="polite"
           >
-            <div className="home-ask-response__label">MeetMate AI</div>
+            <div className="home-ask-response__label">Minute AI</div>
             <div className="home-ask-response__text">{askError ?? askResponse}</div>
           </div>
         )}

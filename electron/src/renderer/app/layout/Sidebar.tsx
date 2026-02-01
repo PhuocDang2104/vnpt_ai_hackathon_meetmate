@@ -54,11 +54,11 @@ const Sidebar = () => {
           <div className="sidebar__logo-icon" style={{ padding: 0, background: 'transparent' }}>
             <img
               src="/meetmate_icon.svg"
-              alt="MeetMate"
+              alt="Minute"
               style={{ width: 40, height: 40, objectFit: 'contain' }}
             />
           </div>
-          <span className="sidebar__logo-text">MeetMate</span>
+          <span className="sidebar__logo-text">Minute</span>
         </div>
       </div>
 

@@ -178,8 +178,8 @@ export const en = {
     generateMinutes: 'Generate Minutes',
     generateActionItems: 'Generate Action Items',
     sidebar: {
-      toggleOpen: 'Open MeetMate AI',
-      toggleClose: 'Hide MeetMate AI',
+      toggleOpen: 'Open Minute AI',
+      toggleClose: 'Hide Minute AI',
       clear: 'Clear conversation',
       emptyTitle: 'Hello!',
       emptyHint: 'Start with a question or pick a suggestion below.',
@@ -189,7 +189,7 @@ export const en = {
       suggestionsLabel: 'Suggestions',
       contexts: {
         general: {
-          title: 'MeetMate AI',
+          title: 'Minute AI',
           subtitle: 'General assistant for projects and meetings',
           placeholder: 'Ask about projects, meetings, documents...',
           prompt: 'Context: general assistant. Keep responses concise and actionable.',
@@ -286,9 +286,9 @@ export const en = {
 
   // About
   about: {
-    title: 'About MeetMate',
+    title: 'About Minute',
     subtitle: 'AI-Powered Meeting Assistant',
-    description: 'MeetMate is a comprehensive meeting management solution with AI integration for automated note-taking, summarization, and task tracking.',
+    description: 'Minute is a comprehensive meeting management solution with AI integration for automated note-taking, summarization, and task tracking.',
     features: 'Key Features',
     team: 'Development Team',
     techStack: 'Tech Stack',

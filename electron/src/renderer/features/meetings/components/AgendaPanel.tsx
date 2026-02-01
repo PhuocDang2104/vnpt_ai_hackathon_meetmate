@@ -62,7 +62,7 @@ export const AgendaPanel = ({ meetingId, meetingType }: AgendaPanelProps) => {
   };
 
   const updateItem = (index: number, updates: Partial<AgendaItem>) => {
-    setItems(prev => prev.map((item, i) => 
+    setItems(prev => prev.map((item, i) =>
       i === index ? { ...item, ...updates } : item
     ));
   };
@@ -127,7 +127,7 @@ export const AgendaPanel = ({ meetingId, meetingType }: AgendaPanelProps) => {
           <Sparkles className="empty-state__icon" />
           <h3 className="empty-state__title">Chưa có chương trình</h3>
           <p className="empty-state__description">
-            Bấm "Tạo với AI" để MeetMate tự động đề xuất chương trình phù hợp với loại cuộc họp
+            Bấm "Tạo với AI" để Minute tự động đề xuất chương trình phù hợp với loại cuộc họp
           </p>
         </div>
       ) : (

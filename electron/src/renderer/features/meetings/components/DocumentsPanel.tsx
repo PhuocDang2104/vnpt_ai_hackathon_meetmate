@@ -79,7 +79,7 @@ export const DocumentsPanel = ({ meetingId }: DocumentsPanelProps) => {
   };
 
   const updateDocStatus = (docId: string, status: 'accepted' | 'ignored') => {
-    setDocuments(prev => prev.map(doc => 
+    setDocuments(prev => prev.map(doc =>
       doc.id === docId ? { ...doc, status } : doc
     ));
   };
@@ -94,9 +94,9 @@ export const DocumentsPanel = ({ meetingId }: DocumentsPanelProps) => {
         description: data.description,
         file_url: data.file_url || `/uploads/${Date.now()}_${data.title}`,
       };
-      
+
       await documentsApi.upload(uploadData);
-      
+
       // Add to local documents list
       const newDoc: PrereadDocument = {
         id: Date.now().toString(),
@@ -138,7 +138,7 @@ export const DocumentsPanel = ({ meetingId }: DocumentsPanelProps) => {
       <div className="panel-header">
         <h3 className="panel-title">Tài liệu Pre-read</h3>
         <div className="panel-actions">
-          <button 
+          <button
             className="btn btn--secondary btn--sm"
             onClick={() => setShowUploadModal(true)}
           >
@@ -177,7 +177,7 @@ export const DocumentsPanel = ({ meetingId }: DocumentsPanelProps) => {
               <DocumentCard
                 key={doc.id}
                 document={doc}
-                onAccept={() => {}}
+                onAccept={() => { }}
                 onIgnore={() => updateDocStatus(doc.id, 'suggested')}
                 showActions={false}
               />
@@ -213,7 +213,7 @@ export const DocumentsPanel = ({ meetingId }: DocumentsPanelProps) => {
           <FolderOpen className="empty-state__icon" />
           <h3 className="empty-state__title">Chưa có tài liệu</h3>
           <p className="empty-state__description">
-            Bấm "AI Gợi ý tài liệu" để MeetMate tìm các tài liệu liên quan từ SharePoint, Wiki, và các nguồn nội bộ
+            Bấm "AI Gợi ý tài liệu" để Minute tìm các tài liệu liên quan từ SharePoint, Wiki, và các nguồn nội bộ
           </p>
         </div>
       )}

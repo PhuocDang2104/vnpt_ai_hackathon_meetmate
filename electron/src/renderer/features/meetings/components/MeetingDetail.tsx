@@ -850,7 +850,7 @@ export const MeetingDetail = () => {
                     <span className="join-platform__badge join-platform__badge--ghost">Manual</span>
                   </div>
                   <p className="join-platform__desc">
-                    Dán link họp, MeetMate mở dock và capture audio tab.
+                    Dán link họp, Minute mở dock và capture audio tab.
                   </p>
                   <div className="join-platform__meta">
                     <span className="pill pill--ghost">Chọn tab + Share audio</span>
@@ -871,7 +871,7 @@ export const MeetingDetail = () => {
                     {joinPlatform === 'gomeet' ? (
                       <>
                         <div className="join-modal__notice">
-                          MeetMate sẽ tạo phòng GoMeet, gắn sessionId + ingestToken rồi mở link cho bạn.
+                          Minute sẽ tạo phòng GoMeet, gắn sessionId + ingestToken rồi mở link cho bạn.
                         </div>
                         <div className="form-group">
                           <label className="form-label">Session ID cho realtime transcript</label>
@@ -918,7 +918,7 @@ export const MeetingDetail = () => {
                             placeholder="Access code từ GoMeet"
                           />
                           <p className="form-hint">
-                            Nếu không nhập, MeetMate tự tạo phòng mới qua API StartNewMeeting.
+                            Nếu không nhập, Minute tự tạo phòng mới qua API StartNewMeeting.
                           </p>
                         </div>
 

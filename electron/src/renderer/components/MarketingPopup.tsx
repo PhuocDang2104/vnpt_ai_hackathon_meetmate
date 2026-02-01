@@ -53,7 +53,7 @@ export const MarketingPopup = () => {
               <Check size={32} />
             </div>
             <h3>Đăng ký thành công!</h3>
-            <p>Cảm ơn bạn đã quan tâm đến MeetMate. Hãy là những người tiên phong kiến tạo tương lai cùng chúng tôi!</p>
+            <p>Cảm ơn bạn đã quan tâm đến Minute. Hãy là những người tiên phong kiến tạo tương lai cùng chúng tôi!</p>
           </div>
         ) : (
           <>
@@ -61,7 +61,7 @@ export const MarketingPopup = () => {
               <div className="icon-wrapper">
                 <Mail size={24} />
               </div>
-              <h2>Tham gia cùng MeetMate</h2>
+              <h2>Tham gia cùng Minute</h2>
               <p>Để lại email để nhận thông tin mới nhất và ưu đãi trải nghiệm sớm.</p>
             </div>
 

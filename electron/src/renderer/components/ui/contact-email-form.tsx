@@ -60,7 +60,7 @@ export const ContactEmailForm = ({ className }: ContactEmailFormProps) => {
       {status === 'success' ? (
         <div className="contact-form__message contact-form__message--success">
           <Check size={16} />
-          Đã ghi nhận email. MeetMate sẽ liên hệ sớm.
+          Đã ghi nhận email. Minute sẽ liên hệ sớm.
         </div>
       ) : null}
       {status === 'error' ? (

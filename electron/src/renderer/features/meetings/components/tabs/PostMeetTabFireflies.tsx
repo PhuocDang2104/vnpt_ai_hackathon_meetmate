@@ -619,7 +619,7 @@ const CenterPanel = ({
     <!-- Header -->
     <div class="header">
       <div class="header-top">
-        <div class="logo">MeetMate</div>
+        <div class="logo">Minute</div>
         <div class="doc-type">BIÊN BẢN CUỘC HỌP</div>
       </div>
       <div class="meeting-title">${meeting.title}</div>
@@ -719,7 +719,7 @@ const CenterPanel = ({
     
     <!-- Footer -->
     <div class="footer">
-      <p>Biên bản được tạo tự động bởi MeetMate AI • ${new Date().toLocaleDateString('vi-VN')}</p>
+      <p>Biên bản được tạo tự động bởi Minute AI • ${new Date().toLocaleDateString('vi-VN')}</p>
     </div>
   </div>
 </body>
@@ -974,7 +974,7 @@ const CenterPanel = ({
       {/* Email Modal with Card UI */}
       {showEmailModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
-      onClick={() => setShowEmailModal(false)}>
+          onClick={() => setShowEmailModal(false)}>
           <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', padding: '24px', width: '680px', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}
             onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 20px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>📧 Gửi biên bản qua Email</h3>

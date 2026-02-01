@@ -11,7 +11,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
     },
-    title: 'MeetMate - VNPT AI Hackathon',
+    title: 'Minute - VNPT AI Hackathon',
   })
 
   if (isDev) {

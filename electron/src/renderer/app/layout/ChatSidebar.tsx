@@ -44,7 +44,7 @@ type ResolvedContext = {
   suggestions: string[];
 };
 
-const SIDEBAR_STORAGE_KEY = 'meetmate_ai_sidebar_open';
+const SIDEBAR_STORAGE_KEY = 'minute_ai_sidebar_open';
 
 const suggestionKeys = {
   general: [
@@ -352,11 +352,11 @@ const ChatSidebar = () => {
         setMessagesForKey(activeKey, current => current.map(msg => (
           msg.id === assistantId
             ? {
-                ...msg,
-                content: response.answer,
-                citations: normalizeRagCitations(response.citations),
-                isLoading: false,
-              }
+              ...msg,
+              content: response.answer,
+              citations: normalizeRagCitations(response.citations),
+              isLoading: false,
+            }
             : msg
         )));
       } else {
@@ -370,11 +370,11 @@ const ChatSidebar = () => {
         setMessagesForKey(activeKey, current => current.map(msg => (
           msg.id === assistantId
             ? {
-                ...msg,
-                content: response.answer,
-                citations: normalizeDocuments(response.relevant_documents),
-                isLoading: false,
-              }
+              ...msg,
+              content: response.answer,
+              citations: normalizeDocuments(response.relevant_documents),
+              isLoading: false,
+            }
             : msg
         )));
       }
@@ -384,11 +384,11 @@ const ChatSidebar = () => {
       setMessagesForKey(activeKey, current => current.map(msg => (
         msg.id === assistantId
           ? {
-              ...msg,
-              content: errorText,
-              isLoading: false,
-              isError: true,
-            }
+            ...msg,
+            content: errorText,
+            isLoading: false,
+            isError: true,
+          }
           : msg
       )));
     } finally {
@@ -464,9 +464,8 @@ const ChatSidebar = () => {
               {messages.map(message => (
                 <div
                   key={message.id}
-                  className={`ai-sidebar__message ai-sidebar__message--${message.role} ${
-                    message.isLoading ? 'ai-sidebar__message--loading' : ''
-                  } ${message.isError ? 'ai-sidebar__message--error' : ''}`}
+                  className={`ai-sidebar__message ai-sidebar__message--${message.role} ${message.isLoading ? 'ai-sidebar__message--loading' : ''
+                    } ${message.isError ? 'ai-sidebar__message--error' : ''}`}
                 >
                   {message.role === 'assistant' && (
                     <div className="ai-sidebar__message-avatar">
@@ -553,7 +552,7 @@ const ChatSidebar = () => {
       >
         <img
           src="/meetmate_ai.png"
-          alt="MeetMate AI"
+          alt="Minute AI"
           className="ai-sidebar__toggle-img"
         />
         <span className="ai-sidebar__toggle-label" aria-hidden="true">Ask me!</span>

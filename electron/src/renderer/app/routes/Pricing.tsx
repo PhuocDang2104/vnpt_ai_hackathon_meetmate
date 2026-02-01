@@ -24,8 +24,8 @@ const Pricing = () => {
       <header className="landing-header">
         <div className="landing-header__brand">
           <Link to="/" className="logo" aria-label="Homepage" title="Homepage">
-            <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon" />
-            <span>MeetMate</span>
+            <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon" />
+            <span>Minute</span>
           </Link>
           <nav className="landing-nav">
             <Link to="/about" className="landing-nav__link">About</Link>
@@ -128,8 +128,8 @@ const Pricing = () => {
 
       <footer className="landing-footer">
         <div className="footer-brand">
-          <img src="/meetmate_icon.svg" alt="MeetMate" className="landing-logo__icon landing-logo__icon--sm" />
-          <span>MeetMate</span>
+          <img src="/meetmate_icon.svg" alt="Minute" className="landing-logo__icon landing-logo__icon--sm" />
+          <span>Minute</span>
         </div>
         <a
           className="landing-footer__link"
@@ -141,7 +141,7 @@ const Pricing = () => {
           GitHub
           <ExternalLink size={14} />
         </a>
-        <p>© 2024 MeetMate - AI Meeting Assistant for Enterprise</p>
+        <p>© 2024 Minute - AI Meeting Assistant for Enterprise</p>
       </footer>
     </div>
   )

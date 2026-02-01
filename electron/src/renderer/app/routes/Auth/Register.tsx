@@ -50,7 +50,7 @@ export const Register: React.FC = () => {
         display_name: formData.display_name,
       });
       setSuccess(result.message);
-      
+
       // Redirect to login after 2 seconds
       setTimeout(() => {
         navigate('/login');
@@ -66,7 +66,7 @@ export const Register: React.FC = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="auth-logo">MeetMate</h1>
+          <h1 className="auth-logo">Minute</h1>
           <p className="auth-subtitle">AI-Powered Meeting Assistant</p>
         </div>
 
@@ -155,8 +155,8 @@ export const Register: React.FC = () => {
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-primary btn-block"
             disabled={loading}
           >

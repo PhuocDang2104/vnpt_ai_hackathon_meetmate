@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
-import { 
+import {
   ArrowLeft,
-  Bell, 
-  HelpCircle, 
-  Home, 
+  Bell,
+  HelpCircle,
+  Home,
   ChevronRight,
   Calendar,
   CheckSquare,
@@ -147,7 +147,7 @@ const findPageTitle = (path: string) => {
   if (path.startsWith('/app/knowledge')) return 'Kho kiến thức'
   if (path.startsWith('/app/tasks')) return 'Nhiệm vụ'
   if (path.startsWith('/app/settings')) return 'Cài đặt'
-  return 'MeetMate'
+  return 'Minute'
 }
 
 const routeBreadcrumbs: Array<{ match: RegExp; trail: string[] }> = [
@@ -162,7 +162,7 @@ const Topbar = () => {
   const { t } = useLanguage()
   const pageTitle = findPageTitle(currentPath)
   const isDockView = /^\/app\/meetings\/[^/]+\/dock/.test(currentPath)
-  
+
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -171,7 +171,7 @@ const Topbar = () => {
   // Load notifications
   useEffect(() => {
     const mockNotifications = generateMockNotifications()
-    
+
     // Load read status from localStorage
     try {
       const readIds = JSON.parse(localStorage.getItem(READ_NOTIFICATIONS_KEY) || '[]')
@@ -198,17 +198,17 @@ const Topbar = () => {
 
   // Mark notification as read
   const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => 
+    setNotifications(prev => prev.map(n =>
       n.id === id ? { ...n, read: true } : n
     ))
-    
+
     // Persist to localStorage
     try {
       const readIds = JSON.parse(localStorage.getItem(READ_NOTIFICATIONS_KEY) || '[]')
       if (!readIds.includes(id)) {
         localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify([...readIds, id]))
       }
-    } catch {}
+    } catch { }
   }
 
   // Mark all as read
@@ -227,8 +227,8 @@ const Topbar = () => {
         <>
           <div className="topbar__dock-left">
             <div className="topbar__dock-brand">
-              <img src="/meetmate_icon.svg" alt="MeetMate" className="topbar__dock-logo" />
-              <span className="topbar__dock-name">MeetMate</span>
+              <img src="/meetmate_icon.svg" alt="Minute" className="topbar__dock-logo" />
+              <span className="topbar__dock-name">Minute</span>
             </div>
             <ChevronRight size={14} className="topbar__dock-sep" />
             <span className="topbar__dock-crumb">Cuộc họp</span>
@@ -245,117 +245,117 @@ const Topbar = () => {
         </>
       ) : (
         <>
-      <div className="topbar__left">
-        {(() => {
-          const matched = routeBreadcrumbs.find(item => item.match.test(currentPath))
-          const baseCrumb = findPageTitle(currentPath)
-          const trail = matched ? matched.trail : []
-          const crumbs = (trail.length && trail[0] === baseCrumb) ? trail : [baseCrumb, ...trail]
-          return (
-        <div className="topbar__breadcrumb">
-          <Home size={14} />
-          <ChevronRight size={14} />
-          {crumbs.map((crumb, idx) => (
-            <span
-              key={`${crumb}-${idx}`}
-              className={idx === 0 ? 'topbar__breadcrumb-current' : 'topbar__breadcrumb-extra'}
-            >
-              {idx > 0 && <ChevronRight size={12} />}
-              {crumb}
-            </span>
-          ))}
-        </div>
-          )
-        })()}
-        <div className="topbar__search">
-          <Search className="topbar__search-icon" />
-          <input
-            type="search"
-            className="topbar__search-input"
-            placeholder="Tìm kiếm cuộc họp, dự án, tài liệu..."
-            value={searchTerm}
-            onChange={event => setSearchTerm(event.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="topbar__right">
-        {/* Notifications */}
-        <div className="notification-wrapper" ref={dropdownRef}>
-          <button 
-            className={`topbar__icon-btn ${unreadCount > 0 ? 'topbar__icon-btn--badge' : ''}`}
-            title="Thông báo"
-            onClick={() => setShowNotifications(!showNotifications)}
-            data-count={unreadCount > 9 ? '9+' : unreadCount}
-          >
-            <Bell size={18} />
-          </button>
-
-          {/* Notification Dropdown */}
-          {showNotifications && (
-            <div className="notification-dropdown">
-              <div className="notification-dropdown__header">
-                <h3>Thông báo</h3>
-                {unreadCount > 0 && (
-                  <button 
-                    className="notification-dropdown__mark-all"
-                    onClick={markAllAsRead}
-                  >
-                    <Check size={14} />
-                    Đánh dấu tất cả đã đọc
-                  </button>
-                )}
-              </div>
-
-              <div className="notification-dropdown__list">
-                {notifications.length === 0 ? (
-                  <div className="notification-dropdown__empty">
-                    <Bell size={32} />
-                    <p>Không có thông báo mới</p>
-                  </div>
-                ) : (
-                  notifications.map(notification => (
-                    <Link
-                      key={notification.id}
-                      to={notification.link || '#'}
-                      className={`notification-item ${!notification.read ? 'notification-item--unread' : ''}`}
-                      onClick={() => {
-                        markAsRead(notification.id)
-                        setShowNotifications(false)
-                      }}
+          <div className="topbar__left">
+            {(() => {
+              const matched = routeBreadcrumbs.find(item => item.match.test(currentPath))
+              const baseCrumb = findPageTitle(currentPath)
+              const trail = matched ? matched.trail : []
+              const crumbs = (trail.length && trail[0] === baseCrumb) ? trail : [baseCrumb, ...trail]
+              return (
+                <div className="topbar__breadcrumb">
+                  <Home size={14} />
+                  <ChevronRight size={14} />
+                  {crumbs.map((crumb, idx) => (
+                    <span
+                      key={`${crumb}-${idx}`}
+                      className={idx === 0 ? 'topbar__breadcrumb-current' : 'topbar__breadcrumb-extra'}
                     >
-                      <div className="notification-item__icon">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="notification-item__content">
-                        <div className="notification-item__title">{notification.title}</div>
-                        <div className="notification-item__message">{notification.message}</div>
-                        <div className="notification-item__time">{formatRelativeTime(notification.time)}</div>
-                      </div>
-                      {!notification.read && <div className="notification-item__dot" />}
-                    </Link>
-                  ))
-                )}
-              </div>
-
-              <div className="notification-dropdown__footer">
-                <Link 
-                  to="/app/settings" 
-                  className="notification-dropdown__settings"
-                  onClick={() => setShowNotifications(false)}
-                >
-                  Cài đặt thông báo
-                </Link>
-              </div>
+                      {idx > 0 && <ChevronRight size={12} />}
+                      {crumb}
+                    </span>
+                  ))}
+                </div>
+              )
+            })()}
+            <div className="topbar__search">
+              <Search className="topbar__search-icon" />
+              <input
+                type="search"
+                className="topbar__search-input"
+                placeholder="Tìm kiếm cuộc họp, dự án, tài liệu..."
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+              />
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Help */}
-        <Link to="/about" className="topbar__icon-btn" title="Giới thiệu MeetMate">
-          <HelpCircle size={18} />
-        </Link>
-      </div>
+          <div className="topbar__right">
+            {/* Notifications */}
+            <div className="notification-wrapper" ref={dropdownRef}>
+              <button
+                className={`topbar__icon-btn ${unreadCount > 0 ? 'topbar__icon-btn--badge' : ''}`}
+                title="Thông báo"
+                onClick={() => setShowNotifications(!showNotifications)}
+                data-count={unreadCount > 9 ? '9+' : unreadCount}
+              >
+                <Bell size={18} />
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="notification-dropdown">
+                  <div className="notification-dropdown__header">
+                    <h3>Thông báo</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        className="notification-dropdown__mark-all"
+                        onClick={markAllAsRead}
+                      >
+                        <Check size={14} />
+                        Đánh dấu tất cả đã đọc
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="notification-dropdown__list">
+                    {notifications.length === 0 ? (
+                      <div className="notification-dropdown__empty">
+                        <Bell size={32} />
+                        <p>Không có thông báo mới</p>
+                      </div>
+                    ) : (
+                      notifications.map(notification => (
+                        <Link
+                          key={notification.id}
+                          to={notification.link || '#'}
+                          className={`notification-item ${!notification.read ? 'notification-item--unread' : ''}`}
+                          onClick={() => {
+                            markAsRead(notification.id)
+                            setShowNotifications(false)
+                          }}
+                        >
+                          <div className="notification-item__icon">
+                            {getNotificationIcon(notification.type)}
+                          </div>
+                          <div className="notification-item__content">
+                            <div className="notification-item__title">{notification.title}</div>
+                            <div className="notification-item__message">{notification.message}</div>
+                            <div className="notification-item__time">{formatRelativeTime(notification.time)}</div>
+                          </div>
+                          {!notification.read && <div className="notification-item__dot" />}
+                        </Link>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="notification-dropdown__footer">
+                    <Link
+                      to="/app/settings"
+                      className="notification-dropdown__settings"
+                      onClick={() => setShowNotifications(false)}
+                    >
+                      Cài đặt thông báo
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Help */}
+            <Link to="/about" className="topbar__icon-btn" title="Giới thiệu Minute">
+              <HelpCircle size={18} />
+            </Link>
+          </div>
         </>
       )}
     </header>

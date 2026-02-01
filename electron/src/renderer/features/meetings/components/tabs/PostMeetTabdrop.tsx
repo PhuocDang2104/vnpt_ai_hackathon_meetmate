@@ -247,7 +247,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
           <div class="content">${renderMarkdownToHtml(minutes.minutes_markdown || minutes.executive_summary || 'Không có nội dung')}</div>
         </div>
         <div class="footer">
-          <p>Biên bản được tạo bởi MeetMate AI</p>
+          <p>Biên bản được tạo bởi Minute AI</p>
           <p>Ngày xuất: ${new Date().toLocaleString('vi-VN')}</p>
         </div>
         <script>window.onload = function() { window.print(); }</script>
@@ -411,7 +411,7 @@ const SummarySection = ({ meeting }: { meeting: MeetingWithParticipants }) => {
           ) : (
             <div className="empty-minutes">
               <h4>Chưa có biên bản</h4>
-              <p>Nhấn "AI tạo biên bản" để MeetMate AI tự động tạo biên bản dựa trên nội dung cuộc họp</p>
+              <p>Nhấn "AI tạo biên bản" để Minute AI tự động tạo biên bản dựa trên nội dung cuộc họp</p>
               <button className="btn btn--accent" onClick={handleGenerateMinutes} disabled={isGenerating}>
                 AI tạo biên bản ngay
               </button>
@@ -1071,7 +1071,7 @@ const DistributionSection = ({ meeting }: { meeting: MeetingWithParticipants }) 
   useEffect(() => {
     if (minutes && meeting) {
       const startDate = new Date(meeting.start_time);
-      setEmailSubject(`[MeetMate] Biên bản cuộc họp: ${meeting.title} - ${startDate.toLocaleDateString('vi-VN')}`);
+      setEmailSubject(`[Minute] Biên bản cuộc họp: ${meeting.title} - ${startDate.toLocaleDateString('vi-VN')}`);
       setEmailBody(generateEmailBody());
     }
   }, [minutes, meeting]);
@@ -1106,10 +1106,10 @@ Thời gian: ${startDate.toLocaleDateString('vi-VN')} - ${startDate.toLocaleTime
 TÓM TẮT:
 ${summary}
 
-Vui lòng xem chi tiết biên bản đính kèm hoặc truy cập MeetMate để xem đầy đủ.
+Vui lòng xem chi tiết biên bản đính kèm hoặc truy cập Minute để xem đầy đủ.
 
 Trân trọng,
-MeetMate AI Assistant`;
+Minute AI Assistant`;
   };
 
   const handleOpenEmailModal = () => {

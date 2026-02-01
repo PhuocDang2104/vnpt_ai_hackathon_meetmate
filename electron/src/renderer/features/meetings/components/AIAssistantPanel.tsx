@@ -90,7 +90,7 @@ export const AIAssistantPanel = ({ meetingId }: AIAssistantPanelProps) => {
       <div className="ai-assistant__header">
         <div className="ai-assistant__title">
           <Sparkles size={20} />
-          <h3>MeetMate AI Assistant</h3>
+          <h3>Minute AI Assistant</h3>
         </div>
         <p className="ai-assistant__subtitle">
           Hỏi bất cứ điều gì về dự án, policy, hoặc context cuộc họp
@@ -106,7 +106,7 @@ export const AIAssistantPanel = ({ meetingId }: AIAssistantPanelProps) => {
         ) : responses.length === 0 ? (
           <div className="ai-assistant__empty">
             <MessageSquare size={32} className="text-muted" />
-            <p>Bắt đầu hỏi MeetMate AI</p>
+            <p>Bắt đầu hỏi Minute AI</p>
             <div className="suggested-questions">
               {SUGGESTED_QUESTIONS.map((q, i) => (
                 <button
@@ -132,7 +132,7 @@ export const AIAssistantPanel = ({ meetingId }: AIAssistantPanelProps) => {
                 <div className="ai-message ai-message--assistant">
                   <div className="ai-message__header">
                     <Sparkles size={14} />
-                    <span>MeetMate AI</span>
+                    <span>Minute AI</span>
                     <span className="ai-message__confidence">
                       {Math.round(response.confidence * 100)}% confidence
                     </span>
@@ -175,7 +175,7 @@ export const AIAssistantPanel = ({ meetingId }: AIAssistantPanelProps) => {
           <div className="ai-message ai-message--assistant ai-message--loading">
             <div className="ai-message__header">
               <Sparkles size={14} />
-              <span>MeetMate AI đang suy nghĩ...</span>
+              <span>Minute AI đang suy nghĩ...</span>
             </div>
             <div className="ai-message__loading-dots">
               <span></span>
